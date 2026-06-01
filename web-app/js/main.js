@@ -594,7 +594,9 @@ function restoreUploadSection(cachedEntries) {
     var beGeoId  = document.getElementById("lci-begeoid").value.trim();
     var region   = document.getElementById("lci-region").value;
     var week     = document.getElementById("lci-week").value;
-    var expected = "CPI_data_" + region + "_" + week + ".csv";
+    var expected = region === "DISTI"
+      ? "CPI_data_disti_" + week + ".csv"
+      : "CPI_data_" + region + "_" + week + ".csv";
     var errEl    = document.getElementById("lci-error");
     errEl.classList.add("d-none");
 
