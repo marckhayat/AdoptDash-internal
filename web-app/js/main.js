@@ -149,7 +149,7 @@ function handleCSV(file) {
       setTimeout(function() {
         try {
           APP_DATA = transformData(results.data);
-          finishLoad(file.name, APP_DATA.length, false, "workspan");
+          finishLoad(file.name, APP_DATA.length, false, "ws-" + file.name);
         } catch(err) {
           restoreUploadSection([]);
           console.error(err);
@@ -294,7 +294,7 @@ function parseCSVAndFinish(csvString, filename, headerAutoDetected) {
       setTimeout(function () {
         try {
           APP_DATA = transformData(results.data);
-          finishLoad(filename, APP_DATA.length, headerAutoDetected, "workspan");
+          finishLoad(filename, APP_DATA.length, headerAutoDetected, "ws-" + filename);
         } catch (err) {
           restoreUploadSection();
           console.error(err);
@@ -309,7 +309,7 @@ function parseCSVAndFinish(csvString, filename, headerAutoDetected) {
   });
 }
 
-function finishLoad(filename, rowCount, headerAutoDetected, idbType) {
+function finishLoad(filename, rowCount, headerAutoDetected, idbType, loadedAt) {
   // Save to IndexedDB (fire-and-forget)
   if (idbType && APP_DATA) {
     IDB.save(idbType, APP_DATA, {
@@ -328,14 +328,48 @@ function finishLoad(filename, rowCount, headerAutoDetected, idbType) {
   document.getElementById("status-rows").textContent =
     rowCount.toLocaleString() + " rows" +
     (headerAutoDetected ? " · header auto-detected" : "");
+  var dateEl = document.getElementById("status-date");
+  dateEl.textContent = "";
 
   var activeTab = document.querySelector(".nav-link.active[data-bs-target]");
   renderActiveTab(activeTab ? activeTab.dataset.bsTarget : "#tab-overview");
 }
 
-function restoreUploadSection() {
+function restoreUploadSection(cachedEntries) {
+  cachedEntries = cachedEntries || [];
   var sec = document.getElementById("upload-section");
   sec.classList.remove("d-none");
+
+  function fmtDate(iso) {
+    if (!iso) return "";
+    var d = new Date(iso);
+    return d.toLocaleDateString("en-GB") + " " + d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+  }
+
+  function resumeCard(entry) {
+    var isCpi = entry.type.indexOf("cpi-") === 0;
+    var beGeoId = isCpi ? entry.type.replace("cpi-", "") : "";
+    var html = '<div class="card border-success mb-2 p-2">';
+    html += '<div class="d-flex justify-content-between align-items-start gap-2">';
+    html += '<div style="min-width:0">';
+    if (isCpi) html += '<div class="fw-semibold small">BE GEO ID: ' + beGeoId + '</div>';
+    html += '<div class="text-muted small text-truncate" title="' + entry.meta.filename + '">' + entry.meta.filename + '</div>';
+    html += '<div class="text-muted" style="font-size:0.72rem">' + (entry.meta.rowCount||0).toLocaleString() + ' rows &middot; ' + fmtDate(entry.meta.loadedAt) + '</div>';
+    html += '</div>';
+    html += '<div class="d-flex gap-1 flex-shrink-0">';
+    html += '<button class="btn btn-sm btn-success idb-resume-btn py-0" data-idbtype="' + entry.type + '" title="Resume"><i class="bi bi-play-fill"></i></button>';
+    html += '<button class="btn btn-sm btn-outline-danger idb-clear-btn py-0" data-idbtype="' + entry.type + '" title="Delete"><i class="bi bi-trash"></i></button>';
+    html += '</div></div></div>';
+    return html;
+  }
+
+  // Split cached entries
+  var wsEntries = [];
+  var cpiEntries = [];
+  cachedEntries.forEach(function (e) {
+    if (e.type.indexOf("ws-") === 0) wsEntries.push(e);
+    else if (e.type.indexOf("cpi-") === 0) cpiEntries.push(e);
+  });
 
   // ── Compute week options: 2026W11 → current ISO week ──────────────────────
   function getISOWeek(date) {
@@ -348,119 +382,176 @@ function restoreUploadSection() {
   var now = getISOWeek(new Date());
   var weekOptions = "";
   for (var w = 11; w <= now.week; w++) {
-    var label = now.year + "W" + (w < 10 ? "0" + w : w);
+    var wLabel = now.year + "W" + (w < 10 ? "0" + w : w);
     var selected = (w === now.week) ? ' selected' : '';
-    weekOptions += '<option value="' + label + '"' + selected + '>' + label + '</option>';
+    weekOptions += '<option value="' + wLabel + '"' + selected + '>' + wLabel + '</option>';
   }
 
+  // ── Build two-column layout ────────────────────────────────────────────────
   sec.innerHTML =
-    '<div class="upload-card mx-auto my-5">' +
-    '  <div class="card shadow-sm">' +
-    '    <div class="card-body p-5 text-center">' +
-    '      <i class="bi bi-cloud-upload cisco-icon-lg mb-3"></i>' +
-    '      <h4 class="mb-2">Upload Workspan Export</h4>' +
-    '      <p class="text-muted mb-3">Upload your Workspan report export<br/>' +
-    '        <small><a href="https://app.workspan.com/reports/view/19849" target="_blank" rel="noopener"><strong>Report 19849</strong></a> for Partners &nbsp;|&nbsp; <a href="https://app.workspan.com/reports/view/21766" target="_blank" rel="noopener"><strong>Report 21766</strong></a> for Distributors</small>' +
-    '      </p>' +
-    '      <div class="alert alert-warning py-2 px-3 text-start small mb-4" style="max-width:440px;margin:0 auto;">' +
-    '        <i class="bi bi-exclamation-triangle me-1"></i>' +
-    '        <strong>For large exports (&gt;20 MB), use CSV.</strong><br/>' +
-    '        In Workspan: <em>Export → CSV</em>. CSV handles any number of rows.<br/>' +
-    '        Excel (.xlsx) works for files up to ~20 MB.' +
-    '      </div>' +
-    '      <label for="file-input" class="btn btn-cisco btn-lg mb-3 px-5">' +
-    '        <i class="bi bi-file-earmark-spreadsheet me-2"></i>Choose File (.xlsx or .csv)' +
-    '      </label>' +
-    '      <input type="file" id="file-input" accept=".xlsx,.xls,.csv" class="d-none" />' +
-    '      <p class="text-muted small mt-2">' +
-    '        <i class="bi bi-shield-lock me-1"></i>' +
-    '        File is processed entirely in your browser — no data is sent to any server.' +
-    '      </p>' +
-    '    </div>' +
-    '  </div>' +
+    '<div class="container-fluid py-4" style="max-width:1100px">' +
+    '<div class="row g-4">' +
+
+    // ── LEFT: Partner column ──────────────────────────────────────────────────
+    '<div class="col-12 col-lg-6">' +
+
+    // Partner upload card
+    '<div class="card shadow-sm mb-3">' +
+    '<div class="card-header fw-semibold" style="font-size:0.9rem"><i class="bi bi-people-fill me-2 text-primary"></i>Partners — Upload Workspan Export</div>' +
+    '<div class="card-body p-4 text-center">' +
+    '<i class="bi bi-cloud-upload cisco-icon-lg mb-3"></i>' +
+    '<p class="text-muted mb-3">Upload your Workspan report export<br/>' +
+    '<small><a href="https://app.workspan.com/reports/view/19849" target="_blank" rel="noopener"><strong>Report 19849</strong></a> for Partners &nbsp;|&nbsp; <a href="https://app.workspan.com/reports/view/21766" target="_blank" rel="noopener"><strong>Report 21766</strong></a> for Distributors</small>' +
+    '</p>' +
+    '<div class="alert alert-warning py-2 px-3 text-start small mb-4" style="max-width:380px;margin:0 auto;">' +
+    '<i class="bi bi-exclamation-triangle me-1"></i><strong>For large exports (&gt;20 MB), use CSV.</strong><br/>' +
+    'In Workspan: <em>Export → CSV</em>. CSV handles any number of rows.' +
     '</div>' +
+    '<label for="file-input" class="btn btn-cisco btn-lg mb-3 px-5"><i class="bi bi-file-earmark-spreadsheet me-2"></i>Choose File (.xlsx or .csv)</label>' +
+    '<input type="file" id="file-input" accept=".xlsx,.xls,.csv" class="d-none" />' +
+    '<p class="text-muted small mt-2"><i class="bi bi-shield-lock me-1"></i>File processed entirely in your browser — no data sent to any server.</p>' +
+    '</div></div>' +
 
-    // ── Cisco-internal section ─────────────────────────────────────────────
-    '<div class="upload-card mx-auto mb-5">' +
-    '  <div class="card shadow-sm border-warning">' +
-    '    <div class="card-header bg-warning bg-opacity-10 fw-semibold" style="font-size:0.9rem">' +
-    '      <i class="bi bi-lock-fill me-2 text-warning"></i>Cisco-internal only' +
-    '    </div>' +
-    '    <div class="card-body p-4">' +
-    '      <p class="text-muted small mb-3">Load a pre-built LCI data file from the shared OneDrive folder, filtered to a specific BE GEO ID.</p>' +
-    '      <div class="mb-3" style="max-width:600px;margin:0 auto">' +
-    '        <label class="form-label small fw-semibold mb-1"><i class="bi bi-folder me-1"></i>OneDrive base path <span class="text-muted fw-normal">(saved per browser)</span></label>' +
-    '        <div class="input-group input-group-sm">' +
-    '          <input type="text" id="lci-basepath" class="form-control form-control-sm" style="font-family:monospace;font-size:0.78rem"/>' +
-    '          <button id="lci-savepath-btn" class="btn btn-outline-secondary" title="Save path"><i class="bi bi-floppy"></i></button>' +
-    '        </div>' +
-    '        <div class="form-text">Change the username part to match your own Windows profile, then click save.</div>' +
-    '      </div>' +
-    '      <div class="row g-3 mb-3 justify-content-center">' +
-    '        <div class="col-auto">' +
-    '          <label class="form-label small fw-semibold mb-1">Region</label>' +
-    '          <select id="lci-region" class="form-select form-select-sm">' +
-    '            <option value="EMEA">EMEA</option>' +
-    '            <option value="AMER">AMER</option>' +
-    '            <option value="APJC">APJC</option>' +
-    '            <option value="DISTI">DISTI</option>' +
-    '          </select>' +
-    '        </div>' +
-    '        <div class="col-auto">' +
-    '          <label class="form-label small fw-semibold mb-1">Week</label>' +
-    '          <select id="lci-week" class="form-select form-select-sm">' + weekOptions + '</select>' +
-    '        </div>' +
-    '        <div class="col-auto">' +
-    '          <label class="form-label small fw-semibold mb-1">BE GEO ID</label>' +
-    '          <input type="number" id="lci-begeoid" class="form-control form-control-sm" placeholder="e.g. 12345" style="width:130px"/>' +
-    '        </div>' +
-    '      </div>' +
-    '      <div id="lci-path-hint" class="alert alert-secondary py-2 px-3 text-start small mb-3 d-none" style="max-width:600px;margin:0 auto">' +
-    '        <span id="lci-path-text" style="word-break:break-all;font-family:monospace"></span>' +
-    '        <button id="lci-copy-btn" class="btn btn-sm btn-outline-secondary ms-2 py-0" title="Copy path"><i class="bi bi-clipboard"></i></button>' +
-    '      </div>' +
-    '      <div id="lci-error" class="alert alert-danger py-2 px-3 small mb-3 d-none" style="max-width:500px;margin:0 auto"></div>' +
-    '      <button id="lci-load-btn" class="btn btn-warning px-4">' +
-    '        <i class="bi bi-folder2-open me-2"></i>Select LCI file…' +
-    '      </button>' +
-    '      <input type="file" id="lci-file-input" accept=".xlsx,.xls" class="d-none" />' +
-    '      <p class="text-muted small mt-3 mb-0">Navigate to the displayed path and select the file.</p>' +
-    '    </div>' +
-    '  </div>' +
-    '</div>';
+    // Previous partner sessions
+    (wsEntries.length > 0 ?
+      '<div class="card shadow-sm border-success">' +
+      '<div class="card-header bg-success bg-opacity-10 fw-semibold" style="font-size:0.85rem"><i class="bi bi-lightning-charge-fill me-2 text-success"></i>Previous partner sessions</div>' +
+      '<div class="card-body p-2">' + wsEntries.map(resumeCard).join("") + '</div>' +
+      '</div>'
+    : '') +
 
-  var fi = document.getElementById("file-input");
-  if (fi) fi.addEventListener("change", handleFileUpload);
+    '</div>' + // /left col
 
-  // ── LCI path hint updater ─────────────────────────────────────────────────
-  var DEFAULT_BASE = "C:\\Users\\YOUR_USERNAME\\OneDrive - Cisco\\Documents - CX Partner Success TEAM\\PCSS Team\\Dashboards and Reporting Metrics\\Adoption Dashboard";
-  var savedBase = localStorage.getItem("lci-basepath") || DEFAULT_BASE;
-  document.getElementById("lci-basepath").value = savedBase;
+    // ── RIGHT: Cisco-internal column ──────────────────────────────────────────
+    '<div class="col-12 col-lg-6">' +
 
-  if (!localStorage.getItem("lci-basepath")) {
-    document.getElementById("lci-basepath").classList.add("is-invalid");
-    document.getElementById("lci-basepath").focus();
+    // Cisco CPI card
+    '<div class="card shadow-sm border-warning mb-3">' +
+    '<div class="card-header bg-warning bg-opacity-10 fw-semibold" style="font-size:0.9rem"><i class="bi bi-lock-fill me-2 text-warning"></i>Cisco-internal — CPI Data</div>' +
+    '<div class="card-body p-4">' +
+    '<p class="text-muted small mb-3">Load a CPI data file from the shared OneDrive folder, filtered to a specific BE GEO ID.</p>' +
+    '<div class="mb-3">' +
+    '<label class="form-label small fw-semibold mb-1"><i class="bi bi-person-badge-fill me-1"></i>Your Cisco username</label>' +
+    '<div class="input-group input-group-sm" style="max-width:320px">' +
+    '<input type="text" id="lci-username" class="form-control form-control-sm" placeholder="e.g. jsmith" style="font-family:monospace"/>' +
+    '</div>' +
+    '<div class="form-text">Your Cisco username (same as your laptop login). Saved per browser.</div>' +
+    '<div class="mt-2 collapse" id="lci-path-advanced">' +
+    '<label class="form-label small fw-semibold mb-1"><i class="bi bi-folder me-1"></i>Full base path <span class="text-muted fw-normal">(auto-filled, override if needed)</span></label>' +
+    '<input type="text" id="lci-basepath" class="form-control form-control-sm" style="font-family:monospace;font-size:0.78rem"/>' +
+    '</div>' +
+    '<a href="#" class="small" id="lci-toggle-advanced">Advanced: edit full path manually</a>' +
+    '</div>' +
+    '<div class="row g-2 mb-3">' +
+    '<div class="col-auto"><label class="form-label small fw-semibold mb-1">Region</label>' +
+    '<select id="lci-region" class="form-select form-select-sm">' +
+    '<option value="EMEA">EMEA</option><option value="AMER">AMER</option><option value="APJC">APJC</option><option value="DISTI">DISTI</option>' +
+    '</select></div>' +
+    '<div class="col-auto"><label class="form-label small fw-semibold mb-1">Week</label>' +
+    '<select id="lci-week" class="form-select form-select-sm">' + weekOptions + '</select></div>' +
+    '<div class="col-auto"><label class="form-label small fw-semibold mb-1">BE GEO ID</label>' +
+    '<input type="number" id="lci-begeoid" class="form-control form-control-sm" placeholder="e.g. 12345" style="width:130px"/></div>' +
+    '</div>' +
+    '<div id="lci-path-hint" class="alert alert-secondary py-2 px-3 text-start small mb-3 d-none">' +
+    '<span id="lci-path-text" style="word-break:break-all;font-family:monospace"></span>' +
+    '<button id="lci-copy-btn" class="btn btn-sm btn-outline-secondary ms-2 py-0" title="Copy path"><i class="bi bi-clipboard"></i></button>' +
+    '</div>' +
+    '<div id="lci-error" class="alert alert-danger py-2 px-3 small mb-3 d-none"></div>' +
+    '<button id="lci-load-btn" class="btn btn-warning px-4"><i class="bi bi-folder2-open me-2"></i>Select CPI file…</button>' +
+    '<input type="file" id="lci-file-input" accept=".csv" class="d-none" />' +
+    '<p class="text-muted small mt-3 mb-0">Navigate to the displayed path and select the file.</p>' +
+    '</div></div>' +
+
+    // Previous CPI sessions
+    (cpiEntries.length > 0 ?
+      '<div class="card shadow-sm border-warning">' +
+      '<div class="card-header bg-warning bg-opacity-10 fw-semibold" style="font-size:0.85rem"><i class="bi bi-lightning-charge-fill me-2 text-warning"></i>Previous CPI sessions</div>' +
+      '<div class="card-body p-2">' +
+      cpiEntries.map(resumeCard).join("") +
+      '</div></div>'
+    : '') +
+
+    '</div>' + // /right col
+    '</div></div>'; // /row /container
+
+  // ── Wire up file inputs ───────────────────────────────────────────────────
+  document.getElementById("file-input").addEventListener("change", handleFileUpload);
+
+  // ── Resume / Clear cache buttons ─────────────────────────────────────────
+  sec.querySelectorAll(".idb-resume-btn").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var type = this.dataset.idbtype;
+      showLoader("Loading from cache…");
+      IDB.load(type).then(function (entry) {
+        if (!entry || !entry.data) { IDB.loadAll().then(function(e){restoreUploadSection(e);}); alert("Cache not found."); return; }
+        APP_DATA = entry.data;
+        APP_FILE_META = { name: entry.meta.filename, lastModified: null, cachedAt: entry.meta.loadedAt ? new Date(entry.meta.loadedAt) : null };
+        finishLoad(entry.meta.filename, entry.meta.rowCount, false, null, entry.meta.loadedAt);
+      }).catch(function (e) { IDB.loadAll().then(function(en){restoreUploadSection(en);}); alert("Error loading cache: " + e); });
+    });
+  });
+
+  sec.querySelectorAll(".idb-clear-btn").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      IDB.remove(this.dataset.idbtype).then(function () {
+        IDB.loadAll().then(function (entries) { restoreUploadSection(entries); });
+      });
+    });
+  });
+
+  // ── CPI path hint ─────────────────────────────────────────────────────────
+  var isMac = navigator.platform.indexOf("Mac") !== -1 || navigator.userAgent.indexOf("Mac") !== -1;
+  var SEP = isMac ? "/" : "\\";
+
+  function buildBasePath(username) {
+    if (!username) return "";
+    return isMac
+      ? "/Users/" + username + "/Library/CloudStorage/OneDrive-Cisco/Documents - CX Partner Success TEAM/PCSS Team/Dashboards and Reporting Metrics/Adoption Dashboard"
+      : "C:\\Users\\" + username + "\\OneDrive - Cisco\\Documents - CX Partner Success TEAM\\PCSS Team\\Dashboards and Reporting Metrics\\Adoption Dashboard";
   }
 
-  document.getElementById("lci-savepath-btn").addEventListener("click", function () {
-    var val = document.getElementById("lci-basepath").value.trim();
-    if (val) {
-      localStorage.setItem("lci-basepath", val);
-      this.innerHTML = '<i class="bi bi-check-lg"></i>';
-      setTimeout(function () {
-        document.getElementById("lci-savepath-btn").innerHTML = '<i class="bi bi-floppy"></i>';
-      }, 1500);
-      updateLciHint();
+  // Restore saved username and base path
+  var savedUsername = localStorage.getItem("lci-username") || "";
+  var savedBase     = localStorage.getItem("lci-basepath") || buildBasePath(savedUsername);
+  document.getElementById("lci-username").value  = savedUsername;
+  document.getElementById("lci-basepath").value  = savedBase || "";
+  if (!savedUsername) document.getElementById("lci-username").classList.add("is-invalid");
+
+  // Toggle advanced path editor
+  document.getElementById("lci-toggle-advanced").addEventListener("click", function (e) {
+    e.preventDefault();
+    var el = document.getElementById("lci-path-advanced");
+    var isShown = el.classList.contains("show");
+    el.classList.toggle("show", !isShown);
+    this.textContent = isShown ? "Advanced: edit full path manually" : "Hide full path";
+  });
+
+  // Username input → auto-build base path
+  document.getElementById("lci-username").addEventListener("input", function () {
+    var u = this.value.trim();
+    this.classList.toggle("is-invalid", !u);
+    if (u) {
+      localStorage.setItem("lci-username", u);
+      var built = buildBasePath(u);
+      document.getElementById("lci-basepath").value = built;
+      localStorage.setItem("lci-basepath", built);
     }
+    updateLciHint();
+  });
+
+  // Manual path override updates hint live and auto-saves
+  document.getElementById("lci-basepath").addEventListener("input", function () {
+    localStorage.setItem("lci-basepath", this.value.trim());
+    updateLciHint();
   });
 
   function lciPath() {
-    var base   = (document.getElementById("lci-basepath").value.trim() || DEFAULT_BASE).replace(/[\\/]+$/, "");
+    var u    = document.getElementById("lci-username").value.trim();
+    var base = (document.getElementById("lci-basepath").value.trim() || buildBasePath(u) || "").replace(/[\\/]+$/, "");
     var region = document.getElementById("lci-region").value;
     var week   = document.getElementById("lci-week").value;
     var folder = "LCI data " + region;
-    var file   = "CPI_data_" + region + "_" + week + ".xlsx";
-    return base + "\\" + folder + "\\" + file;
+    return base + SEP + folder + SEP + "CPI_data_" + region + "_" + week + ".csv";
   }
 
   function updateLciHint() {
@@ -502,7 +593,7 @@ function restoreUploadSection() {
     var beGeoId  = document.getElementById("lci-begeoid").value.trim();
     var region   = document.getElementById("lci-region").value;
     var week     = document.getElementById("lci-week").value;
-    var expected = "CPI_data_" + region + "_" + week + ".xlsx";
+    var expected = "CPI_data_" + region + "_" + week + ".csv";
     var errEl    = document.getElementById("lci-error");
     errEl.classList.add("d-none");
 
@@ -513,66 +604,38 @@ function restoreUploadSection() {
       return;
     }
 
-    showLoader("Reading LCI file…");
-    var reader = new FileReader();
-    reader.onload = function (ev) {
-      setTimeout(function () {
+    showLoader("Reading CPI file…");
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      dynamicTyping: false,
+      worker: false,
+      complete: function (results) {
         try {
-          updateLoaderMsg("Parsing Excel — this may take a moment…");
-          var wb = XLSX.read(ev.target.result, {
-            type: "array", cellDates: false, cellHTML: false, cellStyles: false,
-            dense: true   // dense mode uses less memory
-          });
-
-          // Find sheet with known columns
-          var ws = null;
-          for (var si = 0; si < wb.SheetNames.length; si++) {
-            var candidate = wb.Sheets[wb.SheetNames[si]];
-            var preview = XLSX.utils.sheet_to_json(candidate, { header: 1, defval: null, raw: true, sheetRows: 20 });
-            var hi = findHeaderRowIndex(preview);
-            if (preview[hi]) { ws = candidate; break; }
-          }
-          if (!ws) ws = wb.Sheets[wb.SheetNames[0]];
-
-          // Convert to CSV (memory-efficient for large files) then parse with PapaParse + filter
-          updateLoaderMsg("Converting to CSV…");
-          var csvString = XLSX.utils.sheet_to_csv(ws, { defval: "" });
-
+          if (!results.data || results.data.length === 0) throw new Error("No data found in CSV.");
           updateLoaderMsg("Filtering for BE GEO ID " + beGeoId + "…");
-          var parsed = Papa.parse(csvString, {
-            header: true,
-            skipEmptyLines: true,
-            dynamicTyping: false
-          });
-
-          if (!parsed.data || parsed.data.length === 0) {
-            throw new Error("No data found in file after conversion.");
-          }
-
-          // Log columns for debugging
-          console.log("[LCI] columns:", Object.keys(parsed.data[0]).slice(0, 8));
-
-          var filtered = parsed.data.filter(function (r) {
+          var filtered = results.data.filter(function (r) {
             return String(r["BE GEO ID"] || "").trim() === beGeoId;
           });
-
           if (filtered.length === 0) {
-            restoreUploadSection();
+            IDB.loadAll().then(function(e){restoreUploadSection(e);});
             alert("No rows found for BE GEO ID " + beGeoId + " in " + file.name + ".\nPlease check the ID and try again.");
             return;
           }
-
           updateLoaderMsg("Processing " + filtered.length + " rows…");
           APP_DATA = transformData(filtered);
-          finishLoad(file.name + " · BE GEO ID " + beGeoId, APP_DATA.length, false, "lci");
+          finishLoad(file.name + " · BE GEO ID " + beGeoId, APP_DATA.length, false, "cpi-" + beGeoId);
         } catch (err) {
-          restoreUploadSection();
+          IDB.loadAll().then(function(e){restoreUploadSection(e);});
           console.error(err);
-          alert("Error processing LCI file: " + err.message);
+          alert("Error processing CPI file: " + err.message);
         }
-      }, 50);
-    };
-    reader.readAsArrayBuffer(file);
+      },
+      error: function (err) {
+        IDB.loadAll().then(function(e){restoreUploadSection(e);});
+        alert("Error reading CSV: " + err.message);
+      }
+    });
   });
 }
 
@@ -600,7 +663,12 @@ function resetApp() {
     if (pane) pane.innerHTML = "";
   });
 
-  restoreUploadSection();
+  // Reload cache entries so resume cards show after reset
+  IDB.loadAll().then(function (entries) {
+    restoreUploadSection(entries);
+  }).catch(function () {
+    restoreUploadSection([]);
+  });
 
   // Activate overview tab
   var overviewBtn = document.getElementById("tab-overview-btn");

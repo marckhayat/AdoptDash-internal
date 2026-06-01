@@ -81,8 +81,13 @@ function renderOverview(data) {
 
   // File metadata
   var fileDateLabel = "";
-  if (window.APP_FILE_META && window.APP_FILE_META.lastModified) {
+  var fileDateCaption = "File Date";
+  if (window.APP_FILE_META && window.APP_FILE_META.cachedAt) {
+    fileDateLabel = window.APP_FILE_META.cachedAt.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+    fileDateCaption = "Cached";
+  } else if (window.APP_FILE_META && window.APP_FILE_META.lastModified) {
     fileDateLabel = window.APP_FILE_META.lastModified.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+    fileDateCaption = "File Date";
   }
   var fileName  = (window.APP_FILE_META && window.APP_FILE_META.name)  ? window.APP_FILE_META.name  : "";
   var rowsLabel = (window.APP_DATA) ? window.APP_DATA.length.toLocaleString() + " rows" : "";
@@ -92,7 +97,7 @@ function renderOverview(data) {
   html += '<div><span class="text-muted small">Partner</span><br/><strong class="fs-6">' + escHtml(partnerLabel) + '</strong></div>';
   html += '<div><span class="text-muted small">BE GEO ID</span><br/><strong class="fs-6">' + escHtml(beGeoLabel) + '</strong></div>';
   if (fileDateLabel) {
-    html += '<div><span class="text-muted small">File Date</span><br/><strong class="fs-6">' + escHtml(fileDateLabel) + '</strong></div>';
+    html += '<div><span class="text-muted small">' + fileDateCaption + '</span><br/><strong class="fs-6">' + escHtml(fileDateLabel) + '</strong></div>';
   }
   html += '</div>';
 
@@ -200,8 +205,11 @@ function renderOverview(data) {
 
     var colHeaders = [
       "Total UC Eligible<br>w/o opt-in","Total Potential<br>Incentives",
-      "UC 25-50%<br>eligible","Potential Incentives<br>(25-50%)",
-      "UC 75%<br>eligible","Missed<br>Incentives (75%)","Potential Incentives<br>(75%)",
+      "UC Eligible w/o opt-in<br><small class='text-success fw-normal'><i class='bi bi-check-circle-fill'></i> Onboard &nbsp;<i class='bi bi-check-circle-fill'></i> Use</small>",
+      "Potential Incentives<br><small class='text-success fw-normal'><i class='bi bi-check-circle-fill'></i> Onboard &nbsp;<i class='bi bi-check-circle-fill'></i> Use</small>",
+      "UC Eligible w/o opt-in<br><small class='fw-normal'><i class='bi bi-check-circle-fill'></i> Engage</small>",
+      "Missed Incentives<br><small class='fw-normal'><i class='bi bi-check-circle-fill'></i> Engage</small>",
+      "Potential Incentives<br><small class='fw-normal'><i class='bi bi-check-circle-fill'></i> Engage</small>",
       "UC progressed<br>and missed","Missed Incentives<br>(progressed)",
       "Active<br>Opted-in UC","Potential Incentives<br>(opted-in)",
       "Progressed<br>opted-in UC","Est. Earned<br>Incentives"
