@@ -107,9 +107,26 @@ function transformData(rawRows) {
     if (aapMatches.length) aapColumnKey = aapMatches[0];
   }
 
+  // ── One-time: detect Disti mode and map column keys ─────────────────────
+  var distiColKey = null;
+  var twoTColKey  = null;
+  if (rawRows.length > 0) {
+    var keys = Object.keys(rawRows[0]);
+    distiColKey = keys.find(function(k) { return k.trim().toLowerCase() === "disti name"; }) || null;
+    twoTColKey  = keys.find(function(k) { return k.trim().toLowerCase().indexOf("2t partner name") !== -1; }) || null;
+  }
+  window.APP_IS_DISTI = distiColKey !== null &&
+    rawRows.some(function(r) { return r[distiColKey] && String(r[distiColKey]).trim() !== ""; });
+
   // ── Main transformation ───────────────────────────────────────────────────
   return rawRows.map(function (raw) {
     var r = Object.assign({}, raw); // shallow copy
+
+    // Map disti columns to standard names
+    if (window.APP_IS_DISTI) {
+      if (distiColKey) r["Disti name"] = r[distiColKey];           // ensure consistent key for overview
+      if (twoTColKey)  r["2T Partner Name"] = r[twoTColKey] || ""; // for Details/Customer columns
+    }
 
     // Step 2: Fix offer name (Integrated Secure Operations → Cisco Secure Network Analytics)
     if (norm(r["Track"]) === "INTEGRATED SECURE OPERATIONS") {

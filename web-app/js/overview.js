@@ -69,8 +69,14 @@ function renderOverview(data) {
 
   var partnerNames = uniqueVals("Partner Name");
   var beGeoIds     = uniqueVals("BE GEO ID");
+  var isDisti      = !!window.APP_IS_DISTI;
+  var distiNames   = isDisti ? uniqueVals("Disti name") : [];
+
   var partnerLabel = partnerNames.length === 1 ? partnerNames[0]
                    : partnerNames.length  >  1 ? partnerNames.slice(0, 3).join(", ") + (partnerNames.length > 3 ? " +" + (partnerNames.length - 3) + " more" : "")
+                   : "—";
+  var distiLabel   = distiNames.length === 1 ? distiNames[0]
+                   : distiNames.length  >  1 ? distiNames.slice(0, 3).join(", ") + (distiNames.length > 3 ? " +" + (distiNames.length - 3) + " more" : "")
                    : "—";
   var beGeoLabel   = beGeoIds.length === 1 ? beGeoIds[0]
                    : beGeoIds.length  >  1 ? beGeoIds.slice(0, 4).join(", ") + (beGeoIds.length > 4 ? " +" + (beGeoIds.length - 4) + " more" : "")
@@ -94,7 +100,11 @@ function renderOverview(data) {
 
   // Partner / BE GEO / file date / file info header — all in one bar
   html += '<div class="d-flex flex-wrap gap-4 align-items-center mb-3 px-1 py-2 border-bottom">';
-  html += '<div><span class="text-muted small">Partner</span><br/><strong class="fs-6">' + escHtml(partnerLabel) + '</strong></div>';
+  if (isDisti) {
+    html += '<div><span class="text-muted small">Distributor</span><br/><strong class="fs-6">' + escHtml(distiLabel) + '</strong></div>';
+  } else {
+    html += '<div><span class="text-muted small">Partner</span><br/><strong class="fs-6">' + escHtml(partnerLabel) + '</strong></div>';
+  }
   html += '<div><span class="text-muted small">BE GEO ID</span><br/><strong class="fs-6">' + escHtml(beGeoLabel) + '</strong></div>';
   if (fileDateLabel) {
     html += '<div><span class="text-muted small">' + fileDateCaption + '</span><br/><strong class="fs-6">' + escHtml(fileDateLabel) + '</strong></div>';

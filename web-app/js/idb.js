@@ -74,5 +74,17 @@ var IDB = (function () {
     });
   }
 
-  return { save: save, load: load, remove: remove, loadAll: loadAll };
+  function clearAll() {
+    return open().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        var tx    = db.transaction(STORE, "readwrite");
+        var store = tx.objectStore(STORE);
+        var req   = store.clear();
+        req.onsuccess = resolve;
+        req.onerror   = function (e) { reject(e.target.error); };
+      });
+    });
+  }
+
+  return { save: save, load: load, remove: remove, loadAll: loadAll, clearAll: clearAll };
 })();

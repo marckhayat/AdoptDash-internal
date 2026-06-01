@@ -5,6 +5,7 @@
 // Store file metadata globally so tabs can access it
 var APP_DATA = null;
 var APP_FILE_META = null;
+var APP_IS_DISTI = false;
 
 // Workspan column names used to auto-detect the header row
 var KNOWN_COLUMNS = [
@@ -310,18 +311,46 @@ function parseCSVAndFinish(csvString, filename, headerAutoDetected) {
 }
 
 function finishLoad(filename, rowCount, headerAutoDetected, idbType, loadedAt) {
+  // Sync disti flag — detect from data if transformData didn't run (cache load)
+  APP_IS_DISTI = !!window.APP_IS_DISTI ||
+    !!(APP_DATA && APP_DATA.length > 0 && APP_DATA.some(function(r) {
+      return r["Disti name"] && String(r["Disti name"]).trim() !== "";
+    }));
+  window.APP_IS_DISTI = APP_IS_DISTI;
+
+  // Extract display name from data
+  var displayName = "";
+  if (APP_DATA && APP_DATA.length > 0) {
+    if (APP_IS_DISTI) {
+      var distiNames = [];
+      APP_DATA.forEach(function(r) { if (r["Disti name"]) distiNames.push(String(r["Disti name"]).trim()); });
+      var uniqueDisti = Array.from(new Set(distiNames)).filter(Boolean);
+      displayName = uniqueDisti.slice(0, 2).join(", ") + (uniqueDisti.length > 2 ? " +" + (uniqueDisti.length - 2) + " more" : "");
+    } else {
+      var partnerNames = [];
+      APP_DATA.forEach(function(r) { if (r["Partner Name"]) partnerNames.push(String(r["Partner Name"]).trim()); });
+      var uniquePartners = Array.from(new Set(partnerNames)).filter(Boolean);
+      displayName = uniquePartners.slice(0, 2).join(", ") + (uniquePartners.length > 2 ? " +" + (uniquePartners.length - 2) + " more" : "");
+    }
+  }
+
   // Save to IndexedDB (fire-and-forget)
   if (idbType && APP_DATA) {
     IDB.save(idbType, APP_DATA, {
-      filename:  filename,
-      rowCount:  rowCount,
-      loadedAt:  new Date().toISOString()
+      filename:    filename,
+      rowCount:    rowCount,
+      loadedAt:    new Date().toISOString(),
+      displayName: displayName,
+      isDisti:     APP_IS_DISTI
     }).catch(function (e) { console.warn("IDB save failed:", e); });
   }
 
   restoreUploadSection([]);  // clear upload section
   document.getElementById("upload-section").classList.add("d-none");
   document.getElementById("main-tab-bar").classList.remove("d-none");
+
+  var pviTab = document.getElementById("tab-pvi-btn");
+  if (pviTab) pviTab.closest("li").classList.toggle("d-none", APP_IS_DISTI);
   var sb = document.getElementById("status-bar");
   sb.classList.remove("d-none");
   sb.classList.add("d-flex");
@@ -350,10 +379,11 @@ function restoreUploadSection(cachedEntries) {
   function resumeCard(entry) {
     var isCpi = entry.type.indexOf("cpi-") === 0;
     var beGeoId = isCpi ? entry.type.replace("cpi-", "") : "";
+    var displayName = entry.meta.displayName || "";
     var html = '<div class="card border-success mb-2 p-2">';
     html += '<div class="d-flex justify-content-between align-items-start gap-2">';
     html += '<div style="min-width:0">';
-    if (isCpi) html += '<div class="fw-semibold small">BE GEO ID: ' + beGeoId + '</div>';
+    if (isCpi) html += '<div class="fw-semibold small">' + (displayName || beGeoId) + '</div>';
     html += '<div class="text-muted small text-truncate" title="' + entry.meta.filename + '">' + entry.meta.filename + '</div>';
     html += '<div class="text-muted" style="font-size:0.72rem">' + (entry.meta.rowCount||0).toLocaleString() + ' rows &middot; ' + fmtDate(entry.meta.loadedAt) + '</div>';
     html += '</div>';
@@ -473,7 +503,12 @@ function restoreUploadSection(cachedEntries) {
     : '') +
 
     '</div>' + // /right col
-    '</div></div>'; // /row /container
+    '</div>' +
+    // ── Clear all data button ─────────────────────────────────────────────
+    '<div class="text-center mt-2 mb-1">' +
+    '<button id="clear-all-btn" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash me-1"></i>Clear all browser data</button>' +
+    '</div>' +
+    '</div>'; // /container
 
   // ── Wire up file inputs ───────────────────────────────────────────────────
   document.getElementById("file-input").addEventListener("change", handleFileUpload);
@@ -487,6 +522,7 @@ function restoreUploadSection(cachedEntries) {
         if (!entry || !entry.data) { IDB.loadAll().then(function(e){restoreUploadSection(e);}); alert("Cache not found."); return; }
         APP_DATA = entry.data;
         APP_FILE_META = { name: entry.meta.filename, lastModified: null, cachedAt: entry.meta.loadedAt ? new Date(entry.meta.loadedAt) : null };
+        window.APP_IS_DISTI = !!entry.meta.isDisti;
         finishLoad(entry.meta.filename, entry.meta.rowCount, false, null, entry.meta.loadedAt);
       }).catch(function (e) { IDB.loadAll().then(function(en){restoreUploadSection(en);}); alert("Error loading cache: " + e); });
     });
@@ -497,6 +533,14 @@ function restoreUploadSection(cachedEntries) {
       IDB.remove(this.dataset.idbtype).then(function () {
         IDB.loadAll().then(function (entries) { restoreUploadSection(entries); });
       });
+    });
+  });
+
+  document.getElementById("clear-all-btn").addEventListener("click", function () {
+    if (!confirm("This will delete all cached sessions and your saved username. Continue?")) return;
+    IDB.clearAll().then(function () {
+      localStorage.clear();
+      restoreUploadSection([]);
     });
   });
 
@@ -628,6 +672,7 @@ function restoreUploadSection(cachedEntries) {
           }
           updateLoaderMsg("Processing " + filtered.length + " rows…");
           APP_DATA = transformData(filtered);
+          APP_FILE_META = { name: file.name, lastModified: file.lastModified ? new Date(file.lastModified) : null };
           finishLoad(file.name + " · BE GEO ID " + beGeoId, APP_DATA.length, false, "cpi-" + beGeoId);
         } catch (err) {
           IDB.loadAll().then(function(e){restoreUploadSection(e);});
@@ -661,6 +706,12 @@ function resetApp() {
   sb.classList.remove("d-flex");
   sb.classList.add("d-none");
   document.getElementById("main-tab-bar").classList.add("d-none");
+
+  // Reset disti mode — restore PVI tab
+  APP_IS_DISTI = false;
+  window.APP_IS_DISTI = false;
+  var pviTab = document.getElementById("tab-pvi-btn");
+  if (pviTab) pviTab.closest("li").classList.remove("d-none");
 
   // Clear all tab panes
   ["tab-overview","tab-details","tab-customer","tab-pvi","tab-lifecycle","tab-cpi-adopt"].forEach(function (id) {

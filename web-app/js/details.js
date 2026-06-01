@@ -131,6 +131,10 @@ function renderDetails(data) {
   // Sidebar filters
   html += '<div class="filter-sidebar flex-shrink-0">';
   html += '<div class="fw-bold mb-2" style="font-size:0.8rem;color:var(--cisco-dark)"><i class="bi bi-funnel me-1"></i>Filters</div>';
+  var has2TPartner = data.some(function (r) { return r["2T Partner Name"] && String(r["2T Partner Name"]).trim() !== ""; });
+  if (has2TPartner) {
+    html += '<div class="filter-group"><div class="position-relative"><input type="text" id="filter-2tpartner" class="form-control form-control-sm pe-4" placeholder="&#128269; 2T Partner Name..." /><button id="det-2tpartner-clear" type="button" class="btn btn-link p-0 position-absolute top-50 end-0 translate-middle-y me-2 d-none" style="font-size:0.8rem;color:#999;line-height:1" tabindex="-1"><i class="bi bi-x-lg"></i></button></div></div>';
+  }
   html += '<div class="filter-group"><div class="position-relative"><input type="text" id="filter-crparty" class="form-control form-control-sm pe-4" placeholder="&#128269; CR Party Name..." /><button id="det-crparty-clear" type="button" class="btn btn-link p-0 position-absolute top-50 end-0 translate-middle-y me-2 d-none" style="font-size:0.8rem;color:#999;line-height:1" tabindex="-1"><i class="bi bi-x-lg"></i></button></div></div>';
 
   // Quick-toggle filters
@@ -199,6 +203,19 @@ function renderDetails(data) {
   el.querySelectorAll('input[type=checkbox]').forEach(function (cb) {
     cb.addEventListener("change", function () { currentPage = 1; applyFiltersAndRender(); });
   });
+  if (document.getElementById("filter-2tpartner")) {
+    document.getElementById("filter-2tpartner").addEventListener("input", function () {
+      document.getElementById("det-2tpartner-clear").classList.toggle("d-none", this.value === "");
+      currentPage = 1; applyFiltersAndRender();
+    });
+    document.getElementById("det-2tpartner-clear").addEventListener("click", function () {
+      var inp = document.getElementById("filter-2tpartner");
+      inp.value = "";
+      this.classList.add("d-none");
+      inp.focus();
+      currentPage = 1; applyFiltersAndRender();
+    });
+  }
   document.getElementById("filter-crparty").addEventListener("input", function () {
     document.getElementById("det-crparty-clear").classList.toggle("d-none", this.value === "");
     currentPage = 1; applyFiltersAndRender();
@@ -234,6 +251,7 @@ function renderDetails(data) {
     updateSliderDisplay(prefix);
   });
   document.getElementById("det-clear-btn").addEventListener("click", function () {
+    if (document.getElementById("filter-2tpartner")) document.getElementById("filter-2tpartner").value = "";
     document.getElementById("filter-crparty").value = "";
     el.querySelectorAll('input[type=checkbox]').forEach(function (cb) { cb.checked = false; });
     document.getElementById("filter-portfolio").value = "";
@@ -252,6 +270,7 @@ function renderDetails(data) {
   applyFiltersAndRender();
 
   function applyFiltersAndRender() {
+    var twoTVal          = document.getElementById("filter-2tpartner") ? document.getElementById("filter-2tpartner").value.trim().toLowerCase() : "";
     var crPartyVal       = document.getElementById("filter-crparty").value.trim().toLowerCase();
     var stageChecked     = getChecked("filter-stage");
     var optInChecked     = getChecked("filter-optin");
@@ -288,6 +307,7 @@ function renderDetails(data) {
     var expToDate   = atMax(expTo)   ? null : sliderVal(expTo);
 
     filteredData = data.filter(function (r) {
+      if (twoTVal    && String(r["2T Partner Name"] || "").toLowerCase().indexOf(twoTVal) === -1)   return false;
       if (crPartyVal && String(r["CR Party Name"] || "").toLowerCase().indexOf(crPartyVal) === -1) return false;
       if (stageChecked.length  && stageChecked.indexOf(String(r["Stage"] || "")) === -1)                      return false;
       if (optInChecked.length  && optInChecked.indexOf(String(r["Adopt Rebate Opt-In Status"] || "")) === -1) return false;
@@ -411,6 +431,7 @@ function renderDetails(data) {
     ];
 
     var sortableCols = {
+      "2T Partner Name": true,
       "CR Party Name": true,
       "Potential Incentives": true,
       "Missed Incentives": true,

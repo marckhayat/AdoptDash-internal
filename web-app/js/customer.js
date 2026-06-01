@@ -134,7 +134,10 @@ function renderCustomer(data) {
       return;
     }
 
+    var has2TPartner = data.some(function (r) { return r["2T Partner Name"] && String(r["2T Partner Name"]).trim() !== ""; });
+
     var cols = [
+      ...(has2TPartner ? [{ label: "2T Partner Name", field: "2T Partner Name" }] : []),
       { label: "CR Party Name",                     field: "CR Party Name" },
       { label: "CR Party ID",                       field: "CR Party ID" },
       { label: "Domain",                            field: "Deal CPI Portfolio" },
