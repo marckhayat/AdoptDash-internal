@@ -104,12 +104,7 @@ function transformData(rawRows) {
     var aapMatches = Object.keys(rawRows[0]).filter(function(k) {
       return k.replace(/\s+/g, " ").trim().toLowerCase().indexOf("adoption accountability planning") !== -1;
     });
-    if (aapMatches.length) {
-      aapColumnKey = aapMatches[0];
-      console.log("[AAP] Found column:", aapColumnKey);
-    } else {
-      console.warn("[AAP] Column 'Adoption Accountability Planning...' not found. Available columns:", Object.keys(rawRows[0]));
-    }
+    if (aapMatches.length) aapColumnKey = aapMatches[0];
   }
 
   // ── Main transformation ───────────────────────────────────────────────────
