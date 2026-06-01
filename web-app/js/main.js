@@ -551,8 +551,9 @@ function restoreUploadSection(cachedEntries) {
     var base = (document.getElementById("lci-basepath").value.trim() || buildBasePath(u) || "").replace(/[\\/]+$/, "");
     var region = document.getElementById("lci-region").value;
     var week   = document.getElementById("lci-week").value;
+    var regionFile = region === "DISTI" ? "disti" : region;
     var folder = "LCI data " + region;
-    return base + SEP + folder + SEP + "CPI_data_" + region + "_" + week + ".csv";
+    return base + SEP + folder + SEP + "CPI_data_" + regionFile + "_" + week + ".csv";
   }
 
   function updateLciHint() {
