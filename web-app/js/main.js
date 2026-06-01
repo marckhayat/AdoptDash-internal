@@ -539,7 +539,8 @@ function restoreUploadSection(cachedEntries) {
   document.getElementById("clear-all-btn").addEventListener("click", function () {
     if (!confirm("This will delete all cached sessions and your saved username. Continue?")) return;
     IDB.clearAll().then(function () {
-      localStorage.clear();
+      localStorage.removeItem("lci-username");
+      localStorage.removeItem("lci-basepath");
       restoreUploadSection([]);
     });
   });
