@@ -1,0 +1,331 @@
+/* ============================================================
+   Cisco Adoption Dashboard — Styles
+   ============================================================ */
+
+:root {
+  --cisco-blue:  #00BCF2;
+  --cisco-dark:  #1B2A3B;
+  --cisco-blue2: #005073;
+  --risk-high-bg:   #FFE6E6;
+  --risk-med-bg:    #FFF4CE;
+  --risk-low-bg:    #DFF6DD;
+  --score-green:    #107C10;
+  --score-orange:   #FF8C00;
+  --score-red:      #D13438;
+}
+
+/* ── Navbar ─────────────────────────────────────────────── */
+.cisco-nav {
+  background-color: var(--cisco-dark);
+  border-bottom: 3px solid var(--cisco-blue);
+}
+
+/* ── Tab bar ─────────────────────────────────────────────── */
+.cisco-tab-bar {
+  background: #f8f9fa;
+  border-bottom: 1px solid #dee2e6;
+}
+.cisco-tab-bar .nav-tabs {
+  border-bottom: none;
+}
+.cisco-tab-bar .nav-link {
+  color: #495057;
+  border: none;
+  border-bottom: 3px solid transparent;
+  padding: 0.5rem 1rem;
+  font-size: 0.88rem;
+  font-weight: 500;
+}
+.cisco-tab-bar .nav-link:hover {
+  color: var(--cisco-blue);
+  border-bottom-color: var(--cisco-blue);
+}
+.cisco-tab-bar .nav-link.active {
+  color: var(--cisco-blue);
+  background: transparent;
+  border-bottom: 3px solid var(--cisco-blue);
+  font-weight: 600;
+}
+
+/* ── Upload card ─────────────────────────────────────────── */
+.upload-card {
+  max-width: 600px;
+}
+.upload-card .card {
+  border: 2px dashed #ced4da;
+  border-radius: 12px;
+}
+.cisco-icon-lg {
+  font-size: 3.5rem;
+  color: var(--cisco-blue);
+  display: block;
+}
+
+/* ── Buttons ─────────────────────────────────────────────── */
+.btn-cisco {
+  background-color: var(--cisco-blue);
+  color: #fff;
+  border: none;
+}
+.btn-cisco:hover {
+  background-color: var(--cisco-blue2);
+  color: #fff;
+}
+
+/* ── Status bar ──────────────────────────────────────────── */
+.alert-cisco {
+  background-color: #e8f7fd;
+  border-color: var(--cisco-blue);
+  color: #1a1a1a;
+}
+
+/* ── Risk colours ────────────────────────────────────────── */
+.risk-high { background-color: var(--risk-high-bg) !important; }
+.risk-medium { background-color: var(--risk-med-bg) !important; }
+.risk-low  { background-color: var(--risk-low-bg) !important; }
+
+/* ── Score colours ───────────────────────────────────────── */
+.score-green  { color: var(--score-green)  !important; }
+.score-orange { color: var(--score-orange) !important; }
+.score-red    { color: var(--score-red)    !important; }
+
+/* ── Tables ──────────────────────────────────────────────── */
+.table-wrapper {
+  overflow-x: auto;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+.table-wrapper table {
+  font-size: 0.82rem;
+  min-width: 900px;
+}
+.table-wrapper thead th {
+  position: sticky;
+  top: 0;
+  background: var(--cisco-dark);
+  color: #fff;
+  font-weight: 600;
+  white-space: normal;
+  vertical-align: bottom;
+  z-index: 2;
+  padding: 0.5rem 0.6rem;
+}
+.table-wrapper tbody td {
+  vertical-align: middle;
+  padding: 0.35rem 0.6rem;
+}
+.table-wrapper tbody tr:hover td {
+  background-color: #e8f7fd !important;
+}
+
+/* ── Summary metric cards ────────────────────────────────── */
+.metric-card {
+  text-align: center;
+  border-radius: 10px;
+  padding: 1rem 1.2rem;
+  background: #fff;
+  border: 1px solid #dee2e6;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+}
+.metric-card .metric-value {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--cisco-dark);
+}
+.metric-card .metric-label {
+  font-size: 0.75rem;
+  color: #6c757d;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+/* ── Stage badges ────────────────────────────────────────── */
+.stage-badge {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.2rem 0.55rem;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+.stage-Purchase, .stage-Onboard    { background: #FFE6E6; color: #c0392b; }
+.stage-Implement, .stage-Use       { background: #FFF4CE; color: #9a6200; }
+.stage-Engage, .stage-Adopt,
+.stage-Completed                   { background: #DFF6DD; color: #107C10; }
+
+/* ── PVI score display ───────────────────────────────────── */
+.pvi-score-big {
+  font-size: 2.8rem;
+  font-weight: 800;
+  line-height: 1;
+}
+.pvi-score-total {
+  font-size: 3.6rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+/* ── Overview table specific ─────────────────────────────── */
+.ovw-domain-row td { background: #1B2A3B !important; color: #fff; font-weight: 700; cursor: pointer; user-select: none; }
+.ovw-offer-row td  { background: #e8f0f7 !important; font-weight: 600; cursor: pointer; user-select: none; }
+.ovw-uc-row td     { background: #f4f8fc; }
+.ovw-chevron { display: inline-block; transition: transform 0.15s ease; font-size: 0.75em; margin-right: 4px; }
+
+/* ── Column group headers ────────────────────────────────── */
+.cg1-hdr { background: #e8f4f8 !important; color: #1a5276 !important; border-left: 2px solid #aed6f1 !important; }
+.cg2-hdr { background: #eafaf1 !important; color: #1a7a45 !important; border-left: 2px solid #a9dfbf !important; }
+.cg3-hdr { background: #fef9e7 !important; color: #7d6608 !important; border-left: 2px solid #f9e79f !important; }
+.cg4-hdr { background: #fdedec !important; color: #922b21 !important; border-left: 2px solid #f5b7b1 !important; }
+.cg5-hdr { background: #f4ecf7 !important; color: #6c3483 !important; border-left: 2px solid #d7bde2 !important; }
+
+/* ── Column group data cells ─────────────────────────────── */
+.cg1-cell { background: #f4fafd; border-left: 2px solid #aed6f1 !important; }
+.cg2-cell { background: #f4fdf7; border-left: 2px solid #a9dfbf !important; }
+.cg3-cell { background: #fefdf4; border-left: 2px solid #f9e79f !important; }
+.cg4-cell { background: #fef9f8; border-left: 2px solid #f5b7b1 !important; }
+.cg5-cell { background: #faf6fd; border-left: 2px solid #d7bde2 !important; }
+
+/* ── Type badges ─────────────────────────────────────────── */
+.badge-type {
+  display: inline-block;
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 10px;
+  vertical-align: middle;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.badge-type-standard { background: #dbeafe; color: #1d4ed8; }
+.badge-type-advanced { background: #ede9fe; color: #6d28d9; }
+
+/* ── Days-in-stage progress bar ──────────────────────────── */
+.days-bar-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.days-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--cisco-blue);
+  min-width: 2px;
+}
+
+/* ── Pagination ──────────────────────────────────────────── */
+.pagination .page-link {
+  color: var(--cisco-blue);
+  font-size: 0.82rem;
+}
+.pagination .page-item.active .page-link {
+  background-color: var(--cisco-blue);
+  border-color: var(--cisco-blue);
+}
+
+/* ── Callout cards ───────────────────────────────────────── */
+.callout-card {
+  border-left: 4px solid var(--cisco-blue);
+  background: #fff;
+  border-radius: 6px;
+  padding: 0.7rem 1rem;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+.callout-card .callout-value {
+  font-size: 1.8rem;
+  font-weight: 800;
+  color: var(--cisco-dark);
+}
+.callout-card .callout-label {
+  font-size: 0.72rem;
+  color: #6c757d;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* ── Filter sidebar ──────────────────────────────────────── */
+.filter-sidebar {
+  min-width: 200px;
+  max-width: 220px;
+  font-size: 0.82rem;
+}
+.filter-sidebar .filter-group {
+  margin-bottom: 1rem;
+}
+.filter-sidebar .filter-group label.group-label {
+  font-weight: 700;
+  color: var(--cisco-dark);
+  text-transform: uppercase;
+  font-size: 0.72rem;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.3rem;
+  display: block;
+}
+
+/* ── Chart containers ────────────────────────────────────── */
+.chart-container {
+  position: relative;
+  min-height: 320px;
+}
+
+/* ── Slicer row ──────────────────────────────────────────── */
+.slicer-row {
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  padding: 0.6rem 1rem;
+  margin-bottom: 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+.slicer-row select {
+  font-size: 0.82rem;
+  min-width: 150px;
+}
+.slicer-row label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #495057;
+  margin-bottom: 0;
+}
+
+/* ── Disclaimer ──────────────────────────────────────────── */
+.disclaimer-card {
+  font-size: 0.82rem;
+  font-style: italic;
+  color: #666;
+  background: #f8f9fa;
+  border-left: 4px solid #ced4da;
+  padding: 0.7rem 1rem;
+  border-radius: 4px;
+  margin-bottom: 1.2rem;
+}
+
+/* ── Expiry highlight ────────────────────────────────────── */
+.expiry-warn { background-color: #FFE6E6 !important; font-weight: 600; color: #c0392b; }
+
+/* ── Dual-range date slider ─────────────────────────────────── */
+.date-slider-group { padding-bottom: 4px; }
+.slider-val-display { display: flex; justify-content: space-between; font-size: 0.70rem; color: #555; margin-bottom: 3px; }
+.dual-range-wrap { position: relative; height: 28px; }
+.dual-range-track { position: absolute; top: 12px; left: 0; right: 0; height: 4px; background: #d9d9d9; border-radius: 2px; pointer-events: none; }
+.dual-range-fill  { position: absolute; top: 12px; height: 4px; background: var(--cisco-blue2); border-radius: 2px; pointer-events: none; }
+.dual-range-wrap input[type=range] {
+  position: absolute; width: 100%; top: 8px; height: 12px;
+  margin: 0; padding: 0; background: transparent; outline: none;
+  pointer-events: none; -webkit-appearance: none; appearance: none;
+}
+.dual-range-wrap input[type=range]::-webkit-slider-thumb {
+  pointer-events: all; -webkit-appearance: none; appearance: none;
+  width: 14px; height: 14px; border-radius: 50%;
+  background: var(--cisco-blue2); cursor: pointer;
+  border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.3);
+}
+.dual-range-wrap input[type=range]::-moz-range-thumb {
+  pointer-events: all; width: 14px; height: 14px; border-radius: 50%;
+  background: var(--cisco-blue2); cursor: pointer; border: 2px solid #fff;
+}
+
+/* ── Dimmed row (expired / completed) ───────────────────── */
+.row-dimmed td { background-color: #d0d0d0 !important; }

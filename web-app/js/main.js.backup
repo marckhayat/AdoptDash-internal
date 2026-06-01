@@ -1,0 +1,766 @@
+// =============================================================================
+// main.js — Application entry point
+// =============================================================================
+
+var APP_DATA = null;
+
+// SharePoint base URLs for each region (from Excel VBA)
+var SHAREPOINT_URLS = {
+  EMEA:  'https://cisco.sharepoint.com/sites/CXPO-TEAM/Shared%20Documents/PCSS%20Team/Dashboards%20and%20Reporting%20Metrics/Adoption%20Dashboard/LCI%20data%20EMEA/CPI_data_EMEA_',
+  AMER:  'https://cisco.sharepoint.com/sites/CXPO-TEAM/Shared%20Documents/PCSS%20Team/Dashboards%20and%20Reporting%20Metrics/Adoption%20Dashboard/LCI%20data%20AMER/CPI_data_AMER_',
+  APJC:  'https://cisco.sharepoint.com/sites/CXPO-TEAM/Shared%20Documents/PCSS%20Team/Dashboards%20and%20Reporting%20Metrics/Adoption%20Dashboard/LCI%20data%20APJC/CPI_data_APJC_',
+  DISTI: 'https://cisco.sharepoint.com/sites/CXPO-TEAM/Shared%20Documents/PCSS%20Team/Dashboards%20and%20Reporting%20Metrics/Adoption%20Dashboard/LCI%20data%20DISTI/CPI_data_disti_'
+};
+
+// Workspan column names used to auto-detect the header row
+var KNOWN_COLUMNS = [
+  "Deal WS-ID", "Partner Name", "CR Party Name", "Track", "Sub-Track",
+  "Stage", "CR Party ID", "BE GEO ID", "Program Type", "Booking Date",
+  "Incentive Level", "Adopt Rebate Opt-In Status", "Deal Incentive Expiry Date"
+];
+
+document.addEventListener("DOMContentLoaded", init);
+
+function init() {
+  wireUploadEvents();
+  document.querySelectorAll('[data-bs-toggle="tab"]').forEach(function (tab) {
+    tab.addEventListener("shown.bs.tab", function (e) {
+      if (!APP_DATA) return;
+      renderActiveTab(e.target.dataset.bsTarget);
+    });
+  });
+}
+
+// Wire all event listeners on the upload section (called on init + after restore)
+function wireUploadEvents() {
+  var fi = document.getElementById("file-input");
+  if (fi) fi.addEventListener("change", handleFileUpload);
+
+  var btn = document.getElementById("internal-load-btn");
+  if (btn) btn.addEventListener("click", handleInternalFetch);
+
+  // Auto-populate the week input with the current ISO week
+  var weekInput = document.getElementById("internal-week");
+  if (weekInput && !weekInput.value) {
+    var cw = getCurrentISOWeekStr();
+    weekInput.value = cw;
+    var hint = document.getElementById("internal-week-hint");
+    if (hint) hint.textContent = "Current ISO week: " + cw;
+  }
+}
+
+// Returns current ISO calendar week string, e.g. "2026W21"
+function getCurrentISOWeekStr() {
+  var d = new Date();
+  d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  var day = d.getUTCDay() || 7; // Sunday = 7
+  d.setUTCDate(d.getUTCDate() + 4 - day); // anchor to Thursday
+  var yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  var weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+  return d.getUTCFullYear() + "W" + String(weekNo).padStart(2, "0");
+}
+
+function showLoader(message) {
+  document.getElementById("upload-section").classList.add("d-none");
+  var ls = document.getElementById("loader-section");
+  ls.classList.remove("d-none");
+  var el = document.getElementById("loader-msg");
+  if (el) el.textContent = message || "Loading…";
+}
+
+function updateLoaderMsg(msg) {
+  var el = document.getElementById("loader-msg");
+  if (el) el.textContent = msg;
+}
+
+// Find which row in the 2-D array contains the Workspan column headers.
+// Returns the row index, or -1 if nothing plausible is found.
+function findHeaderRowIndex(rows2d) {
+  var bestIdx = -1;
+  var bestScore = 0;
+  for (var i = 0; i < Math.min(rows2d.length, 50); i++) {
+    var row = rows2d[i];
+    if (!row) continue;
+    var matchCount = 0;
+    for (var j = 0; j < row.length; j++) {
+      var cell = row[j];
+      if (cell && KNOWN_COLUMNS.indexOf(String(cell).trim()) !== -1) matchCount++;
+    }
+    if (matchCount > bestScore) {
+      bestScore = matchCount;
+      bestIdx = i;
+    }
+    if (matchCount >= 3) break;  // good enough, stop early
+  }
+  // Accept if we found at least 1 known column, otherwise fall back to row 0
+  return bestScore >= 1 ? bestIdx : 0;
+}
+
+// Convert a 2-D array (header row + data rows) to array-of-objects
+function rows2dToObjects(rows2d, headerIdx) {
+  var headers = rows2d[headerIdx].map(function (h) { return h === null || h === undefined ? "" : String(h).trim(); });
+  var result = [];
+  for (var i = headerIdx + 1; i < rows2d.length; i++) {
+    var row = rows2d[i];
+    if (!row) continue;
+    // Skip entirely blank rows
+    var hasData = false;
+    for (var j = 0; j < row.length; j++) { if (row[j] !== null && row[j] !== undefined && row[j] !== "") { hasData = true; break; } }
+    if (!hasData) continue;
+    var obj = {};
+    for (var k = 0; k < headers.length; k++) {
+      if (headers[k]) obj[headers[k]] = row[k] !== undefined ? row[k] : null;
+    }
+    result.push(obj);
+  }
+  return result;
+}
+
+function handleFileUpload(event) {
+  var file = event.target.files[0];
+  if (!file) return;
+
+  var ext = file.name.split(".").pop().toLowerCase();
+  var sizeMB = file.size / (1024 * 1024);
+
+  // Warn early for large XLSX — don't even attempt, it will crash the browser tab
+  if (ext !== "csv" && sizeMB > 20) {
+    var msg =
+      "This Excel file is " + sizeMB.toFixed(0) + " MB, which is too large to load in the browser.\n\n" +
+      "Please export your Workspan report as CSV instead:\n" +
+      "  1. In Workspan, run report 19849 (Partners) or 21766 (Distributors)\n" +
+      "  2. Click Export → CSV\n" +
+      "  3. Upload the .csv file here\n\n" +
+      "CSV files of any size work perfectly — there is no size limit.";
+    alert(msg);
+    // Reset the input so the user can pick again
+    event.target.value = "";
+    return;
+  }
+
+  showLoader("Reading file — this may take a moment for large files…");
+
+  if (ext === "csv") {
+    handleCSV(file);
+  } else {
+    handleXLSX(file);
+  }
+}
+
+// ── Cisco Internal Mode: open SharePoint download link ───────────────────────
+function handleInternalFetch() {
+  var region  = document.getElementById("internal-region").value;
+  var beGeoId = document.getElementById("internal-begeo").value.trim();
+  var week    = document.getElementById("internal-week").value.trim().toUpperCase();
+
+  if (!region) { alert("Please select a region."); return; }
+  if (!week)   { alert("Please enter a week (e.g. " + getCurrentISOWeekStr() + ")."); return; }
+
+  // Build the SharePoint direct-download URL
+  var url = SHAREPOINT_URLS[region] + week + ".csv";
+
+  // Store the BE GEO ID filter for after file loads
+  window.INTERNAL_BEGEO_FILTER = beGeoId;
+  window.INTERNAL_LABEL = region + " · Week " + week + (beGeoId ? " · BE GEO ID " + beGeoId : " · All partners");
+
+  // Open SharePoint link — user downloads, then we prompt to upload
+  var opened = window.open(url, "_blank");
+  
+  if (!opened) {
+    // Popup blocked — show the URL
+    var msg = 
+      "Pop-up blocked. Please allow pop-ups or open this link manually:\n\n" + url + 
+      "\n\nAfter downloading, upload the CSV file using the 'Partner / Distributor' option above.";
+    alert(msg);
+    return;
+  }
+
+  // Show instruction to upload after download
+  setTimeout(function() {
+    var msg = 
+      "SharePoint opened in a new tab.\n\n" +
+      "1. Download the CSV file from SharePoint\n" +
+      "2. Upload it using the 'Partner / Distributor' file upload above" +
+      (beGeoId ? "\n\n(The filter for BE GEO ID " + beGeoId + " will be applied automatically after upload.)" : "");
+    alert(msg);
+  }, 500);
+}
+
+// ── CSV path: PapaParse streams the file — handles millions of rows ──────────
+function handleCSV(file) {
+  Papa.parse(file, {
+    header: true,
+    skipEmptyLines: true,
+    dynamicTyping: false,  // keep raw strings; transform.js handles types
+    worker: false,
+    step: null,
+    complete: function(results) {
+      if (!results.data || results.data.length === 0) {
+        restoreUploadSection();
+        alert("The CSV file appears to be empty or has no data rows.");
+        return;
+      }
+      updateLoaderMsg("Processing " + results.data.length.toLocaleString() + " rows…");
+      setTimeout(function() {
+        try {
+          APP_DATA = transformData(results.data);
+          finishLoad(file.name, APP_DATA.length, false);
+        } catch(err) {
+          restoreUploadSection();
+          console.error(err);
+          alert("Error processing data: " + err.message);
+        }
+      }, 50);
+    },
+    error: function(err) {
+      restoreUploadSection();
+      alert("Error reading CSV: " + err.message);
+    }
+  });
+}
+
+// ── XLSX path: runs in a Web Worker to avoid main-thread memory limits ───────
+function handleXLSX(file) {
+  var reader = new FileReader();
+  reader.onload = function (e) {
+    var buffer = e.target.result;
+
+    // Try Worker first (better memory headroom, non-blocking)
+    var workerSupported = (typeof Worker !== 'undefined');
+
+    if (workerSupported) {
+      try {
+        // Use a blob worker so it works from file:// protocol
+        var workerSrc = 'js/xlsx-worker.js';
+        var worker = new Worker(workerSrc);
+
+        worker.onmessage = function (ev) {
+          var msg = ev.data;
+          if (msg.type === 'progress') {
+            updateLoaderMsg(msg.msg);
+          } else if (msg.type === 'done') {
+            worker.terminate();
+            parseCSVAndFinish(msg.csv, file.name, msg.headerIdx > 0);
+          } else if (msg.type === 'error') {
+            worker.terminate();
+            restoreUploadSection();
+            alert('Error reading Excel file:\n' + msg.msg);
+          }
+        };
+
+        worker.onerror = function (err) {
+          worker.terminate();
+          // Worker failed (e.g. file:// blocked importScripts) — fall back to main thread
+          console.warn('Worker failed, falling back to main thread:', err.message);
+          handleXLSXMainThread(buffer, file.name);
+        };
+
+        // Transfer the buffer to the worker (zero-copy)
+        worker.postMessage(buffer, [buffer]);
+        return;
+      } catch (workerErr) {
+        console.warn('Could not start worker, falling back to main thread:', workerErr.message);
+      }
+    }
+
+    // Fallback: run on main thread
+    handleXLSXMainThread(buffer, file.name);
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// Main-thread XLSX fallback (same logic as worker but synchronous)
+function handleXLSXMainThread(buffer, filename) {
+  setTimeout(function () {
+    try {
+      updateLoaderMsg('Parsing Excel file…');
+      var wb = XLSX.read(buffer, {
+        type: 'array',
+        cellDates: false,
+        cellHTML: false,
+        cellStyles: false,
+        cellFormula: false,
+        dense: true
+      });
+
+      updateLoaderMsg('Detecting data layout…');
+      var sheetName = null, headerIdx = 0;
+
+      for (var si = 0; si < wb.SheetNames.length; si++) {
+        var candidateSheet = wb.Sheets[wb.SheetNames[si]];
+        if (!candidateSheet || !candidateSheet['!ref']) continue;
+        var preview = XLSX.utils.sheet_to_json(candidateSheet, { header: 1, defval: null, raw: true, sheetRows: 15 });
+        if (!preview || preview.length === 0) continue;
+        var hi = findHeaderRowIndex(preview);
+        var hrow = preview[hi] || [];
+        var score = 0;
+        for (var ci = 0; ci < hrow.length; ci++) {
+          if (hrow[ci] && KNOWN_COLUMNS.indexOf(String(hrow[ci]).trim()) !== -1) score++;
+        }
+        if (score > 0) { sheetName = wb.SheetNames[si]; headerIdx = hi; break; }
+      }
+      if (!sheetName) {
+        for (var si2 = 0; si2 < wb.SheetNames.length; si2++) {
+          var fs = wb.Sheets[wb.SheetNames[si2]];
+          if (fs && fs['!ref']) { sheetName = wb.SheetNames[si2]; break; }
+        }
+      }
+      if (!sheetName) {
+        restoreUploadSection();
+        alert('No readable sheets found. Sheets: ' + wb.SheetNames.join(', '));
+        return;
+      }
+
+      updateLoaderMsg('Converting to CSV…');
+      var csvString = XLSX.utils.sheet_to_csv(wb.Sheets[sheetName], { defval: '' });
+      if (headerIdx > 0) {
+        var lines = csvString.split('\n');
+        csvString = lines.slice(headerIdx).join('\n');
+      }
+
+      parseCSVAndFinish(csvString, filename, headerIdx > 0);
+    } catch (err) {
+      restoreUploadSection();
+      console.error(err);
+      alert('Error reading Excel file: ' + err.message);
+    }
+  }, 50);
+}
+
+// Shared final step: PapaParse the CSV string → transform → display
+function parseCSVAndFinish(csvString, filename, headerAutoDetected) {
+  if (!csvString || csvString.trim() === '') {
+    restoreUploadSection();
+    alert('The sheet appears to be empty after reading.');
+    return;
+  }
+  updateLoaderMsg('Parsing rows…');
+  Papa.parse(csvString, {
+    header: true,
+    skipEmptyLines: true,
+    dynamicTyping: false,
+    complete: function (results) {
+      if (!results.data || results.data.length === 0) {
+        restoreUploadSection();
+        alert('No data rows found.');
+        return;
+      }
+      updateLoaderMsg('Processing ' + results.data.length.toLocaleString() + ' rows…');
+      setTimeout(function () {
+        try {
+          APP_DATA = transformData(results.data);
+          finishLoad(filename, APP_DATA.length, headerAutoDetected);
+        } catch (err) {
+          restoreUploadSection();
+          console.error(err);
+          alert('Error processing data: ' + err.message);
+        }
+      }, 50);
+    },
+    error: function (err) {
+      restoreUploadSection();
+      alert('Error parsing sheet: ' + err.message);
+    }
+  });
+}
+
+function finishLoad(filename, rowCount, headerAutoDetected) {
+  restoreUploadSection();
+  document.getElementById("upload-section").classList.add("d-none");
+  document.getElementById("status-bar").classList.remove("d-none");
+  document.getElementById("status-filename").textContent = filename;
+  document.getElementById("status-rows").textContent =
+    rowCount.toLocaleString() + " rows loaded" +
+    (headerAutoDetected ? " · header auto-detected" : "");
+
+  var activeTab = document.querySelector(".nav-link.active[data-bs-target]");
+  renderActiveTab(activeTab ? activeTab.dataset.bsTarget : "#tab-overview");
+}
+
+function restoreUploadSection() {
+  document.getElementById("loader-section").classList.add("d-none");
+  var sec = document.getElementById("upload-section");
+  sec.classList.remove("d-none");
+  wireUploadEvents();
+}
+
+function renderActiveTab(target) {
+  switch (target) {
+    case "#tab-overview":  renderOverview(APP_DATA);  break;
+    case "#tab-details":   renderDetails(APP_DATA);   break;
+    case "#tab-customer":  renderCustomer(APP_DATA);  break;
+    case "#tab-pvi":       renderPVI(APP_DATA);       break;
+    case "#tab-lifecycle": renderLifecycle(APP_DATA); break;
+    case "#tab-cpi-adopt": renderCPIAdopt(APP_DATA);  break;
+  }
+}
+
+function resetApp() {
+  APP_DATA = null;
+  document.getElementById("status-bar").classList.add("d-none");
+
+  // Clear all tab panes
+  ["tab-overview","tab-details","tab-customer","tab-pvi","tab-lifecycle","tab-cpi-adopt"].forEach(function (id) {
+    var pane = document.getElementById(id);
+    if (pane) pane.innerHTML = "";
+  });
+
+  restoreUploadSection();
+
+  // Activate overview tab
+  var overviewBtn = document.getElementById("tab-overview-btn");
+  if (overviewBtn) {
+    var bsTab = new bootstrap.Tab(overviewBtn);
+    bsTab.show();
+  }
+}
+
+window.APP_DATA        = APP_DATA;
+window.resetApp        = resetApp;
+window.renderActiveTab = renderActiveTab;
+
+// Find which row in the 2-D array contains the Workspan column headers.
+// Returns the row index, or -1 if nothing plausible is found.
+function findHeaderRowIndex(rows2d) {
+  var bestIdx = -1;
+  var bestScore = 0;
+  for (var i = 0; i < Math.min(rows2d.length, 50); i++) {
+    var row = rows2d[i];
+    if (!row) continue;
+    var matchCount = 0;
+    for (var j = 0; j < row.length; j++) {
+      var cell = row[j];
+      if (cell && KNOWN_COLUMNS.indexOf(String(cell).trim()) !== -1) matchCount++;
+    }
+    if (matchCount > bestScore) {
+      bestScore = matchCount;
+      bestIdx = i;
+    }
+    if (matchCount >= 3) break;  // good enough, stop early
+  }
+  // Accept if we found at least 1 known column, otherwise fall back to row 0
+  return bestScore >= 1 ? bestIdx : 0;
+}
+
+// Convert a 2-D array (header row + data rows) to array-of-objects
+function rows2dToObjects(rows2d, headerIdx) {
+  var headers = rows2d[headerIdx].map(function (h) { return h === null || h === undefined ? "" : String(h).trim(); });
+  var result = [];
+  for (var i = headerIdx + 1; i < rows2d.length; i++) {
+    var row = rows2d[i];
+    if (!row) continue;
+    // Skip entirely blank rows
+    var hasData = false;
+    for (var j = 0; j < row.length; j++) { if (row[j] !== null && row[j] !== undefined && row[j] !== "") { hasData = true; break; } }
+    if (!hasData) continue;
+    var obj = {};
+    for (var k = 0; k < headers.length; k++) {
+      if (headers[k]) obj[headers[k]] = row[k] !== undefined ? row[k] : null;
+    }
+    result.push(obj);
+  }
+  return result;
+}
+
+
+function handleFileUpload(event) {
+  var file = event.target.files[0];
+  if (!file) return;
+
+  var ext = file.name.split(".").pop().toLowerCase();
+  var sizeMB = file.size / (1024 * 1024);
+
+  if (ext !== "csv" && sizeMB > 20) {
+    var msg =
+      "This Excel file is " + sizeMB.toFixed(0) + " MB, which is too large to load in the browser.\n\n" +
+      "Please export your Workspan report as CSV instead:\n" +
+      "  1. In Workspan, run report 19849 (Partners) or 21766 (Distributors)\n" +
+      "  2. Click Export → CSV\n" +
+      "  3. Upload the .csv file here\n\n" +
+      "CSV files of any size work perfectly — there is no size limit.";
+    alert(msg);
+    event.target.value = "";
+    return;
+  }
+
+  showLoader("Reading file — this may take a moment for large files…");
+
+  if (ext === "csv") {
+    handleCSV(file);
+  } else {
+    handleXLSX(file);
+  }
+}
+
+function handleInternalFetch() {
+  var region  = document.getElementById("internal-region").value;
+  var beGeoId = document.getElementById("internal-begeo").value.trim();
+  var week    = document.getElementById("internal-week").value.trim().toUpperCase();
+
+  if (!region) { alert("Please select a region."); return; }
+  if (!week)   { alert("Please enter a week (e.g. " + getCurrentISOWeekStr() + ")."); return; }
+
+  var url = SHAREPOINT_URLS[region] + week + ".csv";
+  window.INTERNAL_BEGEO_FILTER = beGeoId;
+  window.INTERNAL_LABEL = region + " · Week " + week + (beGeoId ? " · BE GEO ID " + beGeoId : " · All partners");
+
+  var opened = window.open(url, "_blank");
+  
+  if (!opened) {
+    var msg = 
+      "Pop-up blocked. Please allow pop-ups or open this link manually:\n\n" + url + 
+      "\n\nAfter downloading, upload the CSV file using the 'Partner / Distributor' option above.";
+    alert(msg);
+    return;
+  }
+
+  setTimeout(function() {
+    var msg = 
+      "SharePoint opened in a new tab.\n\n" +
+      "1. Download the CSV file from SharePoint\n" +
+      "2. Upload it using the 'Partner / Distributor' file upload above" +
+      (beGeoId ? "\n\n(The filter for BE GEO ID " + beGeoId + " will be applied automatically after upload.)" : "");
+    alert(msg);
+  }, 500);
+}
+
+function handleCSV(file) {
+  Papa.parse(file, {
+    header: true,
+    skipEmptyLines: true,
+    dynamicTyping: false,
+    worker: false,
+    step: null,
+    complete: function(results) {
+      if (!results.data || results.data.length === 0) {
+        restoreUploadSection();
+        alert("The CSV file appears to be empty or has no data rows.");
+        return;
+      }
+      var data = results.data;
+      var filename = file.name;
+      
+      if (window.INTERNAL_BEGEO_FILTER) {
+        var beGeoId = window.INTERNAL_BEGEO_FILTER;
+        data = data.filter(function (row) {
+          return row["BE GEO ID"] && String(row["BE GEO ID"]).trim() === beGeoId;
+        });
+        if (data.length === 0) {
+          restoreUploadSection();
+          alert('No records found for BE GEO ID "' + beGeoId + '".\n\nCheck the ID and try again.');
+          window.INTERNAL_BEGEO_FILTER = null;
+          window.INTERNAL_LABEL = null;
+          return;
+        }
+        filename = window.INTERNAL_LABEL || filename;
+        window.INTERNAL_BEGEO_FILTER = null;
+        window.INTERNAL_LABEL = null;
+      }
+      
+      updateLoaderMsg("Processing " + data.length.toLocaleString() + " rows…");
+      setTimeout(function() {
+        try {
+          APP_DATA = transformData(data);
+          finishLoad(filename, APP_DATA.length, false);
+        } catch(err) {
+          restoreUploadSection();
+          console.error(err);
+          alert("Error processing data: " + err.message);
+        }
+      }, 50);
+    },
+    error: function(err) {
+      restoreUploadSection();
+      alert("Error reading CSV: " + err.message);
+    }
+  });
+}
+
+function handleXLSX(file) {
+  var reader = new FileReader();
+  reader.onload = function (e) {
+    var buffer = e.target.result;
+    var workerSupported = (typeof Worker !== 'undefined');
+
+    if (workerSupported) {
+      try {
+        var workerSrc = 'js/xlsx-worker.js';
+        var worker = new Worker(workerSrc);
+
+        worker.onmessage = function (ev) {
+          var msg = ev.data;
+          if (msg.type === 'progress') {
+            updateLoaderMsg(msg.msg);
+          } else if (msg.type === 'done') {
+            worker.terminate();
+            parseCSVAndFinish(msg.csv, file.name, msg.headerIdx > 0);
+          } else if (msg.type === 'error') {
+            worker.terminate();
+            restoreUploadSection();
+            alert('Error reading Excel file:\n' + msg.msg);
+          }
+        };
+
+        worker.onerror = function (err) {
+          worker.terminate();
+          console.warn('Worker failed, falling back to main thread:', err.message);
+          handleXLSXMainThread(buffer, file.name);
+        };
+
+        worker.postMessage(buffer, [buffer]);
+        return;
+      } catch (workerErr) {
+        console.warn('Could not start worker, falling back to main thread:', workerErr.message);
+      }
+    }
+
+    handleXLSXMainThread(buffer, file.name);
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function handleXLSXMainThread(buffer, filename) {
+  setTimeout(function () {
+    try {
+      updateLoaderMsg('Parsing Excel file…');
+      var wb = XLSX.read(buffer, {
+        type: 'array',
+        cellDates: false,
+        cellHTML: false,
+        cellStyles: false,
+        cellFormula: false,
+        dense: true
+      });
+
+      updateLoaderMsg('Detecting data layout…');
+      var sheetName = null, headerIdx = 0;
+
+      for (var si = 0; si < wb.SheetNames.length; si++) {
+        var candidateSheet = wb.Sheets[wb.SheetNames[si]];
+        if (!candidateSheet || !candidateSheet['!ref']) continue;
+        var preview = XLSX.utils.sheet_to_json(candidateSheet, { header: 1, defval: null, raw: true, sheetRows: 15 });
+        if (!preview || preview.length === 0) continue;
+        var hi = findHeaderRowIndex(preview);
+        var hrow = preview[hi] || [];
+        var score = 0;
+        for (var ci = 0; ci < hrow.length; ci++) {
+          if (hrow[ci] && KNOWN_COLUMNS.indexOf(String(hrow[ci]).trim()) !== -1) score++;
+        }
+        if (score > 0) { sheetName = wb.SheetNames[si]; headerIdx = hi; break; }
+      }
+      if (!sheetName) {
+        for (var si2 = 0; si2 < wb.SheetNames.length; si2++) {
+          var fs = wb.Sheets[wb.SheetNames[si2]];
+          if (fs && fs['!ref']) { sheetName = wb.SheetNames[si2]; break; }
+        }
+      }
+      if (!sheetName) {
+        restoreUploadSection();
+        alert('No readable sheets found. Sheets: ' + wb.SheetNames.join(', '));
+        return;
+      }
+
+      updateLoaderMsg('Converting to CSV…');
+      var csvString = XLSX.utils.sheet_to_csv(wb.Sheets[sheetName], { defval: '' });
+      if (headerIdx > 0) {
+        var lines = csvString.split('\n');
+        csvString = lines.slice(headerIdx).join('\n');
+      }
+
+      parseCSVAndFinish(csvString, filename, headerIdx > 0);
+    } catch (err) {
+      restoreUploadSection();
+      console.error(err);
+      alert('Error reading Excel file: ' + err.message);
+    }
+  }, 50);
+}
+
+function parseCSVAndFinish(csvString, filename, headerAutoDetected) {
+  if (!csvString || csvString.trim() === '') {
+    restoreUploadSection();
+    alert('The sheet appears to be empty after reading.');
+    return;
+  }
+  updateLoaderMsg('Parsing rows…');
+  Papa.parse(csvString, {
+    header: true,
+    skipEmptyLines: true,
+    dynamicTyping: false,
+    complete: function (results) {
+      if (!results.data || results.data.length === 0) {
+        restoreUploadSection();
+        alert('No data rows found.');
+        return;
+      }
+      updateLoaderMsg('Processing ' + results.data.length.toLocaleString() + ' rows…');
+      setTimeout(function () {
+        try {
+          APP_DATA = transformData(results.data);
+          finishLoad(filename, APP_DATA.length, headerAutoDetected);
+        } catch (err) {
+          restoreUploadSection();
+          console.error(err);
+          alert('Error processing data: ' + err.message);
+        }
+      }, 50);
+    },
+    error: function (err) {
+      restoreUploadSection();
+      alert('Error parsing sheet: ' + err.message);
+    }
+  });
+}
+
+function finishLoad(filename, rowCount, headerAutoDetected) {
+  restoreUploadSection();
+  document.getElementById("upload-section").classList.add("d-none");
+  document.getElementById("status-bar").classList.remove("d-none");
+  document.getElementById("status-filename").textContent = filename;
+  document.getElementById("status-rows").textContent =
+    rowCount.toLocaleString() + " rows loaded" +
+    (headerAutoDetected ? " · header auto-detected" : "");
+
+  var activeTab = document.querySelector(".nav-link.active[data-bs-target]");
+  renderActiveTab(activeTab ? activeTab.dataset.bsTarget : "#tab-overview");
+}
+
+function restoreUploadSection() {
+  document.getElementById("loader-section").classList.add("d-none");
+  var sec = document.getElementById("upload-section");
+  sec.classList.remove("d-none");
+  wireUploadEvents();
+}
+
+function renderActiveTab(target) {
+  switch (target) {
+    case "#tab-overview":  renderOverview(APP_DATA);  break;
+    case "#tab-details":   renderDetails(APP_DATA);   break;
+    case "#tab-customer":  renderCustomer(APP_DATA);  break;
+    case "#tab-pvi":       renderPVI(APP_DATA);       break;
+    case "#tab-lifecycle": renderLifecycle(APP_DATA); break;
+    case "#tab-cpi-adopt": renderCPIAdopt(APP_DATA);  break;
+  }
+}
+
+function resetApp() {
+  APP_DATA = null;
+  document.getElementById("status-bar").classList.add("d-none");
+
+  ["tab-overview","tab-details","tab-customer","tab-pvi","tab-lifecycle","tab-cpi-adopt"].forEach(function (id) {
+    var pane = document.getElementById(id);
+    if (pane) pane.innerHTML = "";
+  });
+
+  restoreUploadSection();
+
+  var overviewBtn = document.getElementById("tab-overview-btn");
+  if (overviewBtn) {
+    var bsTab = new bootstrap.Tab(overviewBtn);
+    bsTab.show();
+  }
+}
+
+window.APP_DATA        = APP_DATA;
+window.resetApp        = resetApp;
+window.renderActiveTab = renderActiveTab;

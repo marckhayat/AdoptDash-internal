@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cisco Adoption Dashboard</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+  <!-- ── Top Navigation ──────────────────────────────────────────────────── -->
+  <nav class="navbar navbar-expand-lg navbar-dark cisco-nav px-3 py-2">
+    <a class="navbar-brand fw-bold fs-5" href="#">
+      <i class="bi bi-bar-chart-fill me-2"></i>Adoption Dashboard
+    </a>
+    <span class="navbar-text text-white-50 small ms-2">Cisco CX Partner Organization</span>
+    <div id="status-bar" class="d-none ms-auto d-flex align-items-center gap-2">
+      <i class="bi bi-check-circle-fill text-success"></i>
+      <span class="text-white-50 small" id="status-filename"></span>
+      <span class="text-white-50 small" id="status-rows"></span>
+      <button class="btn btn-sm btn-outline-light py-0" onclick="resetApp()">
+        <i class="bi bi-arrow-repeat me-1"></i>Change file
+      </button>
+    </div>
+  </nav>
+
+  <!-- ── Tab bar ─────────────────────────────────────────────────────────── -->
+  <div class="cisco-tab-bar px-3 pt-2">
+    <ul class="nav nav-tabs" id="mainTabs" role="tablist">
+      <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="tab-overview-btn" data-bs-toggle="tab"
+          data-bs-target="#tab-overview" type="button" role="tab">
+          <i class="bi bi-grid-3x3-gap me-1"></i>Overview
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="tab-details-btn" data-bs-toggle="tab"
+          data-bs-target="#tab-details" type="button" role="tab">
+          <i class="bi bi-table me-1"></i>Details
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="tab-customer-btn" data-bs-toggle="tab"
+          data-bs-target="#tab-customer" type="button" role="tab">
+          <i class="bi bi-building me-1"></i>Customer
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="tab-pvi-btn" data-bs-toggle="tab"
+          data-bs-target="#tab-pvi" type="button" role="tab">
+          <i class="bi bi-speedometer2 me-1"></i>PVI
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="tab-lifecycle-btn" data-bs-toggle="tab"
+          data-bs-target="#tab-lifecycle" type="button" role="tab">
+          <i class="bi bi-bar-chart me-1"></i>Lifecycle
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="tab-cpi-adopt-btn" data-bs-toggle="tab"
+          data-bs-target="#tab-cpi-adopt" type="button" role="tab">
+          <i class="bi bi-graph-up-arrow me-1"></i>CPI Adopt
+        </button>
+      </li>
+    </ul>
+  </div>
+
+  <!-- ── Main Content ────────────────────────────────────────────────────── -->
+  <div class="container-fluid px-3 py-3">
+
+    <!-- Upload Section -->
+    <div id="upload-section"></div>
+
+    <!-- Tab content panes -->
+    <div class="tab-content" id="mainTabContent">
+      <div class="tab-pane fade show active" id="tab-overview" role="tabpanel"></div>
+      <div class="tab-pane fade" id="tab-details"   role="tabpanel"></div>
+      <div class="tab-pane fade" id="tab-customer"  role="tabpanel"></div>
+      <div class="tab-pane fade" id="tab-pvi"       role="tabpanel"></div>
+      <div class="tab-pane fade" id="tab-lifecycle" role="tabpanel"></div>
+      <div class="tab-pane fade" id="tab-cpi-adopt" role="tabpanel"></div>
+    </div>
+
+  </div><!-- /container-fluid -->
+
+  <!-- ── Scripts ─────────────────────────────────────────────────────────── -->
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+
+  <script src="js/idb.js"></script>
+  <script src="js/fiscal.js"></script>
+  <script src="js/pvi-brackets.js"></script>
+  <script src="js/transform.js"></script>
+  <script src="js/overview.js"></script>
+  <script src="js/details.js"></script>
+  <script src="js/customer.js"></script>
+  <script src="js/pvi.js"></script>
+  <script src="js/lifecycle.js"></script>
+  <script src="js/cpi-adopt.js"></script>
+  <script src="js/main.js"></script>
+<footer class="border-top mt-4 py-3 bg-light">
+  <div class="d-flex align-items-center justify-content-between px-3 flex-wrap gap-2">
+    <div style="font-size:0.78rem">
+      <p class="text-muted mb-1">
+        This tool is an independently developed tool and is not an official Cisco product.
+        It is provided "as is" without warranty of any kind.
+        Partners are responsible for verifying all data and results.
+        Cisco disclaims any liability for damages resulting from the use of this tool.
+      </p>
+      <p class="mb-0">
+        Need help? Visit <a href="https://cs.co/AdoptDash" target="_blank" rel="noopener">cs.co/AdoptDash</a>
+      </p>
+    </div>
+    <div class="text-muted text-end" style="font-size:0.78rem;white-space:nowrap">
+      v6.0 &mdash; 22/06/2026
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
