@@ -98,6 +98,20 @@ function transformData(rawRows) {
   // ── Get 18-FM-ago start (for Steps 19–24) ────────────────────────────────
   var month18AgoStart = get18MonthAgoStart(); // from fiscal.js
 
+  // ── One-time: detect AAP column name ─────────────────────────────────────
+  var aapColumnKey = null;
+  if (rawRows.length > 0) {
+    var aapMatches = Object.keys(rawRows[0]).filter(function(k) {
+      return k.replace(/\s+/g, " ").trim().toLowerCase().indexOf("adoption accountability planning") !== -1;
+    });
+    if (aapMatches.length) {
+      aapColumnKey = aapMatches[0];
+      console.log("[AAP] Found column:", aapColumnKey);
+    } else {
+      console.warn("[AAP] Column 'Adoption Accountability Planning...' not found. Available columns:", Object.keys(rawRows[0]));
+    }
+  }
+
   // ── Main transformation ───────────────────────────────────────────────────
   return rawRows.map(function (raw) {
     var r = Object.assign({}, raw); // shallow copy
@@ -259,6 +273,10 @@ function transformData(rawRows) {
     var ea = r["EA Flag"];
     if (ea === "Y" || ea === "y") r["EA Flag"] = "Yes";
     else if (ea === "N" || ea === "n") r["EA Flag"] = "No";
+
+    // Step 18b: AAP Flag normalization — find column regardless of exact casing/spacing
+    var aapVal = aapColumnKey ? r[aapColumnKey] : null;
+    r["AAP Flag"] = (aapVal === "Y" || aapVal === "y") ? "Yes" : "No";
 
     // Step 19: Offer Risk Level (calendar-based 18-month window)
     var bookDateObj = toDate(r["Booking Date"]);

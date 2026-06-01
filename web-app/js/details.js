@@ -139,6 +139,7 @@ function renderDetails(data) {
   html += '<div class="form-check form-check-sm"><input class="form-check-input" type="checkbox" id="filter-expires-soon"><label class="form-check-label" for="filter-expires-soon">Expires Soon (&lt;3M)</label></div>';
   html += '<div class="form-check form-check-sm"><input class="form-check-input" type="checkbox" id="filter-earned"><label class="form-check-label" for="filter-earned">Earned</label></div>';
   html += '<div class="form-check form-check-sm"><input class="form-check-input" type="checkbox" id="filter-ea"><label class="form-check-label" for="filter-ea">EA</label></div>';
+  html += '<div class="form-check form-check-sm"><input class="form-check-input" type="checkbox" id="filter-aap"><label class="form-check-label" for="filter-aap">AAP</label></div>';
   html += '<div class="form-check form-check-sm"><input class="form-check-input" type="checkbox" id="filter-pvi-eligible"><label class="form-check-label" for="filter-pvi-eligible">PVI Eligible</label></div>';
   html += '<div class="form-check form-check-sm"><input class="form-check-input" type="checkbox" id="filter-pvi-onboard"><label class="form-check-label" for="filter-pvi-onboard">PVI Onboard</label></div>';
   html += '<div class="form-check form-check-sm"><input class="form-check-input" type="checkbox" id="filter-pvi-adopt"><label class="form-check-label" for="filter-pvi-adopt">PVI Adopt</label></div>';
@@ -268,6 +269,7 @@ function renderDetails(data) {
     var expiresSoon      = document.getElementById("filter-expires-soon").checked;
     var earnedChecked    = document.getElementById("filter-earned").checked;
     var eaChecked        = document.getElementById("filter-ea").checked;
+    var aapChecked       = document.getElementById("filter-aap").checked;
     var riskChecked      = getChecked("filter-risk");
     var bkFrom  = document.getElementById("det-bk-from");
     var bkTo    = document.getElementById("det-bk-to");
@@ -303,6 +305,7 @@ function renderDetails(data) {
       if (expiresSoon      && String(r["Expires <3M?"] || "") !== "Yes")                                  return false;
       if (earnedChecked    && r["Earned?"] !== true)                                                        return false;
       if (eaChecked        && String(r["EA Flag"] || "") !== "Yes")                                         return false;
+      if (aapChecked       && String(r["AAP Flag"] || "") !== "Yes")                                        return false;
       if (riskChecked.length && riskChecked.indexOf(String(r["Offer Risk Level"] || "")) === -1)          return false;
 
       if (bkFromDate || bkToDate) {
