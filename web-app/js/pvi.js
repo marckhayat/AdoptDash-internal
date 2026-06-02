@@ -138,7 +138,7 @@ function renderPVI(data) {
       var html = '<div class="d-flex gap-3 flex-wrap">';
       html += '<div class="text-center"><div class="small text-muted">Sim Onboard</div><div style="font-size:1.4rem">' + simOnbScore + '</div></div>';
       html += '<div class="text-center"><div class="small text-muted">Sim Adopt</div><div style="font-size:1.4rem">' + simAdpScore + '</div></div>';
-      html += '<div class="text-center"><div class="small text-muted fw-bold">Sim Total</div><div class="pvi-score-total fw-bold ' + scoreClass(simTotal) + '">' + simTotal.toFixed(1) + '</div></div>';
+      html += '<div class="text-center"><div class="small text-muted fw-bold">Sim Total</div><div class="fw-bold ' + scoreClass(simTotal) + '" style="font-size:1.4rem">' + simTotal.toFixed(1) + '</div></div>';
       html += '</div>';
       document.getElementById("sim-result-" + slug).innerHTML = html;
     }

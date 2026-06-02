@@ -13,7 +13,7 @@
 
   <!-- ── Top Navigation ──────────────────────────────────────────────────── -->
   <nav class="navbar navbar-expand-lg navbar-dark cisco-nav px-3 py-2">
-    <a class="navbar-brand fw-bold fs-5" href="#">
+    <a class="navbar-brand fw-bold fs-5" href="#" onclick="resetApp();return false;">
       <i class="bi bi-bar-chart-fill me-2"></i>Adoption Dashboard
     </a>
     <span class="navbar-text text-white-50 small ms-2">Cisco CX Partner Organization</span>
@@ -109,20 +109,22 @@
   <script src="js/lifecycle.js"></script>
   <script src="js/cpi-adopt.js"></script>
   <script src="js/main.js"></script>
-<footer class="border-top mt-4 py-3 bg-light">
-  <div class="d-flex align-items-center justify-content-between px-3 flex-wrap gap-2">
-    <div style="font-size:0.78rem">
-      <p class="text-muted mb-1">
-        This tool is an independently developed tool and is not an official Cisco product.
-        It is provided "as is" without warranty of any kind.
-        Partners are responsible for verifying all data and results.
-        Cisco disclaims any liability for damages resulting from the use of this tool.
-      </p>
-      <p class="mb-0">
-        Need help? Visit <a href="https://cs.co/AdoptDash" target="_blank" rel="noopener">cs.co/AdoptDash</a>
+<footer class="border-top mt-4 bg-light">
+  <!-- Need help? banner -->
+  <div class="text-center py-3 border-bottom">
+    <span class="text-muted small me-2"><i class="bi bi-question-circle me-1"></i>Need help or want to give feedback?</span>
+    <a href="https://cs.co/AdoptDash" target="_blank" rel="noopener" class="btn btn-sm btn-outline-primary px-3">
+      <i class="bi bi-box-arrow-up-right me-1"></i>Visit cs.co/AdoptDash
+    </a>
+  </div>
+  <!-- Disclaimer + version -->
+  <div class="d-flex align-items-center justify-content-between px-3 py-2 flex-wrap gap-2 cisco-nav">
+    <div style="font-size:0.75rem">
+      <p class="mb-0" style="color:#fff">
+        <span class="fw-semibold me-1">Disclaimer:</span>This tool is independently developed and is not an official Cisco product. Provided "as is" without warranty. Partners are responsible for verifying all data and results.
       </p>
     </div>
-    <div class="text-muted text-end" style="font-size:0.78rem;white-space:nowrap">
+    <div style="font-size:0.78rem;white-space:nowrap;color:#9aa5b1">
       v6.1.1 &mdash; 02/06/2026
     </div>
   </div>

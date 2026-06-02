@@ -49,7 +49,7 @@
 
 /* ── Upload card ─────────────────────────────────────────── */
 .upload-card {
-  max-width: 600px;
+  max-width: 760px;
 }
 .upload-card .card {
   border: 2px dashed #ced4da;

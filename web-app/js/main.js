@@ -337,11 +337,14 @@ function finishLoad(filename, rowCount, headerAutoDetected, idbType, loadedAt) {
 
   // Save to IndexedDB (fire-and-forget)
   if (idbType && APP_DATA) {
+    var beGeoIds = [];
+    APP_DATA.forEach(function(r) { var v = String(r["BE GEO ID"] || "").trim(); if (v && beGeoIds.indexOf(v) === -1) beGeoIds.push(v); });
     IDB.save(idbType, APP_DATA, {
       filename:    filename,
       rowCount:    rowCount,
       loadedAt:    new Date().toISOString(),
       displayName: displayName,
+      beGeoIds:    beGeoIds,
       isDisti:     APP_IS_DISTI
     }).catch(function (e) { console.warn("IDB save failed:", e); });
   }
@@ -374,7 +377,8 @@ function restoreUploadSection(cachedEntries) {
 
   function fmtDate(iso) {
     if (!iso) return "";
-    var d = new Date(iso);
+    var d = (iso instanceof Date) ? iso : new Date(iso);
+    if (isNaN(d.getTime())) return "";
     return d.toLocaleDateString("en-GB") + " " + d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
   }
 
@@ -382,17 +386,30 @@ function restoreUploadSection(cachedEntries) {
     var isCpi = entry.type.indexOf("cpi-") === 0;
     var beGeoId = isCpi ? entry.type.replace("cpi-", "") : "";
     var displayName = entry.meta.displayName || "";
-    var html = '<div class="card border-success mb-2 p-2">';
+    var cardColor  = isCpi ? "warning" : "success";
+    var btnColor   = isCpi ? "warning" : "success";
+    var html = '<div class="col-6"><div class="card border-' + cardColor + ' mb-2 p-2">';
     html += '<div class="d-flex justify-content-between align-items-start gap-2">';
     html += '<div style="min-width:0">';
-    if (isCpi) html += '<div class="fw-semibold small">' + (displayName || beGeoId) + '</div>';
-    html += '<div class="text-muted small text-truncate" title="' + entry.meta.filename + '">' + entry.meta.filename + '</div>';
-    html += '<div class="text-muted" style="font-size:0.72rem">' + (entry.meta.rowCount||0).toLocaleString() + ' rows &middot; ' + fmtDate(entry.meta.loadedAt) + '</div>';
+    if (isCpi) {
+      if (displayName) html += '<div class="fw-semibold small">' + displayName + '</div>';
+    } else {
+      html += '<div class="fw-semibold small">' + entry.meta.filename + '</div>';
+    }
+    if (isCpi) {
+      html += '<div class="text-muted" style="font-size:0.72rem">BE GEO ID ' + beGeoId + ' &middot; ' + (entry.meta.rowCount||0).toLocaleString() + ' rows</div>';
+    } else {
+      var geoStr = (entry.meta.beGeoIds && entry.meta.beGeoIds.length > 0) ? entry.meta.beGeoIds.slice(0,3).join(", ") + (entry.meta.beGeoIds.length > 3 ? " +" + (entry.meta.beGeoIds.length - 3) + " more" : "") : "";
+      html += '<div class="text-muted" style="font-size:0.72rem">' + (geoStr ? 'BE GEO ID ' + geoStr + ' &middot; ' : '') + (entry.meta.rowCount||0).toLocaleString() + ' rows</div>';
+    }
+    var basename = (entry.meta.filename || '').split(/[\\/]/).pop().replace(/\s*·\s*BE GEO ID.*$/, '');
+    var dateStr = fmtDate(entry.meta.loadedAt);
+    html += '<div class="text-muted text-truncate" style="font-size:0.72rem" title="' + entry.meta.filename + '">' + basename + (dateStr ? ' &middot; ' + dateStr : '') + '</div>';
     html += '</div>';
     html += '<div class="d-flex gap-1 flex-shrink-0">';
-    html += '<button class="btn btn-sm btn-success idb-resume-btn py-0" data-idbtype="' + entry.type + '" title="Resume"><i class="bi bi-play-fill"></i></button>';
+    html += '<button class="btn btn-sm btn-' + btnColor + ' idb-resume-btn py-0" data-idbtype="' + entry.type + '" title="Resume"><i class="bi bi-play-fill"></i></button>';
     html += '<button class="btn btn-sm btn-outline-danger idb-clear-btn py-0" data-idbtype="' + entry.type + '" title="Delete"><i class="bi bi-trash"></i></button>';
-    html += '</div></div></div>';
+    html += '</div></div></div></div>';
     return html;
   }
 
@@ -423,7 +440,7 @@ function restoreUploadSection(cachedEntries) {
 
   // ── Build two-column layout ────────────────────────────────────────────────
   sec.innerHTML =
-    '<div class="container-fluid py-4" style="max-width:1100px">' +
+    '<div class="container-fluid py-4" style="max-width:1400px">' +
     '<div class="row g-4">' +
 
     // ── LEFT: Partner column ──────────────────────────────────────────────────
@@ -431,10 +448,10 @@ function restoreUploadSection(cachedEntries) {
 
     // Partner upload card
     '<div class="card shadow-sm mb-3">' +
-    '<div class="card-header fw-semibold" style="font-size:0.9rem"><i class="bi bi-people-fill me-2 text-primary"></i>Partners — Upload Workspan Export</div>' +
-    '<div class="card-body p-4">' +
+    '<div class="card-header fw-semibold" style="font-size:0.9rem"><i class="bi bi-people-fill me-2 text-primary"></i>Partners</div>' +
+    '<div class="card-body p-4 text-center">' +
     // Toggle tabs
-    '<ul class="nav nav-pills mb-3" id="ws-load-tabs">' +
+    '<ul class="nav nav-pills mb-3 justify-content-center" id="ws-load-tabs">' +
     '<li class="nav-item"><button class="nav-link active py-1 px-3" id="ws-tab-file" style="font-size:0.85rem"><i class="bi bi-file-earmark-spreadsheet me-1"></i>Upload File</button></li>' +
     '<li class="nav-item ms-1"><button class="nav-link py-1 px-3" id="ws-tab-api" style="font-size:0.85rem"><i class="bi bi-cloud-download me-1"></i>Load via API</button></li>' +
     '</ul>' +
@@ -444,44 +461,44 @@ function restoreUploadSection(cachedEntries) {
     '<p class="text-muted mb-3">Upload your Workspan report export<br/>' +
     '<small><a href="https://app.workspan.com/reports/view/19849" target="_blank" rel="noopener"><strong>Report 19849</strong></a> for Partners &nbsp;|&nbsp; <a href="https://app.workspan.com/reports/view/21766" target="_blank" rel="noopener"><strong>Report 21766</strong></a> for Distributors</small>' +
     '</p>' +
-    '<div class="alert alert-warning py-2 px-3 text-start small mb-4" style="max-width:380px;margin:0 auto;">' +
+    '<div class="alert alert-warning py-2 px-3 text-start small mb-4">' +
     '<i class="bi bi-exclamation-triangle me-1"></i><strong>For large exports (&gt;20 MB), use CSV.</strong><br/>' +
     'In Workspan: <em>Export → CSV</em>. CSV handles any number of rows.' +
     '</div>' +
     '<label for="file-input" class="btn btn-cisco btn-lg mb-3 px-5"><i class="bi bi-file-earmark-spreadsheet me-2"></i>Choose File (.xlsx or .csv)</label>' +
     '<input type="file" id="file-input" accept=".xlsx,.xls,.csv" class="d-none" />' +
-    '<p class="text-muted small mt-2"><i class="bi bi-shield-lock me-1"></i>File processed entirely in your browser — no data sent to any server.</p>' +
     '</div>' +
     // API panel
-    '<div id="ws-panel-api" class="d-none">' +
+    '<div id="ws-panel-api" class="d-none text-start">' +
     '<div class="alert alert-info py-2 px-3 small mb-3"><i class="bi bi-info-circle me-1"></i>' +
     '<strong>Requires the local proxy to be running.</strong> Start it first using ' +
     '<code>Start Proxy (Windows).bat</code> or <code>Start Proxy (Mac).sh</code> from the web-app folder.</div>' +
-    '<p class="text-muted small mb-3">Enter your WorkSpan API credentials to download the report directly. Credentials are used only in your browser and never stored.</p>'+
-    '<div class="mb-2" style="max-width:380px">' +
+    '<p class="text-muted small mb-3">Enter your WorkSpan API credentials to download the report directly. Credentials are used only in your browser and never stored.</p>' +
+    '<p class="text-muted small mb-3"><i class="bi bi-hourglass-split me-1"></i><strong>Note:</strong> Depending on report size, this may take a few minutes.</p>' +
+    '<div class="mb-2">' +
     '<label class="form-label small fw-semibold mb-1">Report ID</label>' +
     '<input type="number" id="ws-report-id" class="form-control form-control-sm" placeholder="e.g. 19849" />' +
     '</div>' +
-    '<div class="mb-2" style="max-width:380px">' +
+    '<div class="mb-2">' +
     '<label class="form-label small fw-semibold mb-1">Client ID</label>' +
     '<input type="text" id="ws-client-id" class="form-control form-control-sm" placeholder="WS-ApplicationUser_…" style="font-family:monospace;font-size:0.8rem" />' +
     '</div>' +
-    '<div class="mb-3" style="max-width:380px">' +
+    '<div class="mb-3">' +
     '<label class="form-label small fw-semibold mb-1">Client Secret</label>' +
     '<input type="password" id="ws-client-secret" class="form-control form-control-sm" placeholder="••••••••••••" style="font-family:monospace" />' +
     '</div>' +
     '<div id="ws-api-error" class="alert alert-danger py-2 px-3 small mb-2 d-none"></div>' +
     '<div id="ws-api-status" class="text-muted small mb-2 d-none"><i class="bi bi-arrow-repeat me-1"></i><span id="ws-api-status-text"></span></div>' +
     '<button id="ws-api-load-btn" class="btn btn-primary px-4"><i class="bi bi-cloud-download me-2"></i>Load Report</button>' +
-    '<p class="text-muted small mt-3 mb-0"><i class="bi bi-shield-lock me-1"></i>All API calls are made directly from your browser. No proxy server is used.</p>' +
+    '<p class="text-muted small mt-3 mb-0"><i class="bi bi-shield-lock me-1"></i>API calls are routed through the local proxy on your machine. No data leaves your computer.</p>' +
     '</div>' +
-    '</div></div>'+
+    '</div></div>' +
 
     // Previous partner sessions
     (wsEntries.length > 0 ?
       '<div class="card shadow-sm border-success">' +
-      '<div class="card-header bg-success bg-opacity-10 fw-semibold" style="font-size:0.85rem"><i class="bi bi-lightning-charge-fill me-2 text-success"></i>Previous partner sessions</div>' +
-      '<div class="card-body p-2">' + wsEntries.map(resumeCard).join("") + '</div>' +
+      '<div class="card-header bg-success bg-opacity-10 fw-semibold" style="font-size:0.85rem"><i class="bi bi-lightning-charge-fill me-2 text-success"></i>Previous sessions</div>' +
+      '<div class="card-body p-2"><div class="row g-2">' + wsEntries.map(resumeCard).join("") + '</div></div>' +
       '</div>'
     : '') +
 
@@ -492,45 +509,44 @@ function restoreUploadSection(cachedEntries) {
 
     // Cisco CPI card
     '<div class="card shadow-sm border-warning mb-3">' +
-    '<div class="card-header bg-warning bg-opacity-10 fw-semibold" style="font-size:0.9rem"><i class="bi bi-lock-fill me-2 text-warning"></i>Cisco-internal — CPI Data</div>' +
-    '<div class="card-body p-4">' +
+    '<div class="card-header bg-warning bg-opacity-10 fw-semibold" style="font-size:0.9rem"><i class="bi bi-lock-fill me-2 text-warning"></i>Cisco-internal</div>' +
+    '<div class="card-body p-4 text-center">' +
     '<p class="text-muted small mb-3">Load a CPI data file from the shared OneDrive folder, filtered to a specific BE GEO ID.</p>' +
-    '<div class="mb-3">' +
+    '<div class="mb-3 text-start">'+
     '<label class="form-label small fw-semibold mb-1"><i class="bi bi-person-badge-fill me-1"></i>Your Cisco username</label>' +
-    '<div class="input-group input-group-sm" style="max-width:320px">' +
+    '<div class="input-group input-group-sm" style="max-width:420px">' +
     '<input type="text" id="lci-username" class="form-control form-control-sm" placeholder="e.g. jsmith" style="font-family:monospace"/>' +
     '</div>' +
-    '<div class="form-text">Your Cisco username (same as your laptop login). Saved per browser.</div>' +
-    '<div class="mt-2 collapse" id="lci-path-advanced">' +
+    '<div class="mt-2 collapse" id="lci-path-advanced">'+
     '<label class="form-label small fw-semibold mb-1"><i class="bi bi-folder me-1"></i>Full base path <span class="text-muted fw-normal">(auto-filled, override if needed)</span></label>' +
     '<input type="text" id="lci-basepath" class="form-control form-control-sm" style="font-family:monospace;font-size:0.78rem"/>' +
     '</div>' +
     '<a href="#" class="small" id="lci-toggle-advanced">Advanced: edit full path manually</a>' +
     '</div>' +
-    '<div class="row g-2 mb-3">' +
+    '<div class="row g-2 mb-3 align-items-end">' +
     '<div class="col-auto"><label class="form-label small fw-semibold mb-1">Region</label>' +
     '<select id="lci-region" class="form-select form-select-sm">' +
     '<option value="EMEA">EMEA</option><option value="AMER">AMER</option><option value="APJC">APJC</option><option value="DISTI">DISTI</option>' +
     '</select></div>' +
     '<div class="col-auto"><label class="form-label small fw-semibold mb-1">Week</label>' +
     '<select id="lci-week" class="form-select form-select-sm">' + weekOptions + '</select></div>' +
-    '</div>' +
-    '<div class="mb-3">' +
-    '<label class="form-label small fw-semibold mb-1">BE GEO ID(s)</label>' +
+    '<div class="col"><label class="form-label small fw-semibold mb-1">BE GEO ID(s) <span class="fw-normal text-muted" style="font-size:0.75rem">— Separate multiple IDs with comma or space.</span></label>' +
     '<div id="lci-begeoid-wrap" class="form-control form-control-sm d-flex flex-wrap gap-1 align-items-center" style="height:auto;min-height:31px;cursor:text;padding:3px 8px">' +
     '<input type="text" id="lci-begeoid" class="border-0 p-0 bg-transparent" style="outline:none;width:90px;min-width:60px;font-size:0.875rem" placeholder="e.g. 12345" />' +
     '</div>' +
-    '<div class="form-text">Separate multiple IDs with comma or space. Press Enter to confirm each.</div>' +
+    '</div>' +
     '</div>' +
     '<div id="lci-path-hint" class="alert alert-secondary py-2 px-3 text-start small mb-3 d-none">' +
-    '<span id="lci-path-text" style="word-break:break-all;font-family:monospace"></span>' +
+    '<span id="lci-path-text" style="font-family:monospace"></span>' +
     '<button id="lci-copy-btn" class="btn btn-sm btn-outline-secondary ms-2 py-0" title="Copy path"><i class="bi bi-clipboard"></i></button>' +
     '</div>' +
     '<div id="lci-error" class="alert alert-danger py-2 px-3 small mb-3 d-none"></div>' +
     '<div id="lci-session-picker" class="d-none"></div>' +
+    '<div class="d-flex align-items-center gap-3 flex-wrap">' +
+    '<p class="text-muted small mb-0">Navigate to the displayed path and select the file.</p>' +
     '<button id="lci-load-btn" class="btn btn-warning px-4"><i class="bi bi-folder2-open me-2"></i>Select CPI file…</button>' +
     '<input type="file" id="lci-file-input" accept=".csv" class="d-none" />' +
-    '<p class="text-muted small mt-3 mb-0">Navigate to the displayed path and select the file.</p>' +
+    '</div>'+
     '</div></div>' +
 
     // Previous CPI sessions (cached + any pending multi-session results)
@@ -539,33 +555,39 @@ function restoreUploadSection(cachedEntries) {
       if (APP_MULTI_SESSIONS && APP_MULTI_SESSIONS.sessions.length > 0) {
         multiCards = APP_MULTI_SESSIONS.sessions.map(function(sess, i) {
           var name = sess.partnerName ? '<div class="fw-semibold small">' + sess.partnerName + '</div>' : '';
-          return '<div class="card border-warning mb-2 p-2">' +
+          var loadedAt = APP_MULTI_SESSIONS.loadedAt || null;
+          var dateStr = loadedAt ? (function(iso){ var d=new Date(iso); return isNaN(d)?'':(d.toLocaleDateString('en-GB')+' '+d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})); })(loadedAt) : '';
+          return '<div class="col-6"><div class="card border-warning mb-0 p-2">' +
             '<div class="d-flex justify-content-between align-items-start gap-2">' +
             '<div style="min-width:0">' +
             name +
-            '<div class="text-muted small text-truncate">BE GEO ' + sess.id + '</div>' +
-            '<div class="text-muted" style="font-size:0.72rem">' + sess.rows.length.toLocaleString() + ' rows &middot; ' + APP_MULTI_SESSIONS.fileMeta.name + '</div>' +
+            '<div class="text-muted" style="font-size:0.72rem">BE GEO ID ' + sess.id + ' &middot; ' + sess.rows.length.toLocaleString() + ' rows</div>' +
+            '<div class="text-muted text-truncate" style="font-size:0.72rem">' + APP_MULTI_SESSIONS.fileMeta.name + (dateStr ? ' &middot; ' + dateStr : '') + '</div>' +
             '</div>' +
+            '<div class="d-flex gap-1 flex-shrink-0">' +
             '<button class="btn btn-sm btn-warning py-0 multi-pick-btn flex-shrink-0" data-geo-idx="' + i + '" title="Load"><i class="bi bi-play-fill"></i></button>' +
-            '</div></div>';
+            '<button class="btn btn-sm btn-outline-danger py-0 multi-del-btn flex-shrink-0" data-geo-idx="' + i + '" title="Delete"><i class="bi bi-trash"></i></button>' +
+            '</div>' +
+            '</div></div></div>';
         }).join("");
       }
       var hasAny = cpiEntries.length > 0 || multiCards;
       if (!hasAny) return '';
       return '<div class="card shadow-sm border-warning">' +
-        '<div class="card-header bg-warning bg-opacity-10 fw-semibold" style="font-size:0.85rem"><i class="bi bi-lightning-charge-fill me-2 text-warning"></i>Previous CPI sessions</div>' +
-        '<div class="card-body p-2">' +
+        '<div class="card-header bg-warning bg-opacity-10 fw-semibold" style="font-size:0.85rem"><i class="bi bi-lightning-charge-fill me-2 text-warning"></i>Previous sessions</div>' +
+        '<div class="card-body p-2"><div class="row g-2">' +
         multiCards +
         cpiEntries.map(resumeCard).join("") +
-        '</div></div>';
+        '</div></div></div>';
     })()+
 
     '</div>' + // /right col
     '</div>' +
     // ── Clear all data button ─────────────────────────────────────────────
     '<div class="text-center mt-2 mb-1">' +
+    '<p class="text-muted small mb-2"><i class="bi bi-shield-lock me-1"></i>All data is processed entirely in your browser — nothing is sent to any server.</p>' +
     '<button id="clear-all-btn" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash me-1"></i>Clear all browser data</button>' +
-    '</div>' +
+    '</div>'+
     '</div>'; // /container
 
   // ── Wire up file inputs ───────────────────────────────────────────────────
@@ -657,6 +679,15 @@ function restoreUploadSection(cachedEntries) {
         APP_FILE_META = APP_MULTI_SESSIONS.fileMeta;
         finishLoad(APP_MULTI_SESSIONS.fileMeta.name + " · BE GEO ID " + sess.id, APP_DATA.length, false, "cpi-" + sess.id);
       }, 0);
+    });
+  });
+
+  sec.querySelectorAll(".multi-del-btn").forEach(function(btn) {
+    btn.addEventListener("click", function() {
+      var idx = parseInt(this.dataset.geoIdx, 10);
+      APP_MULTI_SESSIONS.sessions.splice(idx, 1);
+      if (APP_MULTI_SESSIONS.sessions.length === 0) APP_MULTI_SESSIONS = null;
+      IDB.loadAll().then(function(en) { restoreUploadSection(en); });
     });
   });
 
@@ -753,7 +784,14 @@ function restoreUploadSection(cachedEntries) {
 
   function updateLciHint() {
     var path = lciPath();
-    document.getElementById("lci-path-text").textContent = path;
+    document.getElementById("lci-path-text").title = path;
+    var MAX = 68;
+    var display = path;
+    if (path.length > MAX) {
+      var keep = Math.floor((MAX - 3) / 2);
+      display = path.slice(0, keep) + "…" + path.slice(path.length - keep);
+    }
+    document.getElementById("lci-path-text").textContent = display;
     document.getElementById("lci-path-hint").classList.remove("d-none");
   }
 
@@ -933,7 +971,7 @@ function restoreUploadSection(cachedEntries) {
             ? '\n⚠ No data found for: ' + notFound.map(function(s) { return s.id; }).join(", ")
             : "";
           if (notFoundNote) console.warn(notFoundNote);
-          APP_MULTI_SESSIONS = { sessions: found, fileMeta: { name: file.name, lastModified: file.lastModified ? new Date(file.lastModified) : null }, notFoundNote: notFound.length > 0 ? notFound.map(function(s){return s.id;}).join(", ") : "" };
+          APP_MULTI_SESSIONS = { sessions: found, fileMeta: { name: file.name, lastModified: file.lastModified ? new Date(file.lastModified) : null }, loadedAt: new Date().toISOString(), notFoundNote: notFound.length > 0 ? notFound.map(function(s){return s.id;}).join(", ") : "" };
           IDB.loadAll().then(function(en) {
             restoreUploadSection(en);
           });
@@ -956,49 +994,7 @@ function restoreUploadSection(cachedEntries) {
 
 function renderMultiPicker() {
   var barEl = document.getElementById("multi-session-bar");
-  if (!barEl) return;
-  // Only show the bar when upload section is hidden (a session is active)
-  var uploadHidden = document.getElementById("upload-section").classList.contains("d-none");
-  if (!APP_MULTI_SESSIONS || !uploadHidden) { barEl.classList.add("d-none"); barEl.innerHTML = ""; return; }
-
-  var found = APP_MULTI_SESSIONS.sessions;
-  var cards = found.map(function(sess, i) {
-    var isCurrent = APP_DATA && APP_FILE_META && APP_FILE_META.name === APP_MULTI_SESSIONS.fileMeta.name &&
-      APP_DATA.length > 0 && APP_DATA.some(function(r) { return String(r["BE GEO ID"] || "").trim() === sess.id; });
-    var name = sess.partnerName ? '<span class="fw-semibold me-1">' + sess.partnerName + '</span>' : '';
-    return '<div class="d-inline-flex align-items-center gap-1 me-2 mb-1 p-1 px-2 rounded border ' + (isCurrent ? 'border-warning bg-warning bg-opacity-25' : 'border-secondary bg-white') + '" style="font-size:0.8rem">' +
-      name +
-      '<span class="text-muted">BE GEO ' + sess.id + '</span>' +
-      '<span class="text-muted ms-1" style="font-size:0.72rem">(' + sess.rows.length.toLocaleString() + ')</span>' +
-      (!isCurrent ? '<button class="btn btn-sm btn-warning py-0 ms-2 lci-pick-btn" style="font-size:0.75rem;padding:1px 6px" data-geo-idx="' + i + '">Load</button>' : '<span class="ms-2 text-warning fw-semibold" style="font-size:0.72rem">● active</span>') +
-      '</div>';
-  }).join("");
-
-  barEl.innerHTML =
-    '<div class="d-flex flex-wrap align-items-center gap-1 py-2 px-2 border-bottom bg-light" style="font-size:0.82rem">' +
-    '<span class="fw-semibold me-2"><i class="bi bi-collection me-1 text-warning"></i>Multi-GEO sessions:</span>' +
-    cards +
-    '<button class="btn btn-sm btn-outline-secondary py-0 ms-auto" style="font-size:0.72rem" id="multi-session-close"><i class="bi bi-x"></i> Clear</button>' +
-    '</div>';
-  barEl.classList.remove("d-none");
-
-  barEl.querySelectorAll(".lci-pick-btn").forEach(function(btn) {
-    btn.addEventListener("click", function() {
-      var idx = parseInt(this.dataset.geoIdx, 10);
-      var sess = APP_MULTI_SESSIONS.sessions[idx];
-      showLoader("Processing " + sess.rows.length + " rows for " + sess.id + "…");
-      setTimeout(function() {
-        APP_DATA = transformData(sess.rows);
-        APP_FILE_META = APP_MULTI_SESSIONS.fileMeta;
-        finishLoad(APP_MULTI_SESSIONS.fileMeta.name + " · BE GEO ID " + sess.id, APP_DATA.length, false, "cpi-" + sess.id);
-      }, 0);
-    });
-  });
-  var closeBtn = document.getElementById("multi-session-close");
-  if (closeBtn) closeBtn.addEventListener("click", function() {
-    APP_MULTI_SESSIONS = null;
-    renderMultiPicker();
-  });
+  if (barEl) { barEl.classList.add("d-none"); barEl.innerHTML = ""; }
 }
 
 function renderActiveTab(target) {
