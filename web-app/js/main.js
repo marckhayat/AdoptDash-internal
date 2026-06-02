@@ -7,6 +7,7 @@ var APP_DATA = null;
 var APP_FILE_META = null;
 var APP_IS_DISTI = false;
 var APP_MULTI_SESSIONS = null; // { sessions: [...], fileMeta: {...} }
+var APP_VERSION = "v6.1.2";
 
 // Workspan column names used to auto-detect the header row
 var KNOWN_COLUMNS = [
@@ -440,6 +441,10 @@ function restoreUploadSection(cachedEntries) {
 
   // ── Build two-column layout ────────────────────────────────────────────────
   sec.innerHTML =
+    '<div id="update-banner" class="d-none alert alert-info alert-dismissible mb-0 py-2 px-3 rounded-0" style="font-size:0.85rem">' +
+    '<i class="bi bi-arrow-up-circle-fill me-2"></i><strong>Update available!</strong> Version <span id="update-version"></span> is on GitHub. ' +
+    '<a href="https://github.com/marckhayat/AdoptDash/tags" target="_blank" rel="noopener" class="alert-link ms-1">View changelog</a>' +
+    '<button type="button" class="btn-close py-2" data-bs-dismiss="alert"></button></div>' +
     '<div class="container-fluid py-4" style="max-width:1400px">' +
     '<div class="row g-4">' +
 
@@ -990,6 +995,23 @@ function restoreUploadSection(cachedEntries) {
   });
 
   renderMultiPicker(); // show persistent session bar if APP_MULTI_SESSIONS is set
+
+  // ── Update check (runs once per page load) ────────────────────────────────
+  fetch("https://api.github.com/repos/marckhayat/AdoptDash/tags")
+    .then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(tags) {
+      if (!Array.isArray(tags) || tags.length === 0) return;
+      var latest = tags[0].name;
+      if (latest && latest !== APP_VERSION) {
+        var bannerEl = document.getElementById("update-banner");
+        var verEl    = document.getElementById("update-version");
+        if (bannerEl && verEl) {
+          verEl.textContent = latest;
+          bannerEl.classList.remove("d-none");
+        }
+      }
+    })
+    .catch(function() { /* network unavailable — silently ignore */ });
 }
 
 function renderMultiPicker() {
