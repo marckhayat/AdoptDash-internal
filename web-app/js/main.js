@@ -7,7 +7,7 @@ var APP_DATA = null;
 var APP_FILE_META = null;
 var APP_IS_DISTI = false;
 var APP_MULTI_SESSIONS = null; // { sessions: [...], fileMeta: {...} }
-var APP_VERSION = "v6.1.2";
+var APP_VERSION = "v6.1.3";
 
 // Workspan column names used to auto-detect the header row
 var KNOWN_COLUMNS = [

@@ -163,7 +163,7 @@ function renderDetails(data) {
 
   // Date filters
   html += '<div class="filter-group"><label class="group-label">Booking Date</label>'      + makeDateSlider("det-bk",  dateBounds.bk)  + '</div>';
-  html += '<div class="filter-group"><label class="group-label">Rebate Start Date</label>'  + makeDateSlider("det-rs",  dateBounds.rs)  + '</div>';
+  html += '<div class="filter-group"><label class="group-label">Opt-in Date</label>'        + makeDateSlider("det-rs",  dateBounds.rs)  + '</div>';
   html += '<div class="filter-group"><label class="group-label">Rebate Expiry Date</label>' + makeDateSlider("det-exp", dateBounds.exp) + '</div>';
 
   html += makeCheckboxGroup("Offer Risk Level", "filter-risk", riskOpts);
@@ -337,10 +337,9 @@ function renderDetails(data) {
       }
       if (rsFromDate || rsToDate) {
         var d2 = toDate(r["Adopt Rebate Start Date"]);
-        if (d2) {
-          if (rsFromDate && d2 < rsFromDate) return false;
-          if (rsToDate   && d2 > rsToDate)   return false;
-        }
+        if (!d2) return false;
+        if (rsFromDate && d2 < rsFromDate) return false;
+        if (rsToDate   && d2 > rsToDate)   return false;
       }
       if (expFromDate || expToDate) {
         var d3 = toDate(r["Deal Incentive Expiry Date"]);

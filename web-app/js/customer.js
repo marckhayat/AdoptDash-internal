@@ -140,6 +140,7 @@ function renderCustomer(data) {
       ...(has2TPartner ? [{ label: "2T Partner Name", field: "2T Partner Name" }] : []),
       { label: "CR Party Name",                     field: "CR Party Name" },
       { label: "CR Party ID",                       field: "CR Party ID" },
+      { label: "CX Customer BU ID",                 field: "CX Customer BU ID" },
       { label: "Domain",                            field: "Deal CPI Portfolio" },
       { label: "Offer",                             field: "Track" },
       { label: "Use Case",                          field: "Sub-Track",                        isUC: true },
@@ -150,7 +151,7 @@ function renderCustomer(data) {
       { label: "Potential<br>Incentives",           field: "Potential Incentives",             isCurrency: true },
       { label: "Estimated<br>Earned Incentives",    field: "Estimated Earned Incentives",      isCurrency: true },
       { label: "Booking Date",                      field: "Booking Date",                     isDate: true },
-      { label: "Opt-in Start",                      field: "Adopt Rebate Start Date",          isDate: true },
+      { label: "Opt-in Date",                      field: "Adopt Rebate Start Date",          isDate: true },
       { label: "Expiry Date",                       field: "Deal Incentive Expiry Date",       isDate: true, isExpiry: true },
       { label: "Stages Completed<br>Before Opt-in", field: "Missed Incentives",               isMissedFlag: true },
       { label: "Deal WS-ID",                        field: "Deal WS-ID",                       isWsId: true }
