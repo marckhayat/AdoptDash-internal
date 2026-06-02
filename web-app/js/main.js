@@ -432,7 +432,14 @@ function restoreUploadSection(cachedEntries) {
     // Partner upload card
     '<div class="card shadow-sm mb-3">' +
     '<div class="card-header fw-semibold" style="font-size:0.9rem"><i class="bi bi-people-fill me-2 text-primary"></i>Partners — Upload Workspan Export</div>' +
-    '<div class="card-body p-4 text-center">' +
+    '<div class="card-body p-4">' +
+    // Toggle tabs
+    '<ul class="nav nav-pills mb-3" id="ws-load-tabs">' +
+    '<li class="nav-item"><button class="nav-link active py-1 px-3" id="ws-tab-file" style="font-size:0.85rem"><i class="bi bi-file-earmark-spreadsheet me-1"></i>Upload File</button></li>' +
+    '<li class="nav-item ms-1"><button class="nav-link py-1 px-3" id="ws-tab-api" style="font-size:0.85rem"><i class="bi bi-cloud-download me-1"></i>Load via API</button></li>' +
+    '</ul>' +
+    // File upload panel
+    '<div id="ws-panel-file" class="text-center">' +
     '<i class="bi bi-cloud-upload cisco-icon-lg mb-3"></i>' +
     '<p class="text-muted mb-3">Upload your Workspan report export<br/>' +
     '<small><a href="https://app.workspan.com/reports/view/19849" target="_blank" rel="noopener"><strong>Report 19849</strong></a> for Partners &nbsp;|&nbsp; <a href="https://app.workspan.com/reports/view/21766" target="_blank" rel="noopener"><strong>Report 21766</strong></a> for Distributors</small>' +
@@ -444,7 +451,31 @@ function restoreUploadSection(cachedEntries) {
     '<label for="file-input" class="btn btn-cisco btn-lg mb-3 px-5"><i class="bi bi-file-earmark-spreadsheet me-2"></i>Choose File (.xlsx or .csv)</label>' +
     '<input type="file" id="file-input" accept=".xlsx,.xls,.csv" class="d-none" />' +
     '<p class="text-muted small mt-2"><i class="bi bi-shield-lock me-1"></i>File processed entirely in your browser — no data sent to any server.</p>' +
-    '</div></div>' +
+    '</div>' +
+    // API panel
+    '<div id="ws-panel-api" class="d-none">' +
+    '<div class="alert alert-info py-2 px-3 small mb-3"><i class="bi bi-info-circle me-1"></i>' +
+    '<strong>Requires the local proxy to be running.</strong> Start it first using ' +
+    '<code>Start Proxy (Windows).bat</code> or <code>Start Proxy (Mac).sh</code> from the web-app folder.</div>' +
+    '<p class="text-muted small mb-3">Enter your WorkSpan API credentials to download the report directly. Credentials are used only in your browser and never stored.</p>'+
+    '<div class="mb-2" style="max-width:380px">' +
+    '<label class="form-label small fw-semibold mb-1">Report ID</label>' +
+    '<input type="number" id="ws-report-id" class="form-control form-control-sm" placeholder="e.g. 19849" />' +
+    '</div>' +
+    '<div class="mb-2" style="max-width:380px">' +
+    '<label class="form-label small fw-semibold mb-1">Client ID</label>' +
+    '<input type="text" id="ws-client-id" class="form-control form-control-sm" placeholder="WS-ApplicationUser_…" style="font-family:monospace;font-size:0.8rem" />' +
+    '</div>' +
+    '<div class="mb-3" style="max-width:380px">' +
+    '<label class="form-label small fw-semibold mb-1">Client Secret</label>' +
+    '<input type="password" id="ws-client-secret" class="form-control form-control-sm" placeholder="••••••••••••" style="font-family:monospace" />' +
+    '</div>' +
+    '<div id="ws-api-error" class="alert alert-danger py-2 px-3 small mb-2 d-none"></div>' +
+    '<div id="ws-api-status" class="text-muted small mb-2 d-none"><i class="bi bi-arrow-repeat me-1"></i><span id="ws-api-status-text"></span></div>' +
+    '<button id="ws-api-load-btn" class="btn btn-primary px-4"><i class="bi bi-cloud-download me-2"></i>Load Report</button>' +
+    '<p class="text-muted small mt-3 mb-0"><i class="bi bi-shield-lock me-1"></i>All API calls are made directly from your browser. No proxy server is used.</p>' +
+    '</div>' +
+    '</div></div>'+
 
     // Previous partner sessions
     (wsEntries.length > 0 ?
@@ -540,6 +571,81 @@ function restoreUploadSection(cachedEntries) {
   // ── Wire up file inputs ───────────────────────────────────────────────────
   document.getElementById("file-input").addEventListener("change", handleFileUpload);
 
+  // ── API tab toggle ────────────────────────────────────────────────────────
+  document.getElementById("ws-tab-file").addEventListener("click", function() {
+    this.classList.add("active");
+    document.getElementById("ws-tab-api").classList.remove("active");
+    document.getElementById("ws-panel-file").classList.remove("d-none");
+    document.getElementById("ws-panel-api").classList.add("d-none");
+  });
+  document.getElementById("ws-tab-api").addEventListener("click", function() {
+    this.classList.add("active");
+    document.getElementById("ws-tab-file").classList.remove("active");
+    document.getElementById("ws-panel-api").classList.remove("d-none");
+    document.getElementById("ws-panel-file").classList.add("d-none");
+  });
+
+  // ── API load button ───────────────────────────────────────────────────────
+  // Restore saved API credentials
+  var savedReportId = localStorage.getItem("ws-report-id") || "";
+  var savedClientId = localStorage.getItem("ws-client-id") || "";
+  var savedSecret   = localStorage.getItem("ws-client-secret") || "";
+  if (savedReportId) document.getElementById("ws-report-id").value = savedReportId;
+  if (savedClientId) document.getElementById("ws-client-id").value = savedClientId;
+  if (savedSecret)   document.getElementById("ws-client-secret").value = savedSecret;
+
+  document.getElementById("ws-report-id").addEventListener("input", function() {
+    localStorage.setItem("ws-report-id", this.value.trim());
+  });
+  document.getElementById("ws-client-id").addEventListener("input", function() {
+    localStorage.setItem("ws-client-id", this.value.trim());
+  });
+  document.getElementById("ws-client-secret").addEventListener("input", function() {
+    localStorage.setItem("ws-client-secret", this.value.trim());
+  });
+
+  document.getElementById("ws-api-load-btn").addEventListener("click", function() {
+    var reportId = document.getElementById("ws-report-id").value.trim();
+    var clientId = document.getElementById("ws-client-id").value.trim();
+    var secret   = document.getElementById("ws-client-secret").value.trim();
+    var errEl    = document.getElementById("ws-api-error");
+    var statusEl = document.getElementById("ws-api-status");
+    var statusTxt= document.getElementById("ws-api-status-text");
+    errEl.classList.add("d-none");
+    if (!reportId || !clientId || !secret) {
+      errEl.textContent = "Please fill in all three fields.";
+      errEl.classList.remove("d-none");
+      return;
+    }
+    document.getElementById("ws-api-load-btn").disabled = true;
+    statusEl.classList.remove("d-none");
+    statusTxt.textContent = "Connecting…";
+
+    wsLoadReport({
+      reportId: reportId,
+      clientId: clientId,
+      clientSecret: secret,
+      onStatus: function(msg) { statusTxt.textContent = msg; updateLoaderMsg && updateLoaderMsg(msg); }
+    }).then(function(rows) {
+      if (!rows || rows.length === 0) throw new Error("No data returned from API.");
+      showLoader("Processing " + rows.length.toLocaleString() + " rows…");
+      setTimeout(function() {
+        APP_DATA = transformData(rows);
+        APP_FILE_META = { name: "WorkSpan Report " + reportId, lastModified: new Date() };
+        finishLoad("WorkSpan Report " + reportId, APP_DATA.length, false, "ws-api-" + reportId);
+      }, 0);
+    }).catch(function(err) {
+      document.getElementById("ws-api-load-btn").disabled = false;
+      statusEl.classList.add("d-none");
+      var isProxyDown = err.message.indexOf("Failed to fetch") !== -1 || err.message.indexOf("ERR_CONNECTION_REFUSED") !== -1;
+      errEl.innerHTML = '<i class="bi bi-exclamation-triangle me-1"></i>' + err.message +
+        (isProxyDown ? '<br/><span class="text-muted">The local proxy is not running. ' +
+          'Please start it first using <strong>Start Proxy (Windows).bat</strong> or <strong>Start Proxy (Mac).sh</strong> ' +
+          'from the web-app folder.</span>' : '');
+      errEl.classList.remove("d-none");
+    });
+  });
+
   // ── Multi-session pick buttons (pending GEO sessions not yet cached) ──────
   sec.querySelectorAll(".multi-pick-btn").forEach(function(btn) {
     btn.addEventListener("click", function() {
@@ -582,6 +688,9 @@ function restoreUploadSection(cachedEntries) {
     IDB.clearAll().then(function () {
       localStorage.removeItem("lci-username");
       localStorage.removeItem("lci-basepath");
+      localStorage.removeItem("ws-report-id");
+      localStorage.removeItem("ws-client-id");
+      localStorage.removeItem("ws-client-secret");
       restoreUploadSection([]);
     });
   });

@@ -1,0 +1,208 @@
+﻿Diagnose log at 2026-06-01T21:44:09Z
+
+AppPath: C:\Program Files\Git\mingw64\bin\git-credential-manager.exe
+InstallDir: C:\Program Files\Git\mingw64\bin\
+Version: 2.7.3+5fa7116896c82164996a609accd1c5ad90fe730a
+
+------------
+Diagnostic: Environment
+Skipped: False
+Success: True
+Exception: None
+Log:
+OSType: Windows
+OSVersion: 10.0 (build 26200)
+Reading environment variables... OK
+ Variables:
+OneDriveConsumer=C:\Users\makhayat\OneDrive
+ProgramFiles(x86)=C:\Program Files (x86)
+MSYSTEM=MINGW64
+ProgramW6432=C:\Program Files
+windir=C:\Windows
+PROCESSOR_IDENTIFIER=Intel64 Family 6 Model 170 Stepping 4, GenuineIntel
+TMP=C:\Users\makhayat\AppData\Local\Temp
+PROCESSOR_ARCHITECTURE=AMD64
+DriverData=C:\Windows\System32\Drivers\DriverData
+PATHEXT=.COM;.EXE;.BAT;.CMD;.VBS;.VBE;.JS;.JSE;.WSF;.WSH;.MSC;.CPL
+COMPUTERNAME=CSCO-W-PF58JRFK
+ProgramData=C:\ProgramData
+VSCODE_CWD=C:\Users\makhayat\AppData\Local\Programs\Microsoft VS Code
+COPILOT_CLI=1
+PROCESSOR_REVISION=aa04
+TEMP=C:\Users\makhayat\AppData\Local\Temp
+USERPROFILE=C:\Users\makhayat
+LOGONSERVER=\\CSCO-W-PF58JRFK
+TERM=xterm-256color
+USERNAME=makhayat
+SystemRoot=C:\Windows
+CHROME_CRASHPAD_PIPE_NAME=\\.\pipe\crashpad_55288_VDVKEMQOFZVSFGMH
+GIT_EXEC_PATH=C:/Program Files/Git/mingw64/libexec/git-core
+PLINK_PROTOCOL=ssh
+USERDNSDOMAIN=cisco.com
+OneDrive=C:\Users\makhayat\OneDrive - Cisco
+USERDOMAIN_ROAMINGPROFILE=CISCO
+CommonProgramFiles=C:\Program Files\Common Files
+ZES_ENABLE_SYSMAN=1
+VSCODE_L10N_BUNDLE_LOCATION=
+GIT_CONFIG_KEY_0=safe.bareRepository
+APPLICATION_INSIGHTS_NO_STATSBEAT=true
+HOMEPATH=\Users\makhayat
+GIT_CONFIG_VALUE_0=explicit
+COPILOT_OTEL_EXPORTER_TYPE=file
+VSCODE_HANDLES_UNCAUGHT_ERRORS=true
+ALLUSERSPROFILE=C:\ProgramData
+CommonProgramW6432=C:\Program Files\Common Files
+OneDriveCommercial=C:\Users\makhayat\OneDrive - Cisco
+OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=true
+POWERSHELL_UPDATECHECK=Off
+VSCODE_ESM_ENTRYPOINT=vs/workbench/api/node/extensionHostProcess
+PT8HOME=C:\Program Files\Cisco Packet Tracer 8.2.2
+COPILOT_AGENT_SESSION_ID=525e8d60-2edb-4c09-8c4d-9feac93b3c2b
+SESSIONNAME=Console
+GIT_CONFIG_COUNT=1
+CommonProgramFiles(x86)=C:\Program Files (x86)\Common Files
+HOMEDRIVE=C:
+VSCODE_PID=55288
+VSCODE_CRASH_REPORTER_PROCESS_TYPE=extensionHost
+GIT_TRACE2_PARENT_SID=f55f39c4-128c-4bfc-bc3e-9f3561d22d45
+SystemDrive=C:
+NUMBER_OF_PROCESSORS=14
+OS=Windows_NT
+EFC_15672_1592913036=1
+ProgramFiles=C:\Program Files
+ComSpec=C:\Windows\system32\cmd.exe
+HOME=C:\Users\makhayat
+VSCODE_IPC_HOOK=\\.\pipe\0a854f73-1.122.1-main-sock
+ELECTRON_RUN_AS_NODE=1
+PSModulePath=C:\Users\makhayat\OneDrive - Cisco\Documents\WindowsPowerShell\Modules;C:\Program Files\WindowsPowerShell\Modules;C:\Windows\system32\WindowsPowerShell\v1.0\Modules
+TMPDIR=C:\Users\makhayat\AppData\Local\Temp
+APPDATA=C:\Users\makhayat\AppData\Roaming
+USERDOMAIN=CISCO
+PROCESSOR_LEVEL=6
+LC_CTYPE=C.UTF-8
+LOCALAPPDATA=C:\Users\makhayat\AppData\Local
+VSCODE_NLS_CONFIG={"userLocale":"en-us","osLocale":"en-us","resolvedLanguage":"en","defaultMessagesFile":"C:\\Users\\makhayat\\AppData\\Local\\Programs\\Microsoft VS Code\\8761a5560c\\resources\\app\\out\\nls.messages.json","locale":"en-us","availableLanguages":{}}
+Path=C:/Program Files/Git/mingw64/libexec/git-core;C:\Program Files\Git\mingw64\bin;C:\Program Files\Git\usr\bin;C:\Users\makhayat\bin;C:\Windows\system32;C:\Windows;C:\Windows\System32\Wbem;C:\Windows\System32\WindowsPowerShell\v1.0\;C:\Windows\System32\OpenSSH\;C:\Program Files\dotnet\;C:\Program Files\Git\cmd;C:\Program Files\nodejs\;C:\Users\makhayat\AppData\Local\Programs\Python\Launcher\;C:\Users\makhayat\AppData\Local\Microsoft\WindowsApps;C:\Users\makhayat\AppData\Local\Python\bin;C:\Users\makhayat\AppData\Local\Programs\Podman\;C:\Users\makhayat\AppData\Local\Programs\Microsoft VS Code\bin;C:\Users\makhayat\AppData\Roaming\npm;C:\Program Files\sf\bin
+COPILOT_OTEL_FILE_EXPORTER_PATH=\\.\nul
+COLORTERM=truecolor
+VSCODE_CODE_CACHE_PATH=C:\Users\makhayat\AppData\Roaming\Code\CachedData\8761a5560cfd65fdd19ce7e2bd18dab5c0a4d84e
+PUBLIC=C:\Users\Public
+COPILOT_OTEL_ENABLED=true
+
+
+------------
+Diagnostic: File system
+Skipped: False
+Success: True
+Exception: None
+Log:
+Temporary directory is 'C:\Users\makhayat\AppData\Local\Temp\'...
+Checking basic file I/O...
+Writing to temporary file 'C:\Users\makhayat\AppData\Local\Temp\cf9545c48178b1500d620541'... OK
+Reading from temporary file 'C:\Users\makhayat\AppData\Local\Temp\cf9545c48178b1500d620541'... OK
+Deleting temporary file 'C:\Users\makhayat\AppData\Local\Temp\cf9545c48178b1500d620541'... OK
+Testing IFileSystem instance...
+UserHomePath: C:\Users\makhayat
+UserDataDirectoryPath: C:\Users\makhayat\.gcm
+GetCurrentDirectory(): C:\Users\makhayat\OneDrive - Cisco\Documents\AI projects\Adoption Dashboard
+
+------------
+Diagnostic: Networking
+Skipped: False
+Success: True
+Exception: None
+Log:
+Checking networking and HTTP stack...
+Creating HTTP client... OK
+IsNetworkAvailable: True
+Sending HEAD request to http://example.com...Sending HEAD request to https://example.com... OK
+ OK
+Acquiring free TCP port... OK
+Testing local HTTP loopback connections...
+Creating new HTTP listener for http://localhost:61969/... OK
+Waiting for loopback connection... OK
+Writing response... OK
+Waiting for response data... OK
+Loopback connection data OK
+
+------------
+Diagnostic: Git
+Skipped: False
+Success: True
+Exception: None
+Log:
+Getting Git version... OK
+Git version is '2.53.0.windows.2'
+Locating current repository...Git repository at 'C:/Users/makhayat/OneDrive - Cisco/Documents/AI projects/Adoption Dashboard/.git'
+ OK
+Listing all Git configuration... OK
+Git configuration:
+file:C:/Program Files/Git/etc/gitconfig	diff.astextplain.textconv=astextplain
+file:C:/Program Files/Git/etc/gitconfig	filter.lfs.clean=git-lfs clean -- %f
+file:C:/Program Files/Git/etc/gitconfig	filter.lfs.smudge=git-lfs smudge -- %f
+file:C:/Program Files/Git/etc/gitconfig	filter.lfs.process=git-lfs filter-process
+file:C:/Program Files/Git/etc/gitconfig	filter.lfs.required=true
+file:C:/Program Files/Git/etc/gitconfig	http.sslbackend=schannel
+file:C:/Program Files/Git/etc/gitconfig	core.autocrlf=true
+file:C:/Program Files/Git/etc/gitconfig	core.fscache=true
+file:C:/Program Files/Git/etc/gitconfig	core.symlinks=false
+file:C:/Program Files/Git/etc/gitconfig	pull.rebase=false
+file:C:/Program Files/Git/etc/gitconfig	credential.helper=manager
+file:C:/Program Files/Git/etc/gitconfig	credential.https://dev.azure.com.usehttppath=true
+file:C:/Program Files/Git/etc/gitconfig	init.defaultbranch=master
+file:C:/Users/makhayat/.gitconfig	filter.lfs.clean=git-lfs clean -- %f
+file:C:/Users/makhayat/.gitconfig	filter.lfs.smudge=git-lfs smudge -- %f
+file:C:/Users/makhayat/.gitconfig	filter.lfs.process=git-lfs filter-process
+file:C:/Users/makhayat/.gitconfig	filter.lfs.required=true
+file:C:/Users/makhayat/.gitconfig	user.name=marckhayat-ui
+file:C:/Users/makhayat/.gitconfig	user.email=marckhayat@gmail.com
+file:C:/Users/makhayat/.gitconfig	gui.recentrepo=C:/Users/makhayat/PyCharmMiscProject
+file:C:/Users/makhayat/.gitconfig	credential.helper=manager
+file:.git/config	core.repositoryformatversion=0
+file:.git/config	core.filemode=false
+file:.git/config	core.bare=false
+file:.git/config	core.logallrefupdates=true
+file:.git/config	core.symlinks=false
+file:.git/config	core.ignorecase=true
+file:.git/config	remote.origin.url=https://github.com/makhayat_cisco/AdoptDash.git
+file:.git/config	remote.origin.fetch=+refs/heads/*:refs/remotes/origin/*
+file:.git/config	branch.main.remote=origin
+file:.git/config	branch.main.merge=refs/heads/main
+command line:	safe.barerepository=explicit
+
+
+------------
+Diagnostic: Credential storage
+Skipped: False
+Success: True
+Exception: None
+Log:
+ICredentialStore instance is of type: CredentialStore
+Writing test credential... OK
+Reading test credential... OK
+Deleting test credential... OK
+
+------------
+Diagnostic: Microsoft authentication (AAD/MSA)
+Skipped: False
+Success: True
+Exception: None
+Log:
+Broker is not enabled.
+Flow type is: Auto
+Gathering MSAL token cache data... OK
+CacheDirectory: C:\Users\makhayat\AppData\Local\.IdentityService
+CacheFileName: msal.cache
+CacheFilePath: C:\Users\makhayat\AppData\Local\.IdentityService\msal.cache
+Creating cache helper... OK
+Verifying MSAL token cache persistence... OK
+
+------------
+Diagnostic: GitHub API
+Skipped: False
+Success: True
+Exception: None
+Log:
+Using 'https://github.com/' as API target.
+Querying '/meta' endpoint... OK
+
