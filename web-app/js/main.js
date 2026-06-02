@@ -6,6 +6,7 @@
 var APP_DATA = null;
 var APP_FILE_META = null;
 var APP_IS_DISTI = false;
+var APP_MULTI_SESSIONS = null; // { sessions: [...], fileMeta: {...} }
 
 // Workspan column names used to auto-detect the header row
 var KNOWN_COLUMNS = [
@@ -348,6 +349,7 @@ function finishLoad(filename, rowCount, headerAutoDetected, idbType, loadedAt) {
   restoreUploadSection([]);  // clear upload section
   document.getElementById("upload-section").classList.add("d-none");
   document.getElementById("main-tab-bar").classList.remove("d-none");
+  renderMultiPicker(); // re-render persistent session bar (highlights active, keeps others)
 
   var pviTab = document.getElementById("tab-pvi-btn");
   if (pviTab) pviTab.closest("li").classList.toggle("d-none", APP_IS_DISTI);
@@ -394,12 +396,13 @@ function restoreUploadSection(cachedEntries) {
     return html;
   }
 
-  // Split cached entries
+  // Split cached entries — exclude any IDs already covered by APP_MULTI_SESSIONS
+  var multiGeoIds = APP_MULTI_SESSIONS ? APP_MULTI_SESSIONS.sessions.map(function(s) { return "cpi-" + s.id; }) : [];
   var wsEntries = [];
   var cpiEntries = [];
   cachedEntries.forEach(function (e) {
     if (e.type.indexOf("ws-") === 0) wsEntries.push(e);
-    else if (e.type.indexOf("cpi-") === 0) cpiEntries.push(e);
+    else if (e.type.indexOf("cpi-") === 0 && multiGeoIds.indexOf(e.type) === -1) cpiEntries.push(e);
   });
 
   // ── Compute week options: 2026W11 → current ISO week ──────────────────────
@@ -480,27 +483,51 @@ function restoreUploadSection(cachedEntries) {
     '</select></div>' +
     '<div class="col-auto"><label class="form-label small fw-semibold mb-1">Week</label>' +
     '<select id="lci-week" class="form-select form-select-sm">' + weekOptions + '</select></div>' +
-    '<div class="col-auto"><label class="form-label small fw-semibold mb-1">BE GEO ID</label>' +
-    '<input type="number" id="lci-begeoid" class="form-control form-control-sm" placeholder="e.g. 12345" style="width:130px"/></div>' +
+    '</div>' +
+    '<div class="mb-3">' +
+    '<label class="form-label small fw-semibold mb-1">BE GEO ID(s)</label>' +
+    '<div id="lci-begeoid-wrap" class="form-control form-control-sm d-flex flex-wrap gap-1 align-items-center" style="height:auto;min-height:31px;cursor:text;padding:3px 8px">' +
+    '<input type="text" id="lci-begeoid" class="border-0 p-0 bg-transparent" style="outline:none;width:90px;min-width:60px;font-size:0.875rem" placeholder="e.g. 12345" />' +
+    '</div>' +
+    '<div class="form-text">Separate multiple IDs with comma or space. Press Enter to confirm each.</div>' +
     '</div>' +
     '<div id="lci-path-hint" class="alert alert-secondary py-2 px-3 text-start small mb-3 d-none">' +
     '<span id="lci-path-text" style="word-break:break-all;font-family:monospace"></span>' +
     '<button id="lci-copy-btn" class="btn btn-sm btn-outline-secondary ms-2 py-0" title="Copy path"><i class="bi bi-clipboard"></i></button>' +
     '</div>' +
     '<div id="lci-error" class="alert alert-danger py-2 px-3 small mb-3 d-none"></div>' +
+    '<div id="lci-session-picker" class="d-none"></div>' +
     '<button id="lci-load-btn" class="btn btn-warning px-4"><i class="bi bi-folder2-open me-2"></i>Select CPI file…</button>' +
     '<input type="file" id="lci-file-input" accept=".csv" class="d-none" />' +
     '<p class="text-muted small mt-3 mb-0">Navigate to the displayed path and select the file.</p>' +
     '</div></div>' +
 
-    // Previous CPI sessions
-    (cpiEntries.length > 0 ?
-      '<div class="card shadow-sm border-warning">' +
-      '<div class="card-header bg-warning bg-opacity-10 fw-semibold" style="font-size:0.85rem"><i class="bi bi-lightning-charge-fill me-2 text-warning"></i>Previous CPI sessions</div>' +
-      '<div class="card-body p-2">' +
-      cpiEntries.map(resumeCard).join("") +
-      '</div></div>'
-    : '') +
+    // Previous CPI sessions (cached + any pending multi-session results)
+    (function() {
+      var multiCards = "";
+      if (APP_MULTI_SESSIONS && APP_MULTI_SESSIONS.sessions.length > 0) {
+        multiCards = APP_MULTI_SESSIONS.sessions.map(function(sess, i) {
+          var name = sess.partnerName ? '<div class="fw-semibold small">' + sess.partnerName + '</div>' : '';
+          return '<div class="card border-warning mb-2 p-2">' +
+            '<div class="d-flex justify-content-between align-items-start gap-2">' +
+            '<div style="min-width:0">' +
+            name +
+            '<div class="text-muted small text-truncate">BE GEO ' + sess.id + '</div>' +
+            '<div class="text-muted" style="font-size:0.72rem">' + sess.rows.length.toLocaleString() + ' rows &middot; ' + APP_MULTI_SESSIONS.fileMeta.name + '</div>' +
+            '</div>' +
+            '<button class="btn btn-sm btn-warning py-0 multi-pick-btn flex-shrink-0" data-geo-idx="' + i + '" title="Load"><i class="bi bi-play-fill"></i></button>' +
+            '</div></div>';
+        }).join("");
+      }
+      var hasAny = cpiEntries.length > 0 || multiCards;
+      if (!hasAny) return '';
+      return '<div class="card shadow-sm border-warning">' +
+        '<div class="card-header bg-warning bg-opacity-10 fw-semibold" style="font-size:0.85rem"><i class="bi bi-lightning-charge-fill me-2 text-warning"></i>Previous CPI sessions</div>' +
+        '<div class="card-body p-2">' +
+        multiCards +
+        cpiEntries.map(resumeCard).join("") +
+        '</div></div>';
+    })()+
 
     '</div>' + // /right col
     '</div>' +
@@ -512,6 +539,20 @@ function restoreUploadSection(cachedEntries) {
 
   // ── Wire up file inputs ───────────────────────────────────────────────────
   document.getElementById("file-input").addEventListener("change", handleFileUpload);
+
+  // ── Multi-session pick buttons (pending GEO sessions not yet cached) ──────
+  sec.querySelectorAll(".multi-pick-btn").forEach(function(btn) {
+    btn.addEventListener("click", function() {
+      var idx = parseInt(this.dataset.geoIdx, 10);
+      var sess = APP_MULTI_SESSIONS.sessions[idx];
+      showLoader("Processing " + sess.rows.length + " rows for " + sess.id + "…");
+      setTimeout(function() {
+        APP_DATA = transformData(sess.rows);
+        APP_FILE_META = APP_MULTI_SESSIONS.fileMeta;
+        finishLoad(APP_MULTI_SESSIONS.fileMeta.name + " · BE GEO ID " + sess.id, APP_DATA.length, false, "cpi-" + sess.id);
+      }, 0);
+    });
+  });
 
   // ── Resume / Clear cache buttons ─────────────────────────────────────────
   sec.querySelectorAll(".idb-resume-btn").forEach(function (btn) {
@@ -621,23 +662,84 @@ function restoreUploadSection(cachedEntries) {
     });
   });
 
-  // ── Load button: show file picker then process ────────────────────────────
+  // ── Chip / tag input for BE GEO IDs ──────────────────────────────────────
+  var lciGeoIds = [];
+  var beGeoInput = document.getElementById("lci-begeoid");
+  var beGeoWrap  = document.getElementById("lci-begeoid-wrap");
+
+  function renderChips() {
+    // Remove all existing chips (keep the input itself)
+    Array.from(beGeoWrap.querySelectorAll(".geo-chip")).forEach(function(c) { c.remove(); });
+    lciGeoIds.forEach(function(id) {
+      var chip = document.createElement("span");
+      chip.className = "geo-chip badge d-inline-flex align-items-center gap-1 me-1";
+      chip.style.cssText = "background:#ffc107;color:#212529;font-size:0.8rem;padding:3px 7px;border-radius:12px;font-weight:500";
+      chip.textContent = id;
+      var x = document.createElement("button");
+      x.type = "button";
+      x.style.cssText = "background:none;border:none;padding:0 0 0 3px;cursor:pointer;font-size:0.75rem;line-height:1;color:#555;";
+      x.innerHTML = "&#x2715;";
+      x.setAttribute("aria-label", "Remove " + id);
+      x.addEventListener("click", function(e) {
+        e.stopPropagation();
+        lciGeoIds = lciGeoIds.filter(function(v) { return v !== id; });
+        renderChips();
+        if (lciGeoIds.length === 0) beGeoInput.placeholder = "e.g. 12345";
+      });
+      chip.appendChild(x);
+      beGeoWrap.insertBefore(chip, beGeoInput);
+    });
+    beGeoInput.placeholder = lciGeoIds.length === 0 ? "e.g. 12345" : "";
+  }
+
+  function commitGeoInput() {
+    var raw = beGeoInput.value;
+    var parts = raw.split(/[\s,]+/).map(function(s) { return s.trim(); }).filter(Boolean);
+    var added = false;
+    parts.forEach(function(id) {
+      if (id && lciGeoIds.indexOf(id) === -1) { lciGeoIds.push(id); added = true; }
+    });
+    beGeoInput.value = "";
+    if (added) renderChips();
+  }
+
+  beGeoInput.addEventListener("keydown", function(e) {
+    if (e.key === "," || e.key === " " || e.key === "Enter") {
+      e.preventDefault();
+      commitGeoInput();
+    } else if (e.key === "Backspace" && this.value === "" && lciGeoIds.length > 0) {
+      lciGeoIds.pop();
+      renderChips();
+    }
+  });
+  beGeoInput.addEventListener("input", function() {
+    var v = this.value;
+    if (v.indexOf(",") !== -1 || (v.length > 1 && v.indexOf(" ") !== -1)) {
+      commitGeoInput();
+    }
+  });
+  beGeoWrap.addEventListener("click", function() { beGeoInput.focus(); });
+
+  // ── Load button: validate then open file picker ───────────────────────────
   document.getElementById("lci-load-btn").addEventListener("click", function () {
-    var beGeoId = document.getElementById("lci-begeoid").value.trim();
+    commitGeoInput(); // flush anything still typed
     var errEl = document.getElementById("lci-error");
     errEl.classList.add("d-none");
-    if (!beGeoId) {
-      errEl.textContent = "Please enter a BE GEO ID before loading.";
+    if (lciGeoIds.length === 0) {
+      errEl.textContent = "Please enter at least one BE GEO ID before loading.";
       errEl.classList.remove("d-none");
       return;
     }
+    APP_MULTI_SESSIONS = null; // clear previous multi-session state on new load
+    renderMultiPicker();
+    document.getElementById("lci-file-input").value = "";
     document.getElementById("lci-file-input").click();
   });
 
+  // ── File selected: parse CSV, handle single or multiple IDs ──────────────
   document.getElementById("lci-file-input").addEventListener("change", function (e) {
     var file = e.target.files[0];
     if (!file) return;
-    var beGeoId  = document.getElementById("lci-begeoid").value.trim();
     var region   = document.getElementById("lci-region").value;
     var week     = document.getElementById("lci-week").value;
     var expected = region === "DISTI"
@@ -653,6 +755,7 @@ function restoreUploadSection(cachedEntries) {
       return;
     }
 
+    var idsToLoad = lciGeoIds.slice(); // snapshot
     showLoader("Reading CPI file…");
     Papa.parse(file, {
       header: true,
@@ -662,30 +765,122 @@ function restoreUploadSection(cachedEntries) {
       complete: function (results) {
         try {
           if (!results.data || results.data.length === 0) throw new Error("No data found in CSV.");
-          updateLoaderMsg("Filtering for BE GEO ID " + beGeoId + "…");
-          var filtered = results.data.filter(function (r) {
-            return String(r["BE GEO ID"] || "").trim() === beGeoId;
+
+          // Detect disti from raw columns (before transform)
+          var rawKeys = Object.keys(results.data[0] || {});
+          var rawDistiKey = rawKeys.find(function(k) { return k.trim().toLowerCase() === "disti name"; });
+          var rawIsDisti = rawDistiKey && results.data.some(function(r) {
+            return r[rawDistiKey] && String(r[rawDistiKey]).trim() !== "";
           });
-          if (filtered.length === 0) {
-            IDB.loadAll().then(function(e){restoreUploadSection(e);});
-            alert("No rows found for BE GEO ID " + beGeoId + " in " + file.name + ".\nPlease check the ID and try again.");
+
+          // Build per-ID session info
+          updateLoaderMsg("Filtering " + idsToLoad.length + " BE GEO ID(s)…");
+          var sessions = idsToLoad.map(function(id) {
+            var rows = results.data.filter(function(r) {
+              return String(r["BE GEO ID"] || "").trim() === id;
+            });
+            var partnerName = "";
+            if (rows.length > 0) {
+              partnerName = rawIsDisti
+                ? String(rows[0][rawDistiKey] || "").trim()
+                : String(rows[0]["Partner Name"] || "").trim();
+            }
+            return { id: id, rows: rows, partnerName: partnerName };
+          });
+
+          var found = sessions.filter(function(s) { return s.rows.length > 0; });
+          var notFound = sessions.filter(function(s) { return s.rows.length === 0; });
+
+          if (found.length === 0) {
+            IDB.loadAll().then(function(en) { restoreUploadSection(en); });
+            alert("No rows found for " + (idsToLoad.length === 1 ? "BE GEO ID " + idsToLoad[0] : "any of the entered IDs") + " in " + file.name + ".\nPlease check the IDs and try again.");
             return;
           }
-          updateLoaderMsg("Processing " + filtered.length + " rows…");
-          APP_DATA = transformData(filtered);
-          APP_FILE_META = { name: file.name, lastModified: file.lastModified ? new Date(file.lastModified) : null };
-          finishLoad(file.name + " · BE GEO ID " + beGeoId, APP_DATA.length, false, "cpi-" + beGeoId);
+
+          // Helper: load one session's rows
+          function loadOneSession(sess) {
+            updateLoaderMsg("Processing " + sess.rows.length + " rows for " + sess.id + "…");
+            APP_DATA = transformData(sess.rows);
+            APP_FILE_META = { name: file.name, lastModified: file.lastModified ? new Date(file.lastModified) : null };
+            finishLoad(file.name + " · BE GEO ID " + sess.id, APP_DATA.length, false, "cpi-" + sess.id);
+          }
+
+          // Single ID → load directly
+          if (idsToLoad.length === 1) {
+            loadOneSession(found[0]);
+            return;
+          }
+
+          // Multiple IDs → store sessions globally, restore upload section (renderMultiPicker runs at end)
+          var notFoundNote = notFound.length > 0
+            ? '\n⚠ No data found for: ' + notFound.map(function(s) { return s.id; }).join(", ")
+            : "";
+          if (notFoundNote) console.warn(notFoundNote);
+          APP_MULTI_SESSIONS = { sessions: found, fileMeta: { name: file.name, lastModified: file.lastModified ? new Date(file.lastModified) : null }, notFoundNote: notFound.length > 0 ? notFound.map(function(s){return s.id;}).join(", ") : "" };
+          IDB.loadAll().then(function(en) {
+            restoreUploadSection(en);
+          });
+
         } catch (err) {
-          IDB.loadAll().then(function(e){restoreUploadSection(e);});
+          IDB.loadAll().then(function(en) { restoreUploadSection(en); });
           console.error(err);
           alert("Error processing CPI file: " + err.message);
         }
       },
       error: function (err) {
-        IDB.loadAll().then(function(e){restoreUploadSection(e);});
+        IDB.loadAll().then(function(en) { restoreUploadSection(en); });
         alert("Error reading CSV: " + err.message);
       }
     });
+  });
+
+  renderMultiPicker(); // show persistent session bar if APP_MULTI_SESSIONS is set
+}
+
+function renderMultiPicker() {
+  var barEl = document.getElementById("multi-session-bar");
+  if (!barEl) return;
+  // Only show the bar when upload section is hidden (a session is active)
+  var uploadHidden = document.getElementById("upload-section").classList.contains("d-none");
+  if (!APP_MULTI_SESSIONS || !uploadHidden) { barEl.classList.add("d-none"); barEl.innerHTML = ""; return; }
+
+  var found = APP_MULTI_SESSIONS.sessions;
+  var cards = found.map(function(sess, i) {
+    var isCurrent = APP_DATA && APP_FILE_META && APP_FILE_META.name === APP_MULTI_SESSIONS.fileMeta.name &&
+      APP_DATA.length > 0 && APP_DATA.some(function(r) { return String(r["BE GEO ID"] || "").trim() === sess.id; });
+    var name = sess.partnerName ? '<span class="fw-semibold me-1">' + sess.partnerName + '</span>' : '';
+    return '<div class="d-inline-flex align-items-center gap-1 me-2 mb-1 p-1 px-2 rounded border ' + (isCurrent ? 'border-warning bg-warning bg-opacity-25' : 'border-secondary bg-white') + '" style="font-size:0.8rem">' +
+      name +
+      '<span class="text-muted">BE GEO ' + sess.id + '</span>' +
+      '<span class="text-muted ms-1" style="font-size:0.72rem">(' + sess.rows.length.toLocaleString() + ')</span>' +
+      (!isCurrent ? '<button class="btn btn-sm btn-warning py-0 ms-2 lci-pick-btn" style="font-size:0.75rem;padding:1px 6px" data-geo-idx="' + i + '">Load</button>' : '<span class="ms-2 text-warning fw-semibold" style="font-size:0.72rem">● active</span>') +
+      '</div>';
+  }).join("");
+
+  barEl.innerHTML =
+    '<div class="d-flex flex-wrap align-items-center gap-1 py-2 px-2 border-bottom bg-light" style="font-size:0.82rem">' +
+    '<span class="fw-semibold me-2"><i class="bi bi-collection me-1 text-warning"></i>Multi-GEO sessions:</span>' +
+    cards +
+    '<button class="btn btn-sm btn-outline-secondary py-0 ms-auto" style="font-size:0.72rem" id="multi-session-close"><i class="bi bi-x"></i> Clear</button>' +
+    '</div>';
+  barEl.classList.remove("d-none");
+
+  barEl.querySelectorAll(".lci-pick-btn").forEach(function(btn) {
+    btn.addEventListener("click", function() {
+      var idx = parseInt(this.dataset.geoIdx, 10);
+      var sess = APP_MULTI_SESSIONS.sessions[idx];
+      showLoader("Processing " + sess.rows.length + " rows for " + sess.id + "…");
+      setTimeout(function() {
+        APP_DATA = transformData(sess.rows);
+        APP_FILE_META = APP_MULTI_SESSIONS.fileMeta;
+        finishLoad(APP_MULTI_SESSIONS.fileMeta.name + " · BE GEO ID " + sess.id, APP_DATA.length, false, "cpi-" + sess.id);
+      }, 0);
+    });
+  });
+  var closeBtn = document.getElementById("multi-session-close");
+  if (closeBtn) closeBtn.addEventListener("click", function() {
+    APP_MULTI_SESSIONS = null;
+    renderMultiPicker();
   });
 }
 
@@ -703,6 +898,7 @@ function renderActiveTab(target) {
 function resetApp() {
   APP_DATA = null;
   APP_FILE_META = null;
+  // Do NOT clear APP_MULTI_SESSIONS here — user may be switching between sessions
   var sb = document.getElementById("status-bar");
   sb.classList.remove("d-flex");
   sb.classList.add("d-none");
