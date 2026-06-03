@@ -200,8 +200,8 @@ function renderOverview(data) {
     }
 
     // ── Build table HTML
-    // Column groups: E-F | G-H | I-J-K | L-M | N-O-P-Q
-    var cols       = ["E","F","G","H","I","J","K","L","M","N","O","P","Q"];
+    // Column groups: E-F | G-H | I-J-K | L-M | N-O-Q
+    var cols       = ["E","F","G","H","I","J","K","L","M","N","O","Q"];
     var isCurrency = { F:1, H:1, J:1, K:1, M:1, O:1, Q:1 };
 
     // Group membership → CSS class for shading
@@ -210,28 +210,49 @@ function renderOverview(data) {
       G:"cg2", H:"cg2",
       I:"cg3", J:"cg3", K:"cg3",
       L:"cg4", M:"cg4",
-      N:"cg5", O:"cg5", P:"cg5", Q:"cg5"
+      N:"cg5", O:"cg5", Q:"cg5"
     };
 
+    var colTooltips = {
+      E: "Number of customers with use-cases eligible for opting-in. Excludes use-cases that are fully completed or expired, or with a use-case already opted-in within that offer.",
+      F: "The amount of potential incentives associated with these use-cases. Highest incentive per use-case per customer is used in the calculations.",
+      G: "Number of customers who have use-cases with Onboard or Onboard/Use stage completed (1 or 2 out of 4 earning stages), and not opted-in. These are easier targets because their deployments have already started.",
+      H: "The amount of remaining incentives associated with these use-cases. No incentives paid for previously completed stages. Highest incentive per use-case per customer is used in the calculations.",
+      I: "Number of customers who have use-cases with Onboard/Use/Engage completed (3 out of 4 earning stages), and not opted-in. Incentives for the last stage (Adopt) can still be pursued.",
+      J: "The amount of missed incentives for these use-cases. Includes incentives for Onboard/Use/Engage when completed after booking date. Highest incentive per use-case per customer is used.",
+      K: "The amount of remaining incentives for these use-cases, related to the Adopt stage only. Highest incentive per use-case per customer is used.",
+      L: "Number of customers where use-cases progressed (completed or partially/expired) with no opt-in made for that offer. Only counts customers with non-zero missed incentives. No available incentives to pursue.",
+      M: "The amount of missed incentives for these use-cases. Includes incentives for all stages completed after booking date. Highest incentive per use-case per customer is used.",
+      N: "Number of active use-cases where the partner has opted-in. Excludes expired and not-eligible use-cases.",
+      O: "Amount of remaining incentives for opted-in use-cases, i.e. for all earning stages not yet completed.",
+      Q: "The amount of incentives earned through opted-in use-cases. Only stages where completion date is after opt-in date are counted. Note: payment goes through further checks by the CPI team."
+    };
+
+    function infoIcon(c) {
+      var tip = colTooltips[c];
+      if (!tip) return "";
+      return ' <i class="bi bi-info-circle text-muted" style="font-size:0.75rem;cursor:default" data-bs-toggle="tooltip" data-bs-placement="top" title="' + tip.replace(/"/g, "&quot;") + '"></i>';
+    }
+
     var colHeaders = [
-      "Total UC Eligible<br>w/o opt-in","Total Potential<br>Incentives",
-      "UC Eligible w/o opt-in<br><small class='text-success fw-normal'><i class='bi bi-check-circle-fill'></i> Onboard &nbsp;<i class='bi bi-check-circle-fill'></i> Use</small>",
-      "Potential Incentives<br><small class='text-success fw-normal'><i class='bi bi-check-circle-fill'></i> Onboard &nbsp;<i class='bi bi-check-circle-fill'></i> Use</small>",
-      "UC Eligible w/o opt-in<br><small class='fw-normal'><i class='bi bi-check-circle-fill'></i> Engage</small>",
-      "Missed Incentives<br><small class='fw-normal'><i class='bi bi-check-circle-fill'></i> Engage</small>",
-      "Potential Incentives<br><small class='fw-normal'><i class='bi bi-check-circle-fill'></i> Engage</small>",
-      "UC progressed<br>and missed","Missed Incentives<br>(progressed)",
-      "Active<br>Opted-in UC","Potential Incentives<br>(opted-in)",
-      "Progressed<br>opted-in UC","Est. Earned<br>Incentives"
+      "Total UC<br><small class='fw-normal'>(customer count)</small>","Total Potential<br>Incentives",
+      "UC<br><small class='fw-normal'>(customer count)</small>",
+      "Potential Incentives",
+      "UC<br><small class='fw-normal'>(customer count)</small>",
+      "Missed Incentives",
+      "Potential Incentives",
+      "UC<br><small class='fw-normal'>(customer count)</small>","Missed Incentives",
+      "Active UC","Potential Incentives",
+      "Est. Earned<br>Incentives"
     ];
 
     // Group header row
     var groupDefs = [
-      { label: "Not opted-in · Eligible",    span: 2, cls: "cg1" },
-      { label: "Not opted-in · 25–50%",      span: 2, cls: "cg2" },
-      { label: "Not opted-in · 75%",         span: 3, cls: "cg3" },
-      { label: "Not opted-in · Progressed",  span: 2, cls: "cg4" },
-      { label: "Opted-in",                   span: 4, cls: "cg5" }
+      { label: "Not opted-in · Eligible",                                                                                                                                                                  span: 2, cls: "cg1" },
+      { label: "Not opted-in · Eligible · <i class='bi bi-check-circle-fill'></i> Onboard &nbsp;<i class='bi bi-check-circle-fill'></i> Use", span: 2, cls: "cg2" },
+      { label: "Not opted-in · Eligible · <i class='bi bi-check-circle-fill'></i> Engage",                                                    span: 3, cls: "cg3" },
+      { label: "Not opted-in · <i class='bi bi-check-circle-fill'></i> Adopt &nbsp;<i class='bi bi-clock'></i> Expired",          span: 2, cls: "cg4" },
+      { label: "<i class='bi bi-hand-thumbs-up-fill'></i> Opted-in",                                                              span: 3, cls: "cg5" }
     ];
     var groupRow = '<tr><th class="border-end" style="min-width:240px"></th>';
     groupDefs.forEach(function (g) {
@@ -241,11 +262,11 @@ function renderOverview(data) {
 
     var colHeaderRow = '<tr><th style="min-width:240px">Portfolio / Offer / Use Case</th>';
     cols.forEach(function (c, i) {
-      colHeaderRow += '<th class="text-end ' + colGroup[c] + '-hdr" style="min-width:90px">' + colHeaders[i] + '</th>';
+      colHeaderRow += '<th class="text-end ' + colGroup[c] + '-hdr" style="min-width:90px">' + colHeaders[i] + infoIcon(c) + '</th>';
     });
     colHeaderRow += '</tr>';
 
-    var thead = '<thead>' + colHeaderRow + '</thead>';
+    // thead is built later, after totals row is computed
 
     // Helper: render a data cell with group shading
     function td(c, v) {
@@ -274,7 +295,7 @@ function renderOverview(data) {
     domainKeys.forEach(function (domain) {
       var pKey = "p" + pIdx;
       tbody += '<tr class="ovw-domain-row" data-portfolio="' + pKey + '">' +
-        '<td colspan="14"><span class="ovw-chevron">&#9660;</span>' + escHtml(domain) + '</td></tr>';
+        '<td colspan="13"><span class="ovw-chevron">&#9660;</span>' + escHtml(domain) + '</td></tr>';
 
       var offerKeys = Object.keys(groups[domain]).sort();
       var oIdx = 0;
@@ -302,8 +323,33 @@ function renderOverview(data) {
     });
     tbody += "</tbody>";
 
+    // Totals row aligned with columns — shown in tfoot
+    var totalN = 0, totalO = 0, totalQ = 0;
+    fd.forEach(function (r) {
+      if (norm(r["Adopt Rebate Opt-In Status"]) === "OPTED IN" && norm(r["Stage"]) === "ELIGIBLE") {
+        totalN++;
+        totalO += (r["Potential Incentives"] || 0);
+      }
+      totalQ += (r["Estimated Earned Incentives"] || 0);
+    });
+    var totalsRow = '<tr class="table-active fw-semibold"><td>Totals</td>';
+    cols.forEach(function (c) {
+      if (c === "N") totalsRow += '<td class="text-end ' + colGroup[c] + '-cell">' + fmtCount(totalN) + '</td>';
+      else if (c === "O") totalsRow += '<td class="text-end ' + colGroup[c] + '-cell">' + fmtCurrency(totalO) + '</td>';
+      else if (c === "Q") totalsRow += '<td class="text-end ' + colGroup[c] + '-cell">' + fmtCurrency(totalQ) + '</td>';
+      else totalsRow += '<td></td>';
+    });
+    totalsRow += '</tr>';
+
+    var thead = '<thead>' + groupRow + colHeaderRow + totalsRow + '</thead>';
+
     var tableHtml = '<div class="table-wrapper"><table class="table table-bordered table-hover mb-0">' + thead + tbody + "</table></div>";
     document.getElementById("ovw-table-area").innerHTML = tableHtml;
+
+    // Initialise Bootstrap tooltips on info icons
+    document.querySelectorAll("#ovw-table-area [data-bs-toggle='tooltip']").forEach(function (el) {
+      new bootstrap.Tooltip(el, { html: false });
+    });
 
     // ── Collapse / expand on portfolio and offer row clicks
     var collapseState = {};

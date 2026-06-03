@@ -1,0 +1,72 @@
+// =============================================================================
+// mapping.js — Static reference data derived from mapping.xlsx (Ref sheet)
+// Columns: Domain (Portfolio), Offer, Use Case, Type, Guide
+// =============================================================================
+
+var CPI_MAPPING = [
+  { portfolio: "Networking",                offer: "Catalyst Center",               useCase: "Campus Network Automation",                              guide: "https://salesresources.cisco.com/Link/Content/DCVDV84mh3TJQ8QDPD3b8W2DTcW3" },
+  { portfolio: "Networking",                offer: "Catalyst Center",               useCase: "Campus Network Observability and Insights",               guide: "https://salesresources.cisco.com/Link/Content/DC9H9RVF89BMXGF2dXb2BFQFM7T8" },
+  { portfolio: "Networking",                offer: "Catalyst Center",               useCase: "Campus Network Programmability and Integrations",         guide: "https://salesresources.cisco.com/Link/Content/DCc8W63BVHF4W87WV3Pf8PVcFq8P" },
+  { portfolio: "Networking",                offer: "Catalyst Center",               useCase: "Campus Network Segmentation",                            guide: "https://salesresources.cisco.com/Link/Content/DCmXHjbd8qqG284Jc2h7fhqCjXhG" },
+  { portfolio: "Networking",                offer: "Catalyst Center",               useCase: "Campus Network Visibility",                              guide: "https://salesresources.cisco.com/Link/Content/DC7RTb387qGWh8qWmHhfR494d48j" },
+  { portfolio: "Networking",                offer: "Catalyst Center",               useCase: "Cloud Monitoring for Catalyst",                          guide: "https://salesresources.cisco.com/Link/Content/DCc6fbbGg4Dhh872BFDXbjP9T3c8" },
+  { portfolio: "Networking",                offer: "Catalyst Center",               useCase: "Internet and Cloud Visibility",                          guide: "https://salesresources.cisco.com/Link/Content/DCqqQQh9MFjC7GhB4f27p3Q29Mp8" },
+  { portfolio: "Networking",                offer: "Catalyst Center",               useCase: "Location Based Intelligence",                            guide: "https://salesresources.cisco.com/Link/Content/DCXqmHdjGfcB38CCfXbBcTWMXTQV" },
+  { portfolio: "Networking",                offer: "Meraki",                        useCase: "Foundational Networking and Security for Meraki",        guide: "https://salesresources.cisco.com/Link/Content/DCq946RP494fQGhMMj8Tj7DFhMFB" },
+  { portfolio: "Networking",                offer: "Meraki",                        useCase: "Programmability and Integrations for Meraki",            guide: "https://salesresources.cisco.com/Link/Content/DCJFWjc8VhHmdGc27fQgm7VG8dJ8" },
+  { portfolio: "Networking",                offer: "SD WAN",                        useCase: "Multicloud Connectivity",                                guide: "https://salesresources.cisco.com/Link/Content/DC6b33dB8DFQ7GFD884m9JCFVHRd" },
+  { portfolio: "Networking",                offer: "SD WAN",                        useCase: "SD-Routing",                                             guide: "https://salesresources.cisco.com/Link/Content/DCXpXdRBQW63287WQf7pVJm4fqFd" },
+  { portfolio: "Networking",                offer: "SD WAN",                        useCase: "Secure Automated WAN",                                   guide: "https://salesresources.cisco.com/Link/Content/DCT9mHbWqbjVq89JRmXWmcRjdF6d" },
+  { portfolio: "Security",                  offer: "Cisco Secure Network Analytics", useCase: "Network Security Analytics",                            guide: "https://salesresources.cisco.com/Link/Content/DC3h72hWC28BDG2MFXj9FQWdFgd8" },
+  { portfolio: "Security",                  offer: "Duo",                           useCase: "Secure Application Access With Phishing-Resistant MFA", guide: "https://salesresources.cisco.com/Link/Content/DChWJPjDhBHCG8cQQT4dJhGDGqXB" },
+  { portfolio: "Security",                  offer: "Cisco Umbrella",                useCase: "DNS Security",                                           guide: "https://salesresources.cisco.com/Link/Content/DCTmhf2TBqq4WG7Xh7TVbHDTFfF3" },
+  { portfolio: "Security",                  offer: "Cisco Umbrella",                useCase: "Public Cloud Security Policy and Access",                guide: "https://salesresources.cisco.com/Link/Content/DCJThRm6W4gMBGHWGRP9bRXh8Hjd" },
+  { portfolio: "Security",                  offer: "Cisco Secure Firewall",         useCase: "Data Center Firewall Operations",                        guide: "https://salesresources.cisco.com/Link/Content/DCHFpmXWT92HTGQCqH6Mfm3gCPj3" },
+  { portfolio: "Security",                  offer: "Cisco Secure Firewall",         useCase: "Internet Edge Protection",                               guide: "https://salesresources.cisco.com/Link/Content/DCCjTFMPQQWGG8WF2GjCgHCRpffB" },
+  { portfolio: "Security",                  offer: "Identity Services Engine",      useCase: "Network Access Control",                                 guide: "https://salesresources.cisco.com/Link/Content/DCjjXWbm7hpJPGcT9XpV7MpW47cj" },
+  { portfolio: "Cloud + AI Infrastructure", offer: "Cisco Intersight",              useCase: "Simplified Operations",                                  guide: "https://salesresources.cisco.com/Link/Content/DC4Pd2GRgGFRg8cFdMQWMqcMFC7d" },
+  { portfolio: "Cloud + AI Infrastructure", offer: "Data Center Networking",        useCase: "Data Center Network Operations",                         guide: "https://salesresources.cisco.com/Link/Content/DCMTJ82j6CjgbG9RT6pMjpgDpFXG" },
+  { portfolio: "Cloud + AI Infrastructure", offer: "Data Center Networking",        useCase: "Distributed Networking",                                 guide: "https://salesresources.cisco.com/Link/Content/DCbB2Mm8GbV3G8qJJgmb4qqQJJTP" },
+  { portfolio: "Cloud + AI Infrastructure", offer: "Data Center Networking",        useCase: "Distributed Networking with NDFC (DCNM)",                guide: "https://salesresources.cisco.com/Link/Content/DC7Qh9M2bJHDM8f2fjDqhPjVX6Pj" },
+  { portfolio: "Cloud + AI Infrastructure", offer: "Data Center Networking",        useCase: "Fabric Provisioning and Operations with NDFC (DCNM)",    guide: "https://salesresources.cisco.com/Link/Content/DCH4dRd8bC7q38WDVGPCqjTdgf2j" },
+  { portfolio: "Cloud + AI Infrastructure", offer: "Data Center Networking",        useCase: "Network Provisioning and Operations",                    guide: "https://salesresources.cisco.com/Link/Content/DCC6qVR97QGWH8fX7DjRdCRWgHCB" },
+  { portfolio: "Collaboration",             offer: "Webex Suite",                   useCase: "Webex Calling and App",                                  guide: null },
+  { portfolio: "Collaboration",             offer: "Cisco Contact Center",          useCase: "Webex Contact Center",                                   guide: null }
+];
+
+// Lookup: offer name (normalised upper) → portfolio
+var OFFER_TO_PORTFOLIO = (function () {
+  var map = {};
+  CPI_MAPPING.forEach(function (entry) {
+    map[entry.offer.toUpperCase()] = entry.portfolio;
+  });
+  return map;
+}());
+
+// Lookup: use case name (normalised upper) → portfolio
+var USE_CASE_TO_PORTFOLIO = (function () {
+  var map = {};
+  CPI_MAPPING.forEach(function (entry) {
+    map[entry.useCase.toUpperCase()] = entry.portfolio;
+  });
+  return map;
+}());
+
+// Lookup: use case name (normalised upper) → offer
+var USE_CASE_TO_OFFER = (function () {
+  var map = {};
+  CPI_MAPPING.forEach(function (entry) {
+    map[entry.useCase.toUpperCase()] = entry.offer;
+  });
+  return map;
+}());
+
+// Lookup: use case name → guide URL
+var UC_GUIDE_MAP = (function () {
+  var map = {};
+  CPI_MAPPING.forEach(function (entry) {
+    if (entry.guide) map[entry.useCase] = entry.guide;
+  });
+  return map;
+}());
+

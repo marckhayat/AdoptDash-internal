@@ -74,7 +74,7 @@ function renderCPIAdopt(data) {
 
   // ── Column 1: Opt-in Ratio + Opt-in Trend
   html += '<div class="col-12 col-lg-4 d-flex flex-column gap-4">';
-  html += '<div class="card shadow-sm"><div class="card-header fw-semibold">Opt-in Ratio</div><div class="card-body">';
+  html += '<div class="card shadow-sm"><div class="card-header fw-semibold">Opt-in Ratio <small class="fw-normal">(maximum payout for eligible UCs)</small></div><div class="card-body">';
   html += '<div class="chart-container" style="min-height:220px;height:220px"><canvas id="cpi-chart1"></canvas></div>';
   html += '<div id="cpi-ratio-card" class="text-center mt-3"></div>';
   html += '</div></div>';
@@ -85,10 +85,10 @@ function renderCPIAdopt(data) {
 
   // ── Column 2: Incentives + Progression Trend
   html += '<div class="col-12 col-lg-4 d-flex flex-column gap-4">';
-  html += '<div class="card shadow-sm"><div class="card-header fw-semibold">Incentives (opted-in UCs)</div><div class="card-body">';
+  html += '<div class="card shadow-sm"><div class="card-header fw-semibold">Incentives <small class="fw-normal">(all opted-in UCs)</small></div><div class="card-body">';
   html += '<div class="chart-container" style="min-height:220px;height:220px"><canvas id="cpi-chart2"></canvas></div>';
   html += '</div></div>';
-  html += '<div class="card shadow-sm flex-grow-1"><div class="card-header fw-semibold">Monthly Deal Progression Trend</div><div class="card-body">';
+  html += '<div class="card shadow-sm flex-grow-1"><div class="card-header fw-semibold">Monthly Deal Progression Trend <small class="fw-normal">(opted-in UCs)</small></div><div class="card-body">';
   html += '<div class="chart-container" style="min-height:260px;height:260px"><canvas id="cpi-chart4"></canvas></div>';
   html += '</div></div>';
   html += '</div>';
@@ -420,9 +420,9 @@ function renderCPIAdopt(data) {
       }
     });
 
-    // ── Chart 5: Monthly Estimated Earned Incentives (Track)
+    // ── Chart 5: Monthly Estimated Earned Incentives (Portfolio)
     // Logic mirrors the Excel SUMPRODUCT formula:
-    // For each month and each Track, sum each stage's incentive amount where
+    // For each month and each Portfolio, sum each stage's incentive amount where
     // Earned?=TRUE and that stage's completion date falls within the month.
     var EARN_STAGES = [
       { dateField: "Stage Completion Date(onboard)", amtField: "Estimated Incentive Amount(Onboard)" },
@@ -431,19 +431,17 @@ function renderCPIAdopt(data) {
       { dateField: "Stage Completion Date(Adopt)",   amtField: "Estimated Incentive Amount(Adopt)"   }
     ];
 
-    // Collect unique tracks from filtered data (MaxFlag=YES + portfolio/offer filters)
-    var trackSet = new Set();
-    subset.forEach(function (r) { if (r["Track"]) trackSet.add(r["Track"]); });
-    var tracks = Array.from(trackSet).sort();
+    // Use the same portfolio list as Charts 3 & 4
+    var earnPortfolios = portfolioFilter ? [portfolioFilter] : trendPortfolios;
 
-    // earnedByTrack[track][monthIndex] = total earned amount
-    var earnedByTrack = {};
-    tracks.forEach(function (t) { earnedByTrack[t] = new Array(12).fill(0); });
+    // earnedByPortfolio[portfolio][monthIndex] = total earned amount
+    var earnedByPortfolio = {};
+    earnPortfolios.forEach(function (p) { earnedByPortfolio[p] = new Array(12).fill(0); });
 
     subset.forEach(function (r) {
       if (!r["Earned?"]) return;
-      var t = r["Track"];
-      if (!t || !earnedByTrack[t]) return;
+      var p = r["Deal CPI Portfolio"];
+      if (!p || !earnedByPortfolio[p]) return;
       EARN_STAGES.forEach(function (s) {
         var d = new Date(r[s.dateField]);
         if (isNaN(d.getTime())) return;
@@ -452,21 +450,18 @@ function renderCPIAdopt(data) {
         for (var i = 0; i < 12; i++) {
           var start = monthStarts[i];
           var end   = new Date(start.getFullYear(), start.getMonth() + 1, 1);
-          if (d >= start && d < end) { earnedByTrack[t][i] += amt; break; }
+          if (d >= start && d < end) { earnedByPortfolio[p][i] += amt; break; }
         }
       });
     });
 
-    var TRACK_PALETTE = [
-      "#00BCF2","#E55400","#6BB700","#7B3F91",
-      "#FF8C00","#005B99","#C00000","#00B294",
-      "#D69E2E","#553C9A","#2B7A0B","#B83280"
-    ];
-    var earnDatasets = tracks.map(function (t, idx) {
+    var earnFallbackColors = ["#00BCF2","#E55400","#6BB700","#7B3F91","#FF8C00","#005B99"];
+    var earnDatasets = earnPortfolios.map(function (p, idx) {
+      var color = PORTFOLIO_COLORS[p] || earnFallbackColors[idx % earnFallbackColors.length];
       return {
-        label: t,
-        data: earnedByTrack[t],
-        backgroundColor: TRACK_PALETTE[idx % TRACK_PALETTE.length]
+        label: p,
+        data: earnedByPortfolio[p],
+        backgroundColor: color
       };
     });
 

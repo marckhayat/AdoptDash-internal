@@ -2,35 +2,6 @@
 // customer.js — Customer tab renderer
 // =============================================================================
 
-var UC_GUIDE_MAP = {
-  "Campus Network Automation": "https://salesresources.cisco.com/Link/Content/DCVDV84mh3TJQ8QDPD3b8W2DTcW3",
-  "Campus Network Observability and Insights": "https://salesresources.cisco.com/Link/Content/DC9H9RVF89BMXGF2dXb2BFQFM7T8",
-  "Campus Network Programmability and Integrations": "https://salesresources.cisco.com/Link/Content/DCc8W63BVHF4W87WV3Pf8PVcFq8P",
-  "Campus Network Segmentation": "https://salesresources.cisco.com/Link/Content/DCmXHjbd8qqG284Jc2h7fhqCjXhG",
-  "Campus Network Visibility": "https://salesresources.cisco.com/Link/Content/DC7RTb387qGWh8qWmHhfR494d48j",
-  "Cloud Monitoring for Catalyst": "https://salesresources.cisco.com/Link/Content/DCc6fbbGg4Dhh872BFDXbjP9T3c8",
-  "Internet and Cloud Visibility": "https://salesresources.cisco.com/Link/Content/DCqqQQh9MFjC7GhB4f27p3Q29Mp8",
-  "Location Based Intelligence": "https://salesresources.cisco.com/Link/Content/DCXqmHdjGfcB38CCfXbBcTWMXTQV",
-  "Foundational Networking and Security for Meraki": "https://salesresources.cisco.com/Link/Content/DCq946RP494fQGhMMj8Tj7DFhMFB",
-  "Programmability and Integrations for Meraki": "https://salesresources.cisco.com/Link/Content/DCJFWjc8VhHmdGc27fQgm7VG8dJ8",
-  "Multicloud Connectivity": "https://salesresources.cisco.com/Link/Content/DC6b33dB8DFQ7GFD884m9JCFVHRd",
-  "SD-Routing": "https://salesresources.cisco.com/Link/Content/DCXpXdRBQW63287WQf7pVJm4fqFd",
-  "Secure Automated WAN": "https://salesresources.cisco.com/Link/Content/DCT9mHbWqbjVq89JRmXWmcRjdF6d",
-  "Network Security Analytics": "https://salesresources.cisco.com/Link/Content/DC3h72hWC28BDG2MFXj9FQWdFgd8",
-  "Secure Application Access With Phishing-Resistant MFA": "https://salesresources.cisco.com/Link/Content/DChWJPjDhBHCG8cQQT4dJhGDGqXB",
-  "DNS Security": "https://salesresources.cisco.com/Link/Content/DCTmhf2TBqq4WG7Xh7TVbHDTFfF3",
-  "Public Cloud Security Policy and Access": "https://salesresources.cisco.com/Link/Content/DCJThRm6W4gMBGHWGRP9bRXh8Hjd",
-  "Data Center Firewall Operations": "https://salesresources.cisco.com/Link/Content/DCHFpmXWT92HTGQCqH6Mfm3gCPj3",
-  "Internet Edge Protection": "https://salesresources.cisco.com/Link/Content/DCCjTFMPQQWGG8WF2GjCgHCRpffB",
-  "Network Access Control": "https://salesresources.cisco.com/Link/Content/DCjjXWbm7hpJPGcT9XpV7MpW47cj",
-  "Simplified Operations": "https://salesresources.cisco.com/Link/Content/DC4Pd2GRgGFRg8cFdMQWMqcMFC7d",
-  "Data Center Network Operations": "https://salesresources.cisco.com/Link/Content/DCMTJ82j6CjgbG9RT6pMjpgDpFXG",
-  "Distributed Networking": "https://salesresources.cisco.com/Link/Content/DCbB2Mm8GbV3G8qJJgmb4qqQJJTP",
-  "Distributed Networking with NDFC (DCNM)": "https://salesresources.cisco.com/Link/Content/DC7Qh9M2bJHDM8f2fjDqhPjVX6Pj",
-  "Fabric Provisioning and Operations with NDFC (DCNM)": "https://salesresources.cisco.com/Link/Content/DCH4dRd8bC7q38WDVGPCqjTdgf2j",
-  "Network Provisioning and Operations": "https://salesresources.cisco.com/Link/Content/DCC6qVR97QGWH8fX7DjRdCRWgHCB"
-};
-
 function renderCustomer(data) {
   var el = document.getElementById("tab-customer");
   if (!el) return;
@@ -78,16 +49,17 @@ function renderCustomer(data) {
 
   var html = '<div class="d-flex align-items-end gap-4 mb-3">';
   html += '<div>';
-  html += '<label for="cust-name-filter" class="form-label small fw-semibold mb-1">';
-  html += '<i class="bi bi-search me-1"></i>Filter by CR Party Name</label>';
+  html += '<label for="cust-name-filter" class="form-label small fw-semibold mb-1">Customers with opt-ins</label>';
   html += '<div class="position-relative" style="min-width:320px">';
-  html += '<input type="text" id="cust-name-filter" class="form-control form-control-sm pe-4" placeholder="Type to filter customers…"/>';
+  html += '<i class="bi bi-search position-absolute top-50 start-0 translate-middle-y ms-2 text-muted" style="font-size:0.85rem;pointer-events:none"></i>';
+  html += '<input type="text" id="cust-name-filter" class="form-control form-control-sm ps-4 pe-4" placeholder="Customer or WS-Deal ID…"/>';
   html += '<button id="cust-name-clear" type="button" class="btn btn-link p-0 position-absolute top-50 end-0 translate-middle-y me-2 d-none" style="font-size:0.8rem;color:#999;line-height:1" tabindex="-1"><i class="bi bi-x-lg"></i></button>';
   html += '</div>';
   html += '</div>';
   html += '<div class="text-muted small mb-1" id="cust-count-label"></div>';
   html += '</div>';
   html += '<div id="cust-table-area"></div>';
+  html += '<div id="cust-pagination" class="mt-2"></div>';
 
   el.innerHTML = html;
 
@@ -101,6 +73,7 @@ function renderCustomer(data) {
 
   document.getElementById("cust-name-filter").addEventListener("input", function () {
     document.getElementById("cust-name-clear").classList.toggle("d-none", this.value === "");
+    custPage = 1;
     renderCustomerTable(this.value.trim());
   });
   document.getElementById("cust-name-clear").addEventListener("click", function () {
@@ -108,8 +81,13 @@ function renderCustomer(data) {
     inp.value = "";
     this.classList.add("d-none");
     inp.focus();
+    custPage = 1;
     renderCustomerTable("");
   });
+
+  var custSort = { field: null, dir: 1 };
+  var custPage = 1;
+  var CUST_PAGE_SIZE = 50;
 
   renderCustomerTable(document.getElementById("cust-name-filter").value.trim());
 
@@ -118,9 +96,25 @@ function renderCustomer(data) {
 
     var rows = defaultRows.filter(function (r) {
       if (!nameFilter) return true;
+      var q = nameFilter.toLowerCase();
       var name = String(r["CR Party Name"] || "").toLowerCase();
-      return name.indexOf(nameFilter.toLowerCase()) !== -1;
+      var wsid = String(r["Deal WS-ID"] || "").toLowerCase();
+      return name.indexOf(q) !== -1 || wsid.indexOf(q) !== -1;
     });
+
+    // Apply sort
+    if (custSort.field) {
+      var sf = custSort.field;
+      var isDateField = ["Booking Date","Adopt Rebate Start Date","Deal Incentive Expiry Date"].indexOf(sf) !== -1;
+      var isNumField  = ["Potential Incentives","Estimated Earned Incentives"].indexOf(sf) !== -1;
+      rows = rows.slice().sort(function (a, b) {
+        var av = a[sf], bv = b[sf];
+        if (isDateField) { av = toDate(av) || new Date(0); bv = toDate(bv) || new Date(0); }
+        else if (isNumField) { av = parseFloat(av) || 0; bv = parseFloat(bv) || 0; }
+        else { av = String(av || "").toLowerCase(); bv = String(bv || "").toLowerCase(); }
+        return av < bv ? -custSort.dir : av > bv ? custSort.dir : 0;
+      });
+    }
 
     var countLabel = document.getElementById("cust-count-label");
     if (countLabel) {
@@ -131,14 +125,20 @@ function renderCustomer(data) {
       area.innerHTML = '<p class="text-muted mt-2">' +
         (nameFilter ? 'No records match "' + escHtml(nameFilter) + '".' : 'No opted-in eligible or expired records found.') +
         '</p>';
+      document.getElementById("cust-pagination").innerHTML = "";
       return;
     }
+
+    var totalPages = Math.ceil(rows.length / CUST_PAGE_SIZE);
+    if (custPage > totalPages) custPage = totalPages;
+    var start = (custPage - 1) * CUST_PAGE_SIZE;
+    var pageRows = rows.slice(start, start + CUST_PAGE_SIZE);
 
     var has2TPartner = data.some(function (r) { return r["2T Partner Name"] && String(r["2T Partner Name"]).trim() !== ""; });
 
     var cols = [
       ...(has2TPartner ? [{ label: "2T Partner Name", field: "2T Partner Name" }] : []),
-      { label: "CR Party Name",                     field: "CR Party Name" },
+      { label: "CR Party Name",                     field: "CR Party Name",                    sortable: true },
       { label: "CR Party ID",                       field: "CR Party ID" },
       { label: "CX Customer BU ID",                 field: "CX Customer BU ID" },
       { label: "Domain",                            field: "Deal CPI Portfolio" },
@@ -148,19 +148,24 @@ function renderCustomer(data) {
       { label: "Stage Progress",                    field: "Current Stage Progress" },
       { label: "Pending Tasks",                     field: "Current stage pending tasks" },
       { label: "Days in Stage",                     field: "Days in stage",                    isDays: true },
-      { label: "Potential<br>Incentives",           field: "Potential Incentives",             isCurrency: true },
-      { label: "Estimated<br>Earned Incentives",    field: "Estimated Earned Incentives",      isCurrency: true },
-      { label: "Booking Date",                      field: "Booking Date",                     isDate: true },
-      { label: "Opt-in Date",                      field: "Adopt Rebate Start Date",          isDate: true },
-      { label: "Expiry Date",                       field: "Deal Incentive Expiry Date",       isDate: true, isExpiry: true },
+      { label: "Potential<br>Incentives",           field: "Potential Incentives",             isCurrency: true, sortable: true },
+      { label: "Estimated<br>Earned Incentives",    field: "Estimated Earned Incentives",      isCurrency: true, sortable: true },
+      { label: "Booking Date",                      field: "Booking Date",                     isDate: true, sortable: true },
+      { label: "Opt-in Date",                       field: "Adopt Rebate Start Date",          isDate: true, sortable: true },
+      { label: "Expiry Date",                       field: "Deal Incentive Expiry Date",       isDate: true, isExpiry: true, sortable: true },
       { label: "Stages Completed<br>Before Opt-in", field: "Missed Incentives",               isMissedFlag: true },
       { label: "Deal WS-ID",                        field: "Deal WS-ID",                       isWsId: true }
     ];
 
-    var thead = "<thead><tr>" + cols.map(function (c) { return "<th>" + c.label + "</th>"; }).join("") + "</tr></thead>";
+    var thead = "<thead><tr>" + cols.map(function (c) {
+      if (!c.sortable) return "<th>" + c.label + "</th>";
+      var isActive = custSort.field === c.field;
+      var icon = isActive ? (custSort.dir === 1 ? " &#9650;" : " &#9660;") : ' <span style="opacity:0.3">&#8597;</span>';
+      return '<th style="cursor:pointer;white-space:nowrap" data-sortfield="' + c.field + '">' + c.label + icon + '</th>';
+    }).join("") + "</tr></thead>";
 
     var tbody = "<tbody>";
-    rows.forEach(function (r) {
+    pageRows.forEach(function (r) {
       var expiryObj = toDate(r["Deal Incentive Expiry Date"]);
       var isExpired = expiryObj && expiryObj < today;
       var isCompleted = norm(r["Current stage"]) === "COMPLETED";
@@ -222,6 +227,39 @@ function renderCustomer(data) {
     tbody += "</tbody>";
 
     area.innerHTML = '<div class="table-wrapper"><table class="table table-sm table-bordered mb-0">' + thead + tbody + '</table></div>';
+
+    area.querySelectorAll("th[data-sortfield]").forEach(function (th) {
+      th.addEventListener("click", function () {
+        var f = this.getAttribute("data-sortfield");
+        if (custSort.field === f) { custSort.dir *= -1; }
+        else { custSort.field = f; custSort.dir = 1; }
+        custPage = 1;
+        renderCustomerTable(document.getElementById("cust-name-filter").value.trim());
+      });
+    });
+
+    // Pagination controls
+    var pgEl = document.getElementById("cust-pagination");
+    if (totalPages <= 1) { pgEl.innerHTML = ""; return; }
+    var pgHtml = '<nav><ul class="pagination pagination-sm mb-0">';
+    pgHtml += '<li class="page-item' + (custPage === 1 ? ' disabled' : '') + '"><a class="page-link" data-page="' + (custPage - 1) + '">&laquo;</a></li>';
+    var lo = Math.max(1, custPage - 2), hi = Math.min(totalPages, custPage + 2);
+    if (lo > 1)          pgHtml += '<li class="page-item"><a class="page-link" data-page="1">1</a></li>' + (lo > 2 ? '<li class="page-item disabled"><span class="page-link">…</span></li>' : '');
+    for (var p = lo; p <= hi; p++) pgHtml += '<li class="page-item' + (p === custPage ? ' active' : '') + '"><a class="page-link" data-page="' + p + '">' + p + '</a></li>';
+    if (hi < totalPages) pgHtml += (hi < totalPages - 1 ? '<li class="page-item disabled"><span class="page-link">…</span></li>' : '') + '<li class="page-item"><a class="page-link" data-page="' + totalPages + '">' + totalPages + '</a></li>';
+    pgHtml += '<li class="page-item' + (custPage === totalPages ? ' disabled' : '') + '"><a class="page-link" data-page="' + (custPage + 1) + '">&raquo;</a></li>';
+    pgHtml += '</ul></nav>';
+    pgEl.innerHTML = pgHtml;
+    pgEl.querySelectorAll("a.page-link").forEach(function (a) {
+      a.addEventListener("click", function (e) {
+        e.preventDefault();
+        var pg = parseInt(this.getAttribute("data-page"));
+        if (pg >= 1 && pg <= totalPages && pg !== custPage) {
+          custPage = pg;
+          renderCustomerTable(document.getElementById("cust-name-filter").value.trim());
+        }
+      });
+    });
   }
 }
 

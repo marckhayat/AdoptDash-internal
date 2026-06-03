@@ -128,6 +128,10 @@ function renderDetails(data) {
   // ── Build initial HTML
   var html = '<div class="d-flex gap-3">';
 
+  function tip(text) {
+    return ' <i class="bi bi-info-circle text-muted" style="font-size:0.72rem;cursor:default" data-bs-toggle="tooltip" data-bs-placement="right" title="' + text.replace(/"/g, "&quot;") + '"></i>';
+  }
+
   // Sidebar filters
   html += '<div class="filter-sidebar flex-shrink-0">';
   html += '<div class="fw-bold mb-2" style="font-size:0.8rem;color:var(--cisco-dark)"><i class="bi bi-funnel me-1"></i>Filters</div>';
@@ -135,38 +139,48 @@ function renderDetails(data) {
   if (has2TPartner) {
     html += '<div class="filter-group"><div class="position-relative"><input type="text" id="filter-2tpartner" class="form-control form-control-sm pe-4" placeholder="&#128269; 2T Partner Name..." /><button id="det-2tpartner-clear" type="button" class="btn btn-link p-0 position-absolute top-50 end-0 translate-middle-y me-2 d-none" style="font-size:0.8rem;color:#999;line-height:1" tabindex="-1"><i class="bi bi-x-lg"></i></button></div></div>';
   }
-  html += '<div class="filter-group"><div class="position-relative"><input type="text" id="filter-crparty" class="form-control form-control-sm pe-4" placeholder="&#128269; CR Party Name..." /><button id="det-crparty-clear" type="button" class="btn btn-link p-0 position-absolute top-50 end-0 translate-middle-y me-2 d-none" style="font-size:0.8rem;color:#999;line-height:1" tabindex="-1"><i class="bi bi-x-lg"></i></button></div></div>';
+  html += '<div class="filter-group"><div class="position-relative"><input type="text" id="filter-crparty" class="form-control form-control-sm pe-4" placeholder="&#128269; Customer or WS-Deal ID..." /><button id="det-crparty-clear" type="button" class="btn btn-link p-0 position-absolute top-50 end-0 translate-middle-y me-2 d-none" style="font-size:0.8rem;color:#999;line-height:1" tabindex="-1"><i class="bi bi-x-lg"></i></button></div></div>';
 
   // Quick-toggle filters
   html += '<div class="filter-group">';
-  html += '<div class="form-check form-check-sm"><input class="form-check-input" type="checkbox" id="filter-new-eligible"><label class="form-check-label" for="filter-new-eligible">New Eligible</label></div>';
-  html += '<div class="form-check form-check-sm"><input class="form-check-input" type="checkbox" id="filter-expires-soon"><label class="form-check-label" for="filter-expires-soon">Expires Soon (&lt;3M)</label></div>';
-  html += '<div class="form-check form-check-sm"><input class="form-check-input" type="checkbox" id="filter-earned"><label class="form-check-label" for="filter-earned">Earned</label></div>';
-  html += '<div class="form-check form-check-sm"><input class="form-check-input" type="checkbox" id="filter-ea"><label class="form-check-label" for="filter-ea">EA</label></div>';
-  html += '<div class="form-check form-check-sm"><input class="form-check-input" type="checkbox" id="filter-aap"><label class="form-check-label" for="filter-aap">AAP</label></div>';
-  html += '<div class="form-check form-check-sm"><input class="form-check-input" type="checkbox" id="filter-pvi-eligible"><label class="form-check-label" for="filter-pvi-eligible">PVI Eligible</label></div>';
-  html += '<div class="form-check form-check-sm"><input class="form-check-input" type="checkbox" id="filter-pvi-onboard"><label class="form-check-label" for="filter-pvi-onboard">PVI Onboard</label></div>';
-  html += '<div class="form-check form-check-sm"><input class="form-check-input" type="checkbox" id="filter-pvi-adopt"><label class="form-check-label" for="filter-pvi-adopt">PVI Adopt</label></div>';
-  html += '<div class="form-check form-check-sm"><input class="form-check-input" type="checkbox" id="filter-uc2550"><label class="form-check-label" for="filter-uc2550">UC Eligible w/o opt-in <span><i class="bi bi-check-circle-fill"></i> Onboard <i class="bi bi-check-circle-fill"></i> Use</span></label></div>';
-  html += '<div class="form-check form-check-sm"><input class="form-check-input" type="checkbox" id="filter-uc75"><label class="form-check-label" for="filter-uc75">UC Eligible w/o opt-in <span><i class="bi bi-check-circle-fill"></i> Engage</span></label></div>';
-  html += '<div class="form-check form-check-sm"><input class="form-check-input" type="checkbox" id="filter-ucmissed"><label class="form-check-label" for="filter-ucmissed">UC progressed &amp; missed w/o opt-in</label></div>';
-  html += '<div class="d-flex gap-2 align-items-center mt-1 mb-0" style="font-size:0.78rem"><span class="text-muted">Offer opted-in:</span>';
+  html += '<div class="form-check form-check-sm"><input class="form-check-input" type="checkbox" id="filter-new-eligible"><label class="form-check-label" for="filter-new-eligible">New Eligible' + tip("UCs eligible for opt-in, booked within the past 30 days.") + '</label></div>';
+  html += '<div class="form-check form-check-sm"><input class="form-check-input" type="checkbox" id="filter-expires-soon"><label class="form-check-label" for="filter-expires-soon">Expires Soon (&lt;3M)' + tip("Deals where the incentive expires in less than 3 months.") + '</label></div>';
+  html += '<div class="form-check form-check-sm"><input class="form-check-input" type="checkbox" id="filter-earned"><label class="form-check-label" for="filter-earned">Earned' + tip("Deals where incentives have been earned.") + '</label></div>';
+  html += '<div class="form-check form-check-sm"><input class="form-check-input" type="checkbox" id="filter-ea"><label class="form-check-label" for="filter-ea">EA' + tip("EA deals.") + '</label></div>';
+  html += '<div class="form-check form-check-sm"><input class="form-check-input" type="checkbox" id="filter-aap"><label class="form-check-label" for="filter-aap">AAP' + tip("Completed the Adoption Accountability Plan.") + '</label></div>';
+  html += '<div class="form-check form-check-sm"><input class="form-check-input" type="checkbox" id="filter-uc2550"><label class="form-check-label" for="filter-uc2550">UC Eligible w/o opt-in <span><i class="bi bi-check-circle-fill"></i> Onboard <i class="bi bi-check-circle-fill"></i> Use</span>' + tip("A UC that has progressed by 1 or 2 stages (out of 4) and hasn&#39;t been opted-in yet. Easier targets as deployment has already started.") + '</label></div>';
+  html += '<div class="form-check form-check-sm"><input class="form-check-input" type="checkbox" id="filter-uc75"><label class="form-check-label" for="filter-uc75">UC Eligible w/o opt-in <span><i class="bi bi-check-circle-fill"></i> Engage</span>' + tip("A UC that has progressed by 3 stages (out of 4) and hasn&#39;t been opted-in yet. Incentives for the last stage (Adopt) can still be pursued.") + '</label></div>';
+  html += '<div class="form-check form-check-sm"><input class="form-check-input" type="checkbox" id="filter-ucmissed"><label class="form-check-label" for="filter-ucmissed">UC progressed &amp; missed w/o opt-in' + tip("A UC that has completed all 4 earned stages without being opted-in. No available incentives to pursue.") + '</label></div>';
+  html += '<div class="d-flex gap-2 align-items-center mt-1 mb-0" style="font-size:0.78rem"><span class="text-muted">Offer opted-in:' + tip("Any UC opted-in within this offer.") + '</span>';
   html += '<div class="form-check form-check-sm mb-0"><input class="form-check-input" type="checkbox" id="filter-offer-optedin-y" value="Y"><label class="form-check-label" for="filter-offer-optedin-y">Y</label></div>';
   html += '<div class="form-check form-check-sm mb-0"><input class="form-check-input" type="checkbox" id="filter-offer-optedin-n" value="N"><label class="form-check-label" for="filter-offer-optedin-n">N</label></div>';
   html += '</div>';
+  html += makeCheckboxGroup("PVI" + tip("UCs included in the PVI Engagement score calculations."), "filter-pvi", ["Eligible", "Onboard", "Adopt"]);
   html += '</div>';
 
-  html += makeCheckboxGroup("Stage",          "filter-stage",     stages);
-  html += makeCheckboxGroup("Opt-In Status",  "filter-optin",     optIns);
-  html += '<div class="filter-group"><label class="group-label">Portfolio</label>' + makeDropdown("filter-portfolio", portfolios) + '</div>';
-  html += '<div class="filter-group"><label class="group-label">Offer</label>' + makeDropdown("filter-offer", offerList) + '</div>';
+  html += makeCheckboxGroup("Stage", "filter-stage", stages, {
+    "Eligible":     "Can earn incentives on this deal.",
+    "Expired":      "The incentive has reached the expiry date.",
+    "Not Eligible": "Not eligible for incentives (e.g. all stages completed, another UC opted-in in same offer)."
+  });
+  html += makeCheckboxGroup("Opt-In Status", "filter-optin", optIns, {
+    "OPTED IN":  "Deal has been selected for CPI.",
+    "OPTED OUT": "Deal has been de-selected.",
+    "PENDING":   "Opt-in is possible."
+  });
+  html += '<div class="filter-group"><label class="group-label">Portfolio' + tip("The technology domain that encompasses offers and UCs.") + '</label>' + makeDropdown("filter-portfolio", portfolios) + '</div>';
+  html += '<div class="filter-group"><label class="group-label">Offer' + tip("The main solution that was sold to the customer.") + '</label>' + makeDropdown("filter-offer", offerList) + '</div>';
 
   // Date filters
   html += '<div class="filter-group"><label class="group-label">Booking Date</label>'      + makeDateSlider("det-bk",  dateBounds.bk)  + '</div>';
   html += '<div class="filter-group"><label class="group-label">Opt-in Date</label>'        + makeDateSlider("det-rs",  dateBounds.rs)  + '</div>';
   html += '<div class="filter-group"><label class="group-label">Rebate Expiry Date</label>' + makeDateSlider("det-exp", dateBounds.exp) + '</div>';
 
-  html += makeCheckboxGroup("Offer Risk Level", "filter-risk", riskOpts);
+  html += makeCheckboxGroup("Offer Risk Level", "filter-risk", riskOpts, {
+    "High":   "UC is in Purchase/Onboard stage.",
+    "Medium": "UC is in Implement/Use stage.",
+    "Low":    "UC is in Engage/Adopt/Completed stage."
+  });
 
   html += '<button class="btn btn-sm btn-outline-secondary w-100 mt-2" id="det-clear-btn"><i class="bi bi-x-circle me-1"></i>Clear filters</button>';
   html += '</div>'; // /sidebar
@@ -180,6 +194,11 @@ function renderDetails(data) {
   html += '</div>'; // /d-flex
 
   el.innerHTML = html;
+
+  // Initialise Bootstrap tooltips on info icons
+  el.querySelectorAll("[data-bs-toggle='tooltip']").forEach(function (el2) {
+    new bootstrap.Tooltip(el2, { html: false });
+  });
 
   // ── Slider display updater(defined here so it's available to all wiring below)
   function updateSliderDisplay(prefix) {
@@ -227,9 +246,22 @@ function renderDetails(data) {
     inp.focus();
     currentPage = 1; applyFiltersAndRender();
   });
-  document.getElementById("filter-portfolio").addEventListener("change", function () { currentPage = 1; applyFiltersAndRender(); });
+  document.getElementById("filter-portfolio").addEventListener("change", function () {
+    var pf = this.value;
+    var offerSel = document.getElementById("filter-offer");
+    var prevOffer = offerSel.value;
+    var filteredOffers = pf
+      ? CPI_MAPPING.filter(function (e) { return e.portfolio === pf; }).map(function (e) { return e.offer; }).filter(function (o, i, a) { return a.indexOf(o) === i; }).sort()
+      : offerList;
+    offerSel.innerHTML = '<option value="">All Offers</option>';
+    filteredOffers.forEach(function (o) {
+      offerSel.innerHTML += '<option value="' + o.replace(/"/g, "&quot;") + '"' + (o === prevOffer ? ' selected' : '') + '>' + o + '</option>';
+    });
+    if (pf && prevOffer && filteredOffers.indexOf(prevOffer) === -1) offerSel.value = "";
+    currentPage = 1; applyFiltersAndRender();
+  });
   document.getElementById("filter-offer").addEventListener("change", function () { currentPage = 1; applyFiltersAndRender(); });
-  ["filter-pvi-eligible","filter-pvi-onboard","filter-pvi-adopt","filter-uc2550","filter-uc75","filter-ucmissed"].forEach(function (id) {
+  ["filter-uc2550","filter-uc75","filter-ucmissed"].forEach(function (id) {
     // now checkboxes — handled by the global checkbox listener above
   });
   ["det-bk","det-rs","det-exp"].forEach(function (prefix) {
@@ -278,9 +310,9 @@ function renderDetails(data) {
     var offerVal         = document.getElementById("filter-offer").value;
     var offerOptedIn     = document.getElementById("filter-offer-optedin-y") ? document.getElementById("filter-offer-optedin-y").checked : false;
     var offerNotOptedIn  = document.getElementById("filter-offer-optedin-n") ? document.getElementById("filter-offer-optedin-n").checked : false;
-    var pviEligible      = document.getElementById("filter-pvi-eligible").checked;
-    var pviOnboard       = document.getElementById("filter-pvi-onboard").checked;
-    var pviAdopt         = document.getElementById("filter-pvi-adopt").checked;
+    var pviEligible      = document.getElementById("filter-pvi-Eligible") && document.getElementById("filter-pvi-Eligible").checked;
+    var pviOnboard       = document.getElementById("filter-pvi-Onboard")  && document.getElementById("filter-pvi-Onboard").checked;
+    var pviAdopt         = document.getElementById("filter-pvi-Adopt")    && document.getElementById("filter-pvi-Adopt").checked;
     var uc2550           = document.getElementById("filter-uc2550").checked;
     var uc75             = document.getElementById("filter-uc75").checked;
     var ucMissed         = document.getElementById("filter-ucmissed").checked;
@@ -308,7 +340,8 @@ function renderDetails(data) {
 
     filteredData = data.filter(function (r) {
       if (twoTVal    && String(r["2T Partner Name"] || "").toLowerCase().indexOf(twoTVal) === -1)   return false;
-      if (crPartyVal && String(r["CR Party Name"] || "").toLowerCase().indexOf(crPartyVal) === -1) return false;
+      if (crPartyVal && String(r["CR Party Name"] || "").toLowerCase().indexOf(crPartyVal) === -1
+                     && String(r["Deal WS-ID"] || "").toLowerCase().indexOf(crPartyVal) === -1) return false;
       if (stageChecked.length  && stageChecked.indexOf(String(r["Stage"] || "")) === -1)                      return false;
       if (optInChecked.length  && optInChecked.indexOf(String(r["Adopt Rebate Opt-In Status"] || "")) === -1) return false;
       if (portfolioVal         && String(r["Deal CPI Portfolio"] || "") !== portfolioVal)                     return false;
@@ -540,13 +573,15 @@ function renderDetails(data) {
 
     // Pagination
     var pgHtml = '<nav><ul class="pagination pagination-sm mb-0">';
-    pgHtml += '<li class="page-item' + (currentPage===1?" disabled":"") + '"><a class="page-link" href="#" data-page="' + (currentPage-1) + '">‹</a></li>';
+    pgHtml += '<li class="page-item' + (currentPage===1?" disabled":"") + '"><a class="page-link" href="#" data-page="' + (currentPage-1) + '">&laquo;</a></li>';
     var startP = Math.max(1, currentPage - 2);
     var endP   = Math.min(totalPages, currentPage + 2);
+    if (startP > 1)          pgHtml += '<li class="page-item"><a class="page-link" href="#" data-page="1">1</a></li>' + (startP > 2 ? '<li class="page-item disabled"><span class="page-link">…</span></li>' : '');
     for (var p = startP; p <= endP; p++) {
       pgHtml += '<li class="page-item' + (p===currentPage?" active":"") + '"><a class="page-link" href="#" data-page="' + p + '">' + p + '</a></li>';
     }
-    pgHtml += '<li class="page-item' + (currentPage===totalPages||totalPages===0?" disabled":"") + '"><a class="page-link" href="#" data-page="' + (currentPage+1) + '">›</a></li>';
+    if (endP < totalPages)   pgHtml += (endP < totalPages - 1 ? '<li class="page-item disabled"><span class="page-link">…</span></li>' : '') + '<li class="page-item"><a class="page-link" href="#" data-page="' + totalPages + '">' + totalPages + '</a></li>';
+    pgHtml += '<li class="page-item' + (currentPage===totalPages||totalPages===0?" disabled":"") + '"><a class="page-link" href="#" data-page="' + (currentPage+1) + '">&raquo;</a></li>';
     pgHtml += '</ul></nav>';
     pgHtml += '<small class="text-muted ms-2">' + filteredData.length + ' rows</small>';
     document.getElementById("det-pagination").innerHTML = pgHtml;
@@ -568,11 +603,16 @@ function renderDetails(data) {
     return result;
   }
 
-  function makeCheckboxGroup(label, id, options) {
+  function makeCheckboxGroup(label, id, options, optionTips) {
     var html = '<div class="filter-group"><label class="group-label">' + label + '</label><div id="' + id + '">';
     options.forEach(function (o) {
-      html += '<div class="form-check form-check-sm"><input class="form-check-input" type="checkbox" value="' + escHtml(o) + '" id="' + id + '-' + escHtml(o).replace(/\s+/g,"-") + '">' +
-              '<label class="form-check-label" for="' + id + '-' + escHtml(o).replace(/\s+/g,"-") + '">' + escHtml(o) + '</label></div>';
+      var safeid = id + '-' + escHtml(o).replace(/\s+/g,"-");
+      var tipText = optionTips && (optionTips[o] || optionTips[o.toUpperCase()] || optionTips[o.toLowerCase()]);
+      var tipHtml = tipText
+        ? ' <i class="bi bi-info-circle text-muted" style="font-size:0.72rem;cursor:default" data-bs-toggle="tooltip" data-bs-placement="right" title="' + tipText.replace(/"/g,"&quot;") + '"></i>'
+        : '';
+      html += '<div class="form-check form-check-sm"><input class="form-check-input" type="checkbox" value="' + escHtml(o) + '" id="' + safeid + '">' +
+              '<label class="form-check-label" for="' + safeid + '">' + escHtml(o) + tipHtml + '</label></div>';
     });
     html += "</div></div>";
     return html;

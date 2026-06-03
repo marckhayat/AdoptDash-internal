@@ -133,6 +133,14 @@ function transformData(rawRows) {
       r["Track"] = "Cisco Secure Network Analytics";
     }
 
+    // Step 2b: Fix portfolio when set to "No Offer" — look up by offer, then by use case
+    if (norm(r["Deal CPI Portfolio"]) === "NO OFFER" || norm(r["Deal CPI Portfolio"]) === "") {
+      var offerKey   = norm(r["Track"]);
+      var ucKey      = norm(r["Use Case"] || r["Use case"] || "");
+      var fixedPortfolio = OFFER_TO_PORTFOLIO[offerKey] || USE_CASE_TO_PORTFOLIO[ucKey] || r["Deal CPI Portfolio"];
+      r["Deal CPI Portfolio"] = fixedPortfolio;
+    }
+
     // Step 3: CRPartyID-Offer composite key
     r["CRPartyID-Offer"] = String(r["CR Party ID"] || "") + String(r["Track"] || "");
 

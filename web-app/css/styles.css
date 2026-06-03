@@ -329,3 +329,25 @@
 
 /* ── Dimmed row (expired / completed) ───────────────────── */
 .row-dimmed td { background-color: #d0d0d0 !important; }
+
+/* -- CPI Adopt: smaller font for parenthesised text in card headers -- */
+#tab-cpi-adopt .card-header small { font-size: 0.78em; }
+
+/* -- Data load notification panel (fixed top-right) -- */
+#notif-toast-container {
+  position: fixed;
+  top: 70px;
+  right: 1rem;
+  z-index: 1090;
+  width: 300px;
+  pointer-events: none;
+}
+#notif-toast-container .toast {
+  pointer-events: all;
+  border-left-width: 4px;
+  box-shadow: 0 4px 12px rgba(0,0,0,.15);
+}
+#notif-toast-container .toast.notif-new    { border-left-color: #1b6ec2; }
+#notif-toast-container .toast.notif-earned { border-left-color: #198754; }
+#notif-toast-container .toast.notif-expiry { border-left-color: #e6a817; }
+#notif-toast-container .toast.notif-zero   { border-left-color: #adb5bd; opacity: .85; }

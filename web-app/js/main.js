@@ -369,6 +369,7 @@ function finishLoad(filename, rowCount, headerAutoDetected, idbType, loadedAt) {
 
   var activeTab = document.querySelector(".nav-link.active[data-bs-target]");
   renderActiveTab(activeTab ? activeTab.dataset.bsTarget : "#tab-overview");
+  showDataNotifications(APP_DATA);
 }
 
 function restoreUploadSection(cachedEntries) {
@@ -441,10 +442,6 @@ function restoreUploadSection(cachedEntries) {
 
   // ── Build two-column layout ────────────────────────────────────────────────
   sec.innerHTML =
-    '<div id="update-banner" class="d-none alert alert-info alert-dismissible mb-0 py-2 px-3 rounded-0" style="font-size:0.85rem">' +
-    '<i class="bi bi-arrow-up-circle-fill me-2"></i><strong>Update available!</strong> Version <span id="update-version"></span> is on GitHub. ' +
-    '<a href="https://github.com/marckhayat/AdoptDash/tags" target="_blank" rel="noopener" class="alert-link ms-1">View changelog</a>' +
-    '<button type="button" class="btn-close py-2" data-bs-dismiss="alert"></button></div>' +
     '<div class="container-fluid py-4" style="max-width:1400px">' +
     '<div class="row g-4">' +
 
@@ -782,7 +779,7 @@ function restoreUploadSection(cachedEntries) {
     var base = (document.getElementById("lci-basepath").value.trim() || buildBasePath(u) || "").replace(/[\\/]+$/, "");
     var region = document.getElementById("lci-region").value;
     var week   = document.getElementById("lci-week").value;
-    var regionFile = region === "DISTI" ? "disti" : region;
+    var regionFile = region === "DISTI" ? "DISTI" : region;
     var folder = "LCI data " + region;
     return base + SEP + folder + SEP + "CPI_data_" + regionFile + "_" + week + ".csv";
   }
@@ -895,7 +892,7 @@ function restoreUploadSection(cachedEntries) {
     var region   = document.getElementById("lci-region").value;
     var week     = document.getElementById("lci-week").value;
     var expected = region === "DISTI"
-      ? "CPI_data_disti_" + week + ".csv"
+      ? "CPI_data_DISTI_" + week + ".csv"
       : "CPI_data_" + region + "_" + week + ".csv";
     var errEl    = document.getElementById("lci-error");
     errEl.classList.add("d-none");
@@ -1003,11 +1000,21 @@ function restoreUploadSection(cachedEntries) {
       if (!Array.isArray(tags) || tags.length === 0) return;
       var latest = tags[0].name;
       if (latest && latest !== APP_VERSION) {
-        var bannerEl = document.getElementById("update-banner");
-        var verEl    = document.getElementById("update-version");
-        if (bannerEl && verEl) {
-          verEl.textContent = latest;
-          bannerEl.classList.remove("d-none");
+        var container = document.getElementById("notif-toast-container");
+        if (container) {
+          var html =
+            '<div id="notif-update" class="toast show mb-2" style="border-left:4px solid #0d6efd" role="alert" data-bs-autohide="false">' +
+              '<div class="toast-header">' +
+                '<i class="bi bi-arrow-up-circle-fill text-primary me-2"></i>' +
+                '<strong class="me-auto">Update Available</strong>' +
+                '<button type="button" class="btn-close ms-2" onclick="this.closest(\'.toast\').remove()" aria-label="Close"></button>' +
+              '</div>' +
+              '<div class="toast-body small">' +
+                'Version <strong>' + latest + '</strong> is available. ' +
+                '<a href="https://github.com/marckhayat/AdoptDash/tags" target="_blank" rel="noopener">View changelog</a>' +
+              '</div>' +
+            '</div>';
+          container.insertAdjacentHTML("afterbegin", html);
         }
       }
     })
@@ -1030,14 +1037,165 @@ function renderActiveTab(target) {
   }
 }
 
+// ── Data load notifications ──────────────────────────────────────────────────
+function showDataNotifications(data) {
+  var container = document.getElementById("notif-toast-container");
+  if (!container || !data) return;
+  container.innerHTML = "";
+
+  var now    = new Date();
+  var today0 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  var past14 = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 13);
+  var next14 = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 13, 23, 59, 59, 999);
+
+  function pd(x) {
+    if (!x) return null;
+    if (x instanceof Date) return isNaN(x.getTime()) ? null : x;
+    if (typeof x === "number" && x > 1000) {
+      var d = new Date(Math.round((x - 25569) * 86400000));
+      return isNaN(d.getTime()) ? null : d;
+    }
+    if (typeof x === "string" && x.trim()) {
+      var d2 = new Date(x);
+      return isNaN(d2.getTime()) ? null : d2;
+    }
+    return null;
+  }
+
+  // 1. New eligible deals booked in past 14 days with Maximum Incentive Deal Flag = Yes
+  var newEligible = 0;
+  data.forEach(function(r) {
+    var bd = pd(r["Booking Date"]);
+    if (bd && bd >= past14 && bd <= now &&
+        String(r["Stage"] || "").toUpperCase() === "ELIGIBLE" &&
+        String(r["Maximum Incentive Deal Flag"] || "").toUpperCase() === "YES") newEligible++;
+  });
+
+  // 1b. Opt-ins in past 14 days (stage must be Eligible)
+  var newOptIns = 0;
+  var newOptInPotential = 0;
+  data.forEach(function(r) {
+    var od = pd(r["Adopt Rebate Start Date"]);
+    if (od && od >= past14 && od <= now &&
+        String(r["Adopt Rebate Opt-In Status"] || "").toUpperCase() === "OPTED IN" &&
+        String(r["Stage"] || "").toUpperCase() === "ELIGIBLE") {
+      newOptIns++;
+      newOptInPotential += parseFloat(r["Potential Incentives"]) || 0;
+    }
+  });
+
+  // 2. Incentives earned in past 14 days: sum stage amounts where that stage was completed in window
+  var STAGE_MAP = [
+    { dateCol: "Stage Completion Date(onboard)", amtCol: "Estimated Incentive Amount(Onboard)" },
+    { dateCol: "Stage Completion Date(Use)",     amtCol: "Estimated Incentive Amount(Use)"     },
+    { dateCol: "Stage Completion Date(Engage)",  amtCol: "Estimated Incentive Amount(Engage)"  },
+    { dateCol: "Stage Completion Date(Adopt)",   amtCol: "Estimated Incentive Amount(Adopt)"   }
+  ];
+  var earnedLast14 = 0;
+  data.forEach(function(r) {
+    if (String(r["Adopt Rebate Opt-In Status"] || "").toUpperCase() !== "OPTED IN") return;
+    var stg = String(r["Stage"] || "").toUpperCase();
+    if (stg !== "ELIGIBLE") return;
+    STAGE_MAP.forEach(function(s) {
+      var d = pd(r[s.dateCol]);
+      if (d && d >= past14 && d <= now) {
+        earnedLast14 += parseFloat(r[s.amtCol]) || 0;
+      }
+    });
+  });
+
+  // 3. Opted-in eligible deals expiring in the next 14 days
+  var expiringSoon = 0;
+  data.forEach(function(r) {
+    var ed = pd(r["Deal Incentive Expiry Date"]);
+    if (ed && ed >= today0 && ed <= next14 &&
+        String(r["Stage"] || "").toUpperCase() === "ELIGIBLE" &&
+        String(r["Adopt Rebate Opt-In Status"] || "").toUpperCase() === "OPTED IN") expiringSoon++;
+  });
+
+  function fmtMoney(v) {
+    if (v >= 1000000) return "$" + (v / 1000000).toFixed(1) + "M";
+    if (v >= 1000)    return "$" + (v / 1000).toFixed(1) + "K";
+    return "$" + Math.round(v).toLocaleString();
+  }
+
+  var notifs = [
+    {
+      id: "notif-new",
+      cls: "notif-new",
+      icon: "bi-star-fill text-primary",
+      title: "New Eligible Deals",
+      body: newEligible > 0
+        ? "<strong>" + newEligible.toLocaleString() + "</strong> new eligible deal" + (newEligible !== 1 ? "s" : "") + " booked in the past 14 days"
+        : null
+    },
+    {
+      id: "notif-optins",
+      cls: "notif-new",
+      icon: "bi-hand-thumbs-up-fill text-primary",
+      title: "New Opt-ins",
+      body: newOptIns > 0
+        ? "<strong>" + newOptIns.toLocaleString() + "</strong> new opt-in" + (newOptIns !== 1 ? "s" : "") + " in the past 14 days"
+        : null
+    },
+    {
+      id: "notif-potential",
+      cls: "notif-earned",
+      icon: "bi-piggy-bank-fill text-success",
+      title: "New Potential",
+      body: newOptInPotential > 0
+        ? "<strong>" + fmtMoney(newOptInPotential) + "</strong> in potential incentives from new opt-ins"
+        : null
+    },
+    {
+      id: "notif-earned",
+      cls: "notif-earned",
+      icon: "bi-cash-coin text-success",
+      title: "Incentives Earned",
+      body: earnedLast14 > 0
+        ? "<strong>" + fmtMoney(earnedLast14) + "</strong> in incentives earned over the past 14 days"
+        : null
+    },
+    {
+      id: "notif-expiry",
+      cls: "notif-expiry",
+      icon: "bi-clock-history text-warning",
+      title: "Expiring Soon",
+      body: expiringSoon > 0
+        ? "<strong>" + expiringSoon.toLocaleString() + "</strong> opted-in deal" + (expiringSoon !== 1 ? "s" : "") + " expir" + (expiringSoon !== 1 ? "e" : "es") + " within 14 days"
+        : null
+    }
+  ];
+
+  notifs.forEach(function(n) {
+    var hasData = !!n.body;
+    var extraCls = hasData ? n.cls : "notif-zero";
+    var bodyHtml = hasData ? n.body : '<span class="text-muted">Nothing to report in the past 14 days.</span>';
+    var html =
+      '<div id="' + n.id + '" class="toast show mb-2 ' + extraCls + '" role="alert" data-bs-autohide="false">' +
+        '<div class="toast-header">' +
+          '<i class="bi ' + n.icon + ' me-2"></i>' +
+          '<strong class="me-auto">' + n.title + '</strong>' +
+
+          '<button type="button" class="btn-close ms-2" onclick="this.closest(\'.toast\').remove()" aria-label="Close"></button>' +
+        '</div>' +
+        '<div class="toast-body small">' + bodyHtml + '</div>' +
+      '</div>';
+    container.insertAdjacentHTML("beforeend", html);
+  });
+}
+
 function resetApp() {
-  APP_DATA = null;
   APP_FILE_META = null;
   // Do NOT clear APP_MULTI_SESSIONS here — user may be switching between sessions
   var sb = document.getElementById("status-bar");
   sb.classList.remove("d-flex");
   sb.classList.add("d-none");
   document.getElementById("main-tab-bar").classList.add("d-none");
+
+  // Clear notifications
+  var notifC = document.getElementById("notif-toast-container");
+  if (notifC) notifC.innerHTML = "";
 
   // Reset disti mode — restore PVI tab
   APP_IS_DISTI = false;
