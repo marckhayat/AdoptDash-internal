@@ -19,6 +19,7 @@ var KNOWN_COLUMNS = [
 document.addEventListener("DOMContentLoaded", init);
 
 function init() {
+  IDB.requestPersistence();
   // Check IndexedDB for cached datasets and render resume cards if found
   IDB.loadAll().then(function (entries) {
     restoreUploadSection(entries);

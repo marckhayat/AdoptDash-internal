@@ -74,6 +74,15 @@ var IDB = (function () {
     });
   }
 
+  // Request persistent storage so the browser won't auto-evict IndexedDB data
+  function requestPersistence() {
+    if (navigator.storage && navigator.storage.persist) {
+      navigator.storage.persist().then(function (granted) {
+        if (!granted) console.warn("AdoptDash: persistent storage not granted — browser may evict session data.");
+      });
+    }
+  }
+
   function clearAll() {
     return open().then(function (db) {
       return new Promise(function (resolve, reject) {
@@ -86,5 +95,5 @@ var IDB = (function () {
     });
   }
 
-  return { save: save, load: load, remove: remove, loadAll: loadAll, clearAll: clearAll };
+  return { save: save, load: load, remove: remove, loadAll: loadAll, clearAll: clearAll, requestPersistence: requestPersistence };
 })();
