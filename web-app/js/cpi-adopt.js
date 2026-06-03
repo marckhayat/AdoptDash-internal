@@ -142,9 +142,11 @@ function renderCPIAdopt(data) {
     var optedPayout = 0;
     var estEarned   = 0;
     var potRemain   = 0;
+    var revMax      = 0;
+    var missedIncent = 0;
 
     subset.forEach(function (r) {
-      var maxIncentive = parseFloat(r["Revised Maximum Incentive Amount"]) || 0;
+      var maxIncentive = parseFloat(r["Potential Incentives"]) || 0;
       var isEligible  = norm(r["Stage"]) === "ELIGIBLE";
       var isOptedIn   = norm(r["Adopt Rebate Opt-In Status"]) === "OPTED IN";
 
@@ -154,8 +156,15 @@ function renderCPIAdopt(data) {
       }
 
       if (isOptedIn) {
-        estEarned += parseFloat(r["Estimated Earned Incentives"]) || 0;
-        if (isEligible) potRemain += parseFloat(r["Potential Incentives"]) || 0;
+        estEarned    += parseFloat(r["Estimated Earned Incentives"]) || 0;
+        missedIncent += parseFloat(r["Missed Incentives"]) || 0;
+        if (isEligible) {
+          potRemain += parseFloat(r["Potential Incentives"]) || 0;
+        }
+        var isExpired = norm(r["Stage"]) === "EXPIRED";
+        if (isEligible || isExpired) {
+          revMax += parseFloat(r["Revised Maximum Incentive Amount"]) || 0;
+        }
       }
     });
 
@@ -219,10 +228,12 @@ function renderCPIAdopt(data) {
     _cpiChart2 = new Chart(ctx2, {
       type: "bar",
       data: {
-        labels: ["Incentives"],
+        labels: [""],
         datasets: [
-          { label: "Estimated Earned",    data: [estEarned],  backgroundColor: "#107C10" },
-          { label: "Potential Remaining", data: [potRemain],  backgroundColor: "#C7E0F4" }
+          { label: "Missed Incentives",             data: [missedIncent], backgroundColor: "#D13438" },
+          { label: "Estimated Earned",              data: [estEarned],    backgroundColor: "#107C10" },
+          { label: "Potential Remaining",           data: [potRemain],    backgroundColor: "#00BCF2" },
+          { label: "Revised Maximum Incentives",    data: [revMax],       backgroundColor: "#E55400" }
         ]
       },
       options: {

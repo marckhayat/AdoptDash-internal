@@ -7,7 +7,7 @@ var APP_DATA = null;
 var APP_FILE_META = null;
 var APP_IS_DISTI = false;
 var APP_MULTI_SESSIONS = null; // { sessions: [...], fileMeta: {...} }
-var APP_VERSION = "v6.1.3";
+var APP_VERSION = "v6.2";
 
 // Workspan column names used to auto-detect the header row
 var KNOWN_COLUMNS = [
@@ -312,7 +312,7 @@ function parseCSVAndFinish(csvString, filename, headerAutoDetected) {
   });
 }
 
-function finishLoad(filename, rowCount, headerAutoDetected, idbType, loadedAt) {
+function finishLoad(filename, rowCount, headerAutoDetected, idbType, loadedAt, fromCache) {
   // Sync disti flag — detect from data if transformData didn't run (cache load)
   APP_IS_DISTI = !!window.APP_IS_DISTI ||
     !!(APP_DATA && APP_DATA.length > 0 && APP_DATA.some(function(r) {
@@ -352,6 +352,7 @@ function finishLoad(filename, rowCount, headerAutoDetected, idbType, loadedAt) {
 
   restoreUploadSection([]);  // clear upload section
   document.getElementById("upload-section").classList.add("d-none");
+  document.getElementById("mainTabContent").classList.remove("d-none");
   document.getElementById("main-tab-bar").classList.remove("d-none");
   renderMultiPicker(); // re-render persistent session bar (highlights active, keeps others)
 
@@ -369,7 +370,7 @@ function finishLoad(filename, rowCount, headerAutoDetected, idbType, loadedAt) {
 
   var activeTab = document.querySelector(".nav-link.active[data-bs-target]");
   renderActiveTab(activeTab ? activeTab.dataset.bsTarget : "#tab-overview");
-  showDataNotifications(APP_DATA);
+  if (!fromCache) showDataNotifications(APP_DATA);
 }
 
 function restoreUploadSection(cachedEntries) {
@@ -703,7 +704,7 @@ function restoreUploadSection(cachedEntries) {
         APP_DATA = entry.data;
         APP_FILE_META = { name: entry.meta.filename, lastModified: null, cachedAt: entry.meta.loadedAt ? new Date(entry.meta.loadedAt) : null };
         window.APP_IS_DISTI = !!entry.meta.isDisti;
-        finishLoad(entry.meta.filename, entry.meta.rowCount, false, null, entry.meta.loadedAt);
+        finishLoad(entry.meta.filename, entry.meta.rowCount, false, null, entry.meta.loadedAt, true);
       }).catch(function (e) { IDB.loadAll().then(function(en){restoreUploadSection(en);}); alert("Error loading cache: " + e); });
     });
   });
@@ -1003,11 +1004,11 @@ function restoreUploadSection(cachedEntries) {
         var container = document.getElementById("notif-toast-container");
         if (container) {
           var html =
-            '<div id="notif-update" class="toast show mb-2" style="border-left:4px solid #0d6efd" role="alert" data-bs-autohide="false">' +
-              '<div class="toast-header">' +
-                '<i class="bi bi-arrow-up-circle-fill text-primary me-2"></i>' +
+            '<div id="notif-update" class="toast show mb-2" style="border-left:4px solid #e65c00;background:#fff3e0" role="alert" data-bs-autohide="false">' +
+              '<div class="toast-header" style="background:#e65c00;color:#fff">' +
+                '<i class="bi bi-arrow-up-circle-fill me-2"></i>' +
                 '<strong class="me-auto">Update Available</strong>' +
-                '<button type="button" class="btn-close ms-2" onclick="this.closest(\'.toast\').remove()" aria-label="Close"></button>' +
+                '<button type="button" class="btn-close btn-close-white ms-2" onclick="this.closest(\'.toast\').remove()" aria-label="Close"></button>' +
               '</div>' +
               '<div class="toast-body small">' +
                 'Version <strong>' + latest + '</strong> is available. ' +
@@ -1203,7 +1204,10 @@ function resetApp() {
   var pviTab = document.getElementById("tab-pvi-btn");
   if (pviTab) pviTab.closest("li").classList.remove("d-none");
 
-  // Clear all tab panes
+  // Clear all tab panes and hide tab content until data is loaded
+  APP_DATA = null;
+  window.APP_DATA = null;
+  document.getElementById("mainTabContent").classList.add("d-none");
   ["tab-overview","tab-details","tab-customer","tab-pvi","tab-lifecycle","tab-cpi-adopt"].forEach(function (id) {
     var pane = document.getElementById(id);
     if (pane) pane.innerHTML = "";
