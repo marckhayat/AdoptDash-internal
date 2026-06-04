@@ -112,6 +112,7 @@ function renderDetails(data) {
     return ai - bi;
   });
   var offerList  = uniqueVals("Track");
+  var ucList     = uniqueVals("Sub-Track");
   var eaOpts     = uniqueVals("EA Flag");
 
   // Precompute date bounds for sliders
@@ -173,6 +174,7 @@ function renderDetails(data) {
   });
   html += '<div class="filter-group"><label class="group-label">Portfolio' + tip("The technology domain that encompasses offers and UCs.") + '</label>' + makeDropdown("filter-portfolio", portfolios) + '</div>';
   html += '<div class="filter-group"><label class="group-label">Offer' + tip("The main solution that was sold to the customer.") + '</label>' + makeDropdown("filter-offer", offerList) + '</div>';
+  html += '<div class="filter-group"><label class="group-label">Use Case</label>' + makeDropdown("filter-uc", ucList) + '</div>';
 
   // Date filters
   html += '<div class="filter-group"><label class="group-label">Booking Date</label>'      + makeDateSlider("det-bk",  dateBounds.bk)  + '</div>';
@@ -255,6 +257,25 @@ function renderDetails(data) {
     inp.focus();
     currentPage = 1; applyFiltersAndRender();
   });
+  function refreshUcDropdown() {
+    var pf = document.getElementById("filter-portfolio").value;
+    var of = document.getElementById("filter-offer").value;
+    var ucSel = document.getElementById("filter-uc");
+    var prevUc = ucSel.value;
+    var filteredUcs = ucList.filter(function (u) {
+      return data.some(function (r) {
+        if (pf && String(r["Deal CPI Portfolio"] || "") !== pf) return false;
+        if (of && String(r["Track"] || "") !== of) return false;
+        return String(r["Sub-Track"] || "") === u;
+      });
+    });
+    ucSel.innerHTML = '<option value="">All Use Cases</option>';
+    filteredUcs.forEach(function (u) {
+      ucSel.innerHTML += '<option value="' + u.replace(/"/g, "&quot;") + '"' + (u === prevUc ? ' selected' : '') + '>' + u + '</option>';
+    });
+    if (prevUc && filteredUcs.indexOf(prevUc) === -1) ucSel.value = "";
+  }
+
   document.getElementById("filter-portfolio").addEventListener("change", function () {
     var pf = this.value;
     var offerSel = document.getElementById("filter-offer");
@@ -267,12 +288,11 @@ function renderDetails(data) {
       offerSel.innerHTML += '<option value="' + o.replace(/"/g, "&quot;") + '"' + (o === prevOffer ? ' selected' : '') + '>' + o + '</option>';
     });
     if (pf && prevOffer && filteredOffers.indexOf(prevOffer) === -1) offerSel.value = "";
+    refreshUcDropdown();
     currentPage = 1; applyFiltersAndRender();
   });
-  document.getElementById("filter-offer").addEventListener("change", function () { currentPage = 1; applyFiltersAndRender(); });
-  ["filter-uc2550","filter-uc75","filter-ucmissed"].forEach(function (id) {
-    // now checkboxes — handled by the global checkbox listener above
-  });
+  document.getElementById("filter-offer").addEventListener("change", function () { refreshUcDropdown(); currentPage = 1; applyFiltersAndRender(); });
+  document.getElementById("filter-uc").addEventListener("change", function () { currentPage = 1; applyFiltersAndRender(); });
   ["det-bk","det-rs","det-exp"].forEach(function (prefix) {
     ["from","to"].forEach(function (side) {
       var el2 = document.getElementById(prefix + "-" + side);
@@ -332,6 +352,8 @@ function renderDetails(data) {
     el.querySelectorAll('input[type=checkbox]').forEach(function (cb) { cb.checked = false; });
     document.getElementById("filter-portfolio").value = "";
     document.getElementById("filter-offer").value = "";
+    document.getElementById("filter-uc").value = "";
+    refreshUcDropdown();
     ["det-bk","det-rs","det-exp"].forEach(function (prefix) {
       var fromEl = document.getElementById(prefix + "-from");
       var toEl   = document.getElementById(prefix + "-to");
@@ -375,6 +397,7 @@ function renderDetails(data) {
     var optInChecked     = getChecked("filter-optin");
     var portfolioVal     = document.getElementById("filter-portfolio").value;
     var offerVal         = document.getElementById("filter-offer").value;
+    var ucVal            = document.getElementById("filter-uc").value;
     var offerOptedIn     = document.getElementById("filter-offer-optedin-y") ? document.getElementById("filter-offer-optedin-y").checked : false;
     var offerNotOptedIn  = document.getElementById("filter-offer-optedin-n") ? document.getElementById("filter-offer-optedin-n").checked : false;
     var pviEligible      = document.getElementById("filter-pvi-Eligible") && document.getElementById("filter-pvi-Eligible").checked;
@@ -416,6 +439,7 @@ function renderDetails(data) {
       if (optInChecked.length  && optInChecked.indexOf(String(r["Adopt Rebate Opt-In Status"] || "")) === -1) return false;
       if (portfolioVal         && String(r["Deal CPI Portfolio"] || "") !== portfolioVal)                     return false;
       if (offerVal             && String(r["Track"] || "") !== offerVal)                                      return false;
+      if (ucVal                && String(r["Sub-Track"] || "") !== ucVal)                                     return false;
       if (offerOptedIn && !offerNotOptedIn && r["Offer opted-in?"] !== true)  return false;
       if (offerNotOptedIn && !offerOptedIn && r["Offer opted-in?"] === true)   return false;
       if (pviEligible      && !r["PVI Eligible"])   return false;

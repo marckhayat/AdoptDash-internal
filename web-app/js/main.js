@@ -19,7 +19,6 @@ var KNOWN_COLUMNS = [
 document.addEventListener("DOMContentLoaded", init);
 
 function init() {
-  IDB.requestPersistence();
   // Check IndexedDB for cached datasets and render resume cards if found
   IDB.loadAll().then(function (entries) {
     restoreUploadSection(entries);
@@ -704,12 +703,19 @@ function restoreUploadSection(cachedEntries) {
     btn.addEventListener("click", function() {
       var idx = parseInt(this.dataset.geoIdx, 10);
       var sess = APP_MULTI_SESSIONS.sessions[idx];
-      showLoader("Processing " + sess.rows.length + " rows for " + sess.id + "…");
-      setTimeout(function() {
-        APP_DATA = transformData(sess.rows);
+      // Use pre-transformed data if available (saved on import), otherwise transform now
+      if (sess._transformed) {
+        APP_DATA = sess._transformed;
         APP_FILE_META = APP_MULTI_SESSIONS.fileMeta;
         finishLoad(APP_MULTI_SESSIONS.fileMeta.name + " · BE GEO ID " + sess.id, APP_DATA.length, false, "cpi-" + sess.id);
-      }, 0);
+      } else {
+        showLoader("Processing " + sess.rows.length + " rows for " + sess.id + "…");
+        setTimeout(function() {
+          APP_DATA = transformData(sess.rows);
+          APP_FILE_META = APP_MULTI_SESSIONS.fileMeta;
+          finishLoad(APP_MULTI_SESSIONS.fileMeta.name + " · BE GEO ID " + sess.id, APP_DATA.length, false, "cpi-" + sess.id);
+        }, 0);
+      }
     });
   });
 
@@ -997,11 +1003,29 @@ function restoreUploadSection(cachedEntries) {
             return;
           }
 
-          // Multiple IDs → store sessions globally, restore upload section (renderMultiPicker runs at end)
+          // Multiple IDs → process & save all to IDB immediately, then show picker
           var notFoundNote = notFound.length > 0
             ? '\n⚠ No data found for: ' + notFound.map(function(s) { return s.id; }).join(", ")
             : "";
           if (notFoundNote) console.warn(notFoundNote);
+
+          // Transform and save each session to IDB right away so a refresh doesn't lose them
+          found.forEach(function(sess) {
+            var transformed = transformData(sess.rows);
+            var idbKey = "cpi-" + sess.id;
+            var partnerNames2 = Array.from(new Set(transformed.map(function(r) { return String(r["Partner Name"] || "").trim(); }).filter(Boolean)));
+            var beGeoIds2 = [sess.id];
+            IDB.save(idbKey, transformed, {
+              filename:    file.name + " · BE GEO ID " + sess.id,
+              rowCount:    transformed.length,
+              loadedAt:    new Date().toISOString(),
+              displayName: sess.partnerName || sess.id,
+              beGeoIds:    beGeoIds2,
+              isDisti:     rawIsDisti
+            }).catch(function(e) { console.warn("IDB save failed for " + sess.id + ":", e); });
+            sess._transformed = transformed; // cache so play button doesn't re-transform
+          });
+
           APP_MULTI_SESSIONS = { sessions: found, fileMeta: { name: file.name, lastModified: file.lastModified ? new Date(file.lastModified) : null }, loadedAt: new Date().toISOString(), notFoundNote: notFound.length > 0 ? notFound.map(function(s){return s.id;}).join(", ") : "" };
           IDB.loadAll().then(function(en) {
             restoreUploadSection(en);

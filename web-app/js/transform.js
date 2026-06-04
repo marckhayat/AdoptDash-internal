@@ -56,6 +56,11 @@ function transformData(rawRows) {
     return da !== null && db !== null && da.getTime() < db.getTime();
   }
 
+  function dateLTE(a, b) {
+    var da = toDate(a), db = toDate(b);
+    return da !== null && db !== null && da.getTime() <= db.getTime();
+  }
+
   // Parse Task Details text → pending tasks string or null
   function getPendingTasks(text) {
     if (!text || typeof text !== "string" || text.trim() === "") return null;
@@ -255,10 +260,10 @@ function transformData(rawRows) {
     var expiry = r["Deal Incentive Expiry Date"];
     var earned = 0;
     if (optStatus === "OPTED IN" && stageNorm !== "NOT ELIGIBLE") {
-      if (flag("Stage Completion Flag(onboard)")    && dateGTE(r["Stage Completion Date(onboard)"],    lciStart) && dateLT(r["Stage Completion Date(onboard)"],    expiry)) earned += onbAmt;
-      if (flag("Stage Completion Flag(Use)")        && dateGTE(r["Stage Completion Date(Use)"],        lciStart) && dateLT(r["Stage Completion Date(Use)"],        expiry)) earned += useAmt;
-      if (flag("Stage Completion Flag(Engage)")     && dateGTE(r["Stage Completion Date(Engage)"],     lciStart) && dateLT(r["Stage Completion Date(Engage)"],     expiry)) earned += engAmt;
-      if (flag("Stage Completion Flag(Adopt)")      && dateGTE(r["Stage Completion Date(Adopt)"],      lciStart) && dateLT(r["Stage Completion Date(Adopt)"],      expiry)) earned += adpAmt;
+      if (flag("Stage Completion Flag(onboard)")    && dateGTE(r["Stage Completion Date(onboard)"],    lciStart) && dateLTE(r["Stage Completion Date(onboard)"],    expiry)) earned += onbAmt;
+      if (flag("Stage Completion Flag(Use)")        && dateGTE(r["Stage Completion Date(Use)"],        lciStart) && dateLTE(r["Stage Completion Date(Use)"],        expiry)) earned += useAmt;
+      if (flag("Stage Completion Flag(Engage)")     && dateGTE(r["Stage Completion Date(Engage)"],     lciStart) && dateLTE(r["Stage Completion Date(Engage)"],     expiry)) earned += engAmt;
+      if (flag("Stage Completion Flag(Adopt)")      && dateGTE(r["Stage Completion Date(Adopt)"],      lciStart) && dateLTE(r["Stage Completion Date(Adopt)"],      expiry)) earned += adpAmt;
     }
     r["Estimated Earned Incentives"] = earned;
 

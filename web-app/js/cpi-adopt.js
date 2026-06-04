@@ -50,13 +50,7 @@ function renderCPIAdopt(data) {
   });
 
   // ── Build HTML ─────────────────────────────────────────────────────────────
-  var html = '<div class="disclaimer-card mb-3">';
-  html += '<p class="mb-1">The below charts contain <strong>all-time</strong> data for CPI Adopt. One use case per offer and CR Party ID is selected: preference is given to opted-in use cases, otherwise, the highest-incentive use case is chosen.</p>';
-  html += '<p class="mb-1"><strong>Opt-in Ratio:</strong> compares the potentially available payout for eligible opted-in UCs to what can still be opted-in.</p>';
-  html += '<p class="mb-0"><strong>Incentives:</strong> shows, for all opted-in UCs, the total amount of estimated earned incentives and the remaining potential.</p>';
-  html += '</div>';
-
-  html += '<div class="slicer-row mb-3">';
+  var html = '<div class="slicer-row mb-3">';
   html += '<div class="d-flex flex-column"><label for="cpi-portfolio">Portfolio</label>';
   html += '<select id="cpi-portfolio" class="form-select form-select-sm" style="min-width:220px"><option value="">All Portfolios</option>';
   portfolios.forEach(function (p) { html += '<option value="' + p.replace(/"/g,"&quot;") + '">' + p + '</option>'; });
@@ -74,21 +68,21 @@ function renderCPIAdopt(data) {
 
   // ── Column 1: Opt-in Ratio + Opt-in Trend
   html += '<div class="col-12 col-lg-4 d-flex flex-column gap-4">';
-  html += '<div class="card shadow-sm"><div class="card-header fw-semibold">Opt-in Ratio <small class="fw-normal">(maximum payout for eligible UCs)</small></div><div class="card-body">';
+  html += '<div class="card shadow-sm"><div class="card-header fw-semibold">Opt-in Ratio <small class="fw-normal">(maximum payout for eligible UCs)</small> <i class="bi bi-info-circle text-muted ms-1" style="font-size:0.75rem;cursor:default" data-bs-toggle="tooltip" data-bs-placement="top" title="Compares the potentially available payout for eligible opted-in UCs to what can still be opted-in."></i></div><div class="card-body">';
   html += '<div class="chart-container" style="min-height:220px;height:220px"><canvas id="cpi-chart1"></canvas></div>';
   html += '<div id="cpi-ratio-card" class="text-center mt-3"></div>';
   html += '</div></div>';
-  html += '<div class="card shadow-sm flex-grow-1"><div class="card-header fw-semibold">Monthly Opt-in Trend</div><div class="card-body">';
+  html += '<div class="card shadow-sm flex-grow-1"><div class="card-header fw-semibold">Monthly Opt-in Trend <i class="bi bi-info-circle text-muted ms-1" style="font-size:0.75rem;cursor:default" data-bs-toggle="tooltip" data-bs-placement="top" title="Number of opt-ins during the past 12 months."></i></div><div class="card-body">';
   html += '<div class="chart-container" style="min-height:260px;height:260px"><canvas id="cpi-chart3"></canvas></div>';
   html += '</div></div>';
   html += '</div>';
 
   // ── Column 2: Incentives + Progression Trend
   html += '<div class="col-12 col-lg-4 d-flex flex-column gap-4">';
-  html += '<div class="card shadow-sm"><div class="card-header fw-semibold">Incentives <small class="fw-normal">(all opted-in UCs)</small></div><div class="card-body">';
+  html += '<div class="card shadow-sm"><div class="card-header fw-semibold">Incentives <small class="fw-normal">(all opted-in UCs)</small> <i class="bi bi-info-circle text-muted ms-1" style="font-size:0.75rem;cursor:default" data-bs-toggle="tooltip" data-bs-placement="top" title="Shows, for all opted-in UCs, how much incentives were missed, have been estimated earned, remain as potential and the total available incentives."></i></div><div class="card-body">';
   html += '<div class="chart-container" style="min-height:220px;height:220px"><canvas id="cpi-chart2"></canvas></div>';
   html += '</div></div>';
-  html += '<div class="card shadow-sm flex-grow-1"><div class="card-header fw-semibold">Monthly Deal Progression Trend <small class="fw-normal">(opted-in UCs)</small></div><div class="card-body">';
+  html += '<div class="card shadow-sm flex-grow-1"><div class="card-header fw-semibold">Monthly Deal Progression Trend <small class="fw-normal">(opted-in UCs)</small> <i class="bi bi-info-circle text-muted ms-1" style="font-size:0.75rem;cursor:default" data-bs-toggle="tooltip" data-bs-placement="top" title="Number of UCs that have progressed during the past 12 months. No double-count within a month."></i></div><div class="card-body">';
   html += '<div class="chart-container" style="min-height:260px;height:260px"><canvas id="cpi-chart4"></canvas></div>';
   html += '</div></div>';
   html += '</div>';
@@ -96,7 +90,7 @@ function renderCPIAdopt(data) {
   // ── Column 3: Earned incentives by technology (tall)
   html += '<div class="col-12 col-lg-4 d-flex flex-column">';
   html += '<div class="card shadow-sm flex-grow-1"><div class="card-header fw-semibold d-flex justify-content-between align-items-center">';
-  html += '<span>Monthly Estimated Earned Incentives </span>';
+  html += '<span>Monthly Estimated Earned Incentives <i class="bi bi-info-circle text-muted ms-1" style="font-size:0.75rem;cursor:default" data-bs-toggle="tooltip" data-bs-placement="top" title="Amount of estimated earned incentives during the past 12 months."></i></span>';
   html += '<div class="form-check form-switch mb-0 ms-3"><input class="form-check-input" type="checkbox" id="cpi-log-toggle"><label class="form-check-label small" for="cpi-log-toggle">Log scale</label></div>';
   html += '</div><div class="card-body">';
   html += '<div class="chart-container" style="min-height:580px;height:580px"><canvas id="cpi-chart5"></canvas></div>';
@@ -106,6 +100,9 @@ function renderCPIAdopt(data) {
   html += '</div>'; // main row
 
   el.innerHTML = html;
+
+  // Initialise tooltips
+  el.querySelectorAll("[data-bs-toggle='tooltip']").forEach(function (t) { new bootstrap.Tooltip(t, { html: false }); });
 
   // Portfolio change → refresh offer list
   document.getElementById("cpi-portfolio").addEventListener("change", function () {
@@ -146,7 +143,7 @@ function renderCPIAdopt(data) {
     var missedIncent = 0;
 
     subset.forEach(function (r) {
-      var maxIncentive = parseFloat(r["Potential Incentives"]) || 0;
+      var maxIncentive = parseFloat(r["Revised Maximum Incentive Amount"]) || 0;
       var isEligible  = norm(r["Stage"]) === "ELIGIBLE";
       var isOptedIn   = norm(r["Adopt Rebate Opt-In Status"]) === "OPTED IN";
 
@@ -159,11 +156,11 @@ function renderCPIAdopt(data) {
         estEarned    += parseFloat(r["Estimated Earned Incentives"]) || 0;
         missedIncent += parseFloat(r["Missed Incentives"]) || 0;
         if (isEligible) {
-          potRemain += parseFloat(r["Potential Incentives"]) || 0;
+          potRemain += maxIncentive;
         }
         var isExpired = norm(r["Stage"]) === "EXPIRED";
         if (isEligible || isExpired) {
-          revMax += parseFloat(r["Revised Maximum Incentive Amount"]) || 0;
+          revMax += maxIncentive;
         }
       }
     });
