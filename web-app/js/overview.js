@@ -249,9 +249,9 @@ function renderOverview(data) {
     // Group header row
     var groupDefs = [
       { label: "Not opted-in · Eligible",                                                                                                                                                                  span: 2, cls: "cg1" },
-      { label: "Not opted-in · Eligible · <i class='bi bi-check-circle-fill'></i> Onboard &nbsp;<i class='bi bi-check-circle-fill'></i> Use", span: 2, cls: "cg2" },
-      { label: "Not opted-in · Eligible · <i class='bi bi-check-circle-fill'></i> Engage",                                                    span: 3, cls: "cg3" },
-      { label: "Not opted-in · <i class='bi bi-check-circle-fill'></i> Adopt &nbsp;<i class='bi bi-clock'></i> Expired",          span: 2, cls: "cg4" },
+      { label: "<a href='#' class='ovw-drilldown-link' onclick='event.preventDefault();window.navigateToDetails({stage:[\"Eligible\"],offerOptedInN:true,csFrom:2,csTo:4})' title='Open Details tab filtered to this group'>Not opted-in · Eligible · <i class='bi bi-check-circle-fill'></i> Onboard &nbsp;<i class='bi bi-check-circle-fill'></i> Use</a>", span: 2, cls: "cg2" },
+      { label: "<a href='#' class='ovw-drilldown-link' onclick='event.preventDefault();window.navigateToDetails({stage:[\"Eligible\"],offerOptedInN:true,csFrom:5,csTo:5})' title='Open Details tab filtered to this group'>Not opted-in · Eligible · <i class='bi bi-check-circle-fill'></i> Engage</a>", span: 3, cls: "cg3" },
+      { label: "<a href='#' class='ovw-drilldown-link' onclick='event.preventDefault();window.navigateToDetails({ucMissed:true,offerOptedInN:true,optIn:[\"PENDING\"]})' title='Open Details tab filtered to this group'>Not opted-in · <i class='bi bi-check-circle-fill'></i> Adopt &nbsp;<span class='fw-normal opacity-75'>or</span>&nbsp; <i class='bi bi-clock'></i> Expired</a>",          span: 2, cls: "cg4" },
       { label: "<i class='bi bi-hand-thumbs-up-fill'></i> Opted-in",                                                              span: 3, cls: "cg5" }
     ];
     var groupRow = '<tr><th class="border-end" style="min-width:240px"></th>';

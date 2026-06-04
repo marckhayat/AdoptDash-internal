@@ -59,6 +59,8 @@ function renderDetails(data) {
   var filteredData = [];
   var sortField = "CR Party Name";
   var sortDir   = "asc";
+  var currentStageOrder = ["Purchase","Onboard","Implement","Use","Engage","Adopt","Completed"];
+  var ucMissedPreset = false;
 
   // ── Summary dedup measures
   function calcSummary(rows) {
@@ -111,7 +113,6 @@ function renderDetails(data) {
   });
   var offerList  = uniqueVals("Track");
   var eaOpts     = uniqueVals("EA Flag");
-  var riskOpts   = ["High","Medium","Low"];
 
   // Precompute date bounds for sliders
   function getDateBounds(field) {
@@ -126,15 +127,19 @@ function renderDetails(data) {
   };
 
   // ── Build initial HTML
-  var html = '<div class="d-flex gap-3">';
+  var html = '<div class="d-flex gap-3" id="det-layout">';
 
   function tip(text) {
     return ' <i class="bi bi-info-circle text-muted" style="font-size:0.72rem;cursor:default" data-bs-toggle="tooltip" data-bs-placement="right" title="' + text.replace(/"/g, "&quot;") + '"></i>';
   }
 
   // Sidebar filters
-  html += '<div class="filter-sidebar flex-shrink-0">';
-  html += '<div class="fw-bold mb-2" style="font-size:0.8rem;color:var(--cisco-dark)"><i class="bi bi-funnel me-1"></i>Filters</div>';
+  html += '<div class="filter-sidebar flex-shrink-0" id="det-filter-sidebar">';
+  html += '<div class="d-flex align-items-center justify-content-between mb-2">';
+  html += '<div class="fw-bold" style="font-size:0.8rem;color:var(--cisco-dark)"><i class="bi bi-funnel me-1"></i><span id="det-filter-label">Filters</span></div>';
+  html += '<span id="det-filter-toggle" class="text-muted" title="Collapse filters"><i class="bi bi-chevron-left"></i></span>';
+  html += '</div>';
+  html += '<div id="det-filter-body">';
   var has2TPartner = data.some(function (r) { return r["2T Partner Name"] && String(r["2T Partner Name"]).trim() !== ""; });
   if (has2TPartner) {
     html += '<div class="filter-group"><div class="position-relative"><input type="text" id="filter-2tpartner" class="form-control form-control-sm pe-4" placeholder="&#128269; 2T Partner Name..." /><button id="det-2tpartner-clear" type="button" class="btn btn-link p-0 position-absolute top-50 end-0 translate-middle-y me-2 d-none" style="font-size:0.8rem;color:#999;line-height:1" tabindex="-1"><i class="bi bi-x-lg"></i></button></div></div>';
@@ -148,9 +153,6 @@ function renderDetails(data) {
   html += '<div class="form-check form-check-sm"><input class="form-check-input" type="checkbox" id="filter-earned"><label class="form-check-label" for="filter-earned">Earned' + tip("Deals where incentives have been earned.") + '</label></div>';
   html += '<div class="form-check form-check-sm"><input class="form-check-input" type="checkbox" id="filter-ea"><label class="form-check-label" for="filter-ea">EA' + tip("EA deals.") + '</label></div>';
   html += '<div class="form-check form-check-sm"><input class="form-check-input" type="checkbox" id="filter-aap"><label class="form-check-label" for="filter-aap">AAP' + tip("Completed the Adoption Accountability Plan.") + '</label></div>';
-  html += '<div class="form-check form-check-sm"><input class="form-check-input" type="checkbox" id="filter-uc2550"><label class="form-check-label" for="filter-uc2550">UC Eligible w/o opt-in <span><i class="bi bi-check-circle-fill"></i> Onboard <i class="bi bi-check-circle-fill"></i> Use</span>' + tip("A UC that has progressed by 1 or 2 stages (out of 4) and hasn&#39;t been opted-in yet. Easier targets as deployment has already started.") + '</label></div>';
-  html += '<div class="form-check form-check-sm"><input class="form-check-input" type="checkbox" id="filter-uc75"><label class="form-check-label" for="filter-uc75">UC Eligible w/o opt-in <span><i class="bi bi-check-circle-fill"></i> Engage</span>' + tip("A UC that has progressed by 3 stages (out of 4) and hasn&#39;t been opted-in yet. Incentives for the last stage (Adopt) can still be pursued.") + '</label></div>';
-  html += '<div class="form-check form-check-sm"><input class="form-check-input" type="checkbox" id="filter-ucmissed"><label class="form-check-label" for="filter-ucmissed">UC progressed &amp; missed w/o opt-in' + tip("A UC that has completed all 4 earned stages without being opted-in. No available incentives to pursue.") + '</label></div>';
   html += '<div class="d-flex gap-2 align-items-center mt-1 mb-0" style="font-size:0.78rem"><span class="text-muted">Offer opted-in:' + tip("Any UC opted-in within this offer.") + '</span>';
   html += '<div class="form-check form-check-sm mb-0"><input class="form-check-input" type="checkbox" id="filter-offer-optedin-y" value="Y"><label class="form-check-label" for="filter-offer-optedin-y">Y</label></div>';
   html += '<div class="form-check form-check-sm mb-0"><input class="form-check-input" type="checkbox" id="filter-offer-optedin-n" value="N"><label class="form-check-label" for="filter-offer-optedin-n">N</label></div>';
@@ -163,6 +165,7 @@ function renderDetails(data) {
     "Expired":      "The incentive has reached the expiry date.",
     "Not Eligible": "Not eligible for incentives (e.g. all stages completed, another UC opted-in in same offer)."
   });
+  html += '<div class="filter-group"><label class="group-label">Current Stage</label>' + makeStageRangeSlider("det-cs", currentStageOrder) + '</div>';
   html += makeCheckboxGroup("Opt-In Status", "filter-optin", optIns, {
     "OPTED IN":  "Deal has been selected for CPI.",
     "OPTED OUT": "Deal has been de-selected.",
@@ -176,13 +179,8 @@ function renderDetails(data) {
   html += '<div class="filter-group"><label class="group-label">Opt-in Date</label>'        + makeDateSlider("det-rs",  dateBounds.rs)  + '</div>';
   html += '<div class="filter-group"><label class="group-label">Rebate Expiry Date</label>' + makeDateSlider("det-exp", dateBounds.exp) + '</div>';
 
-  html += makeCheckboxGroup("Offer Risk Level", "filter-risk", riskOpts, {
-    "High":   "UC is in Purchase/Onboard stage.",
-    "Medium": "UC is in Implement/Use stage.",
-    "Low":    "UC is in Engage/Adopt/Completed stage."
-  });
-
   html += '<button class="btn btn-sm btn-outline-secondary w-100 mt-2" id="det-clear-btn"><i class="bi bi-x-circle me-1"></i>Clear filters</button>';
+  html += '</div>'; // /det-filter-body
   html += '</div>'; // /sidebar
 
   // Main content
@@ -194,6 +192,17 @@ function renderDetails(data) {
   html += '</div>'; // /d-flex
 
   el.innerHTML = html;
+
+  // ── Collapsible filter sidebar
+  var filterToggle = document.getElementById("det-filter-toggle");
+  var filterBody   = document.getElementById("det-filter-body");
+  var filterSidebar = document.getElementById("det-filter-sidebar");
+  filterToggle.addEventListener("click", function () {
+    var isCollapsed = filterBody.classList.toggle("d-none");
+    filterToggle.classList.toggle("collapsed", isCollapsed);
+    filterSidebar.style.minWidth = isCollapsed ? "0" : "";
+    document.getElementById("det-filter-label").classList.toggle("d-none", isCollapsed);
+  });
 
   // Initialise Bootstrap tooltips on info icons
   el.querySelectorAll("[data-bs-toggle='tooltip']").forEach(function (el2) {
@@ -282,6 +291,41 @@ function renderDetails(data) {
     });
     updateSliderDisplay(prefix);
   });
+
+  function updateStageSliderDisplay() {
+    var fromEl  = document.getElementById("det-cs-from");
+    var toEl    = document.getElementById("det-cs-to");
+    var fillEl  = document.getElementById("det-cs-fill");
+    var fromLbl = document.getElementById("det-cs-from-lbl");
+    var toLbl   = document.getElementById("det-cs-to-lbl");
+    if (!fromEl || !toEl) return;
+    var fromVal = parseInt(fromEl.value), toVal = parseInt(toEl.value);
+    var min = parseInt(fromEl.min),       max  = parseInt(fromEl.max);
+    if (fillEl && max > min) {
+      fillEl.style.left  = ((fromVal - min) / (max - min) * 100) + "%";
+      fillEl.style.right = ((max - toVal)   / (max - min) * 100) + "%";
+    }
+    if (fromLbl) fromLbl.textContent = currentStageOrder[fromVal] || "";
+    if (toLbl)   toLbl.textContent   = currentStageOrder[toVal]   || "";
+  }
+
+  ["det-cs-from", "det-cs-to"].forEach(function (csId) {
+    var csEl = document.getElementById(csId);
+    if (!csEl) return;
+    csEl.addEventListener("input", function () {
+      var fromEl = document.getElementById("det-cs-from");
+      var toEl   = document.getElementById("det-cs-to");
+      if (fromEl && toEl && parseInt(fromEl.value) > parseInt(toEl.value)) {
+        if (csId === "det-cs-from") fromEl.value = toEl.value;
+        else toEl.value = fromEl.value;
+      }
+      updateStageSliderDisplay();
+      currentPage = 1;
+      applyFiltersAndRender();
+    });
+  });
+  updateStageSliderDisplay();
+
   document.getElementById("det-clear-btn").addEventListener("click", function () {
     if (document.getElementById("filter-2tpartner")) document.getElementById("filter-2tpartner").value = "";
     document.getElementById("filter-crparty").value = "";
@@ -295,9 +339,32 @@ function renderDetails(data) {
       if (toEl)   toEl.value   = toEl.max;
       updateSliderDisplay(prefix);
     });
+    ucMissedPreset = false;
+    var csFrom = document.getElementById("det-cs-from");
+    var csTo   = document.getElementById("det-cs-to");
+    if (csFrom) csFrom.value = csFrom.min;
+    if (csTo)   csTo.value   = csTo.max;
+    updateStageSliderDisplay();
     currentPage = 1;
     applyFiltersAndRender();
   });
+
+  // Apply deep-link preset if navigated from another tab
+  if (window._detDeepLink) {
+    var dl = window._detDeepLink;
+    if (dl.stage)         { dl.stage.forEach(function(s) { var _cb3 = document.getElementById("filter-stage-" + s); if (_cb3) _cb3.checked = true; }); }
+    if (dl.ucMissed)      { ucMissedPreset = true; }
+    if (dl.optIn)         { dl.optIn.forEach(function(s) { document.querySelectorAll('#filter-optin input[type=checkbox]').forEach(function(cb) { if (cb.value.toUpperCase() === s.toUpperCase()) cb.checked = true; }); }); }
+    if (dl.offerOptedInN) { var _cbn = document.getElementById("filter-offer-optedin-n"); if (_cbn) _cbn.checked = true; }
+    if (dl.csFrom !== undefined || dl.csTo !== undefined) {
+      var _csFrom = document.getElementById("det-cs-from");
+      var _csTo   = document.getElementById("det-cs-to");
+      if (_csFrom && dl.csFrom !== undefined) _csFrom.value = dl.csFrom;
+      if (_csTo   && dl.csTo   !== undefined) _csTo.value   = dl.csTo;
+      updateStageSliderDisplay();
+    }
+    window._detDeepLink = null;
+  }
 
   applyFiltersAndRender();
 
@@ -313,15 +380,12 @@ function renderDetails(data) {
     var pviEligible      = document.getElementById("filter-pvi-Eligible") && document.getElementById("filter-pvi-Eligible").checked;
     var pviOnboard       = document.getElementById("filter-pvi-Onboard")  && document.getElementById("filter-pvi-Onboard").checked;
     var pviAdopt         = document.getElementById("filter-pvi-Adopt")    && document.getElementById("filter-pvi-Adopt").checked;
-    var uc2550           = document.getElementById("filter-uc2550").checked;
-    var uc75             = document.getElementById("filter-uc75").checked;
-    var ucMissed         = document.getElementById("filter-ucmissed").checked;
+    var ucMissed         = ucMissedPreset;
     var newEligible      = document.getElementById("filter-new-eligible").checked;
     var expiresSoon      = document.getElementById("filter-expires-soon").checked;
     var earnedChecked    = document.getElementById("filter-earned").checked;
     var eaChecked        = document.getElementById("filter-ea").checked;
     var aapChecked       = document.getElementById("filter-aap").checked;
-    var riskChecked      = getChecked("filter-risk");
     var bkFrom  = document.getElementById("det-bk-from");
     var bkTo    = document.getElementById("det-bk-to");
     var rsFrom  = document.getElementById("det-rs-from");
@@ -337,12 +401,18 @@ function renderDetails(data) {
     var rsToDate    = atMax(rsTo)    ? null : sliderVal(rsTo);
     var expFromDate = atMin(expFrom) ? null : sliderVal(expFrom);
     var expToDate   = atMax(expTo)   ? null : sliderVal(expTo);
+    var csFromEl  = document.getElementById("det-cs-from");
+    var csToEl    = document.getElementById("det-cs-to");
+    var csFromIdx = csFromEl ? parseInt(csFromEl.value) : 0;
+    var csToIdx   = csToEl   ? parseInt(csToEl.value)   : currentStageOrder.length - 1;
+    var csActive  = csFromEl && csToEl && !(parseInt(csFromEl.value) === parseInt(csFromEl.min) && parseInt(csToEl.value) === parseInt(csToEl.max));
 
     filteredData = data.filter(function (r) {
       if (twoTVal    && String(r["2T Partner Name"] || "").toLowerCase().indexOf(twoTVal) === -1)   return false;
       if (crPartyVal && String(r["CR Party Name"] || "").toLowerCase().indexOf(crPartyVal) === -1
                      && String(r["Deal WS-ID"] || "").toLowerCase().indexOf(crPartyVal) === -1) return false;
       if (stageChecked.length  && stageChecked.indexOf(String(r["Stage"] || "")) === -1)                      return false;
+      if (csActive) { var _si = currentStageOrder.indexOf(String(r["Current stage"] || "")); if (_si === -1 || _si < csFromIdx || _si > csToIdx) return false; }
       if (optInChecked.length  && optInChecked.indexOf(String(r["Adopt Rebate Opt-In Status"] || "")) === -1) return false;
       if (portfolioVal         && String(r["Deal CPI Portfolio"] || "") !== portfolioVal)                     return false;
       if (offerVal             && String(r["Track"] || "") !== offerVal)                                      return false;
@@ -351,15 +421,12 @@ function renderDetails(data) {
       if (pviEligible      && !r["PVI Eligible"])   return false;
       if (pviOnboard       && !r["PVI Onboard"])    return false;
       if (pviAdopt         && !r["PVI Adopt"])      return false;
-      if (uc2550           && !r["UC 25-50% eligible w/o opt-in"])       return false;
-      if (uc75             && !r["UC 75% eligible w/o opt-in"])          return false;
       if (ucMissed         && !r["UC progressed and missed w/o opt-in"]) return false;
       if (newEligible      && !r["New eligible"])                                                         return false;
       if (expiresSoon      && String(r["Expires <3M?"] || "") !== "Yes")                                  return false;
       if (earnedChecked    && r["Earned?"] !== true)                                                        return false;
       if (eaChecked        && String(r["EA Flag"] || "") !== "Yes")                                         return false;
       if (aapChecked       && String(r["AAP Flag"] || "") !== "Yes")                                        return false;
-      if (riskChecked.length && riskChecked.indexOf(String(r["Offer Risk Level"] || "")) === -1)          return false;
 
       if (bkFromDate || bkToDate) {
         var d = toDate(r["Booking Date"]);
@@ -391,15 +458,14 @@ function renderDetails(data) {
   }
 
   function applySort() {
-    var stageOrder = ["Purchase","Onboard","Implement","Use","Engage","Adopt","Completed"];
     var numericFields = { "Potential Incentives": true, "Missed Incentives": true, "Estimated Earned Incentives": true, "Days in stage": true };
     var dateFields    = { "Deal Incentive Expiry Date": true };
     filteredData.sort(function (a, b) {
       var av = a[sortField], bv = b[sortField];
       if (sortField === "Current stage") {
-        var ai = stageOrder.indexOf(av || ""), bi = stageOrder.indexOf(bv || "");
-        if (ai === -1) ai = stageOrder.length;
-        if (bi === -1) bi = stageOrder.length;
+        var ai = currentStageOrder.indexOf(av || ""), bi = currentStageOrder.indexOf(bv || "");
+        if (ai === -1) ai = currentStageOrder.length;
+        if (bi === -1) bi = currentStageOrder.length;
         return sortDir === "asc" ? ai - bi : bi - ai;
       } else if (numericFields[sortField]) {
         av = av || 0; bv = bv || 0;
@@ -639,6 +705,21 @@ function renderDetails(data) {
       '<div class="dual-range-fill" id="' + prefix + '-fill"></div>' +
       '<input type="range" class="range-from" id="' + prefix + '-from" min="' + minDay + '" max="' + maxDay + '" value="' + minDay + '" step="1">' +
       '<input type="range" class="range-to"   id="' + prefix + '-to"   min="' + minDay + '" max="' + maxDay + '" value="' + maxDay + '" step="1">' +
+      '</div></div>';
+  }
+
+  function makeStageRangeSlider(prefix, options) {
+    var maxIdx = Math.max(0, options.length - 1);
+    return '<div class="date-slider-group">' +
+      '<div class="slider-val-display">' +
+      '<span id="' + prefix + '-from-lbl">' + escHtml(options[0] || "") + '</span>' +
+      '<span id="' + prefix + '-to-lbl">'   + escHtml(options[maxIdx] || "") + '</span>' +
+      '</div>' +
+      '<div class="dual-range-wrap">' +
+      '<div class="dual-range-track"></div>' +
+      '<div class="dual-range-fill" id="' + prefix + '-fill"></div>' +
+      '<input type="range" class="range-from" id="' + prefix + '-from" min="0" max="' + maxIdx + '" value="0"       step="1">' +
+      '<input type="range" class="range-to"   id="' + prefix + '-to"   min="0" max="' + maxIdx + '" value="' + maxIdx + '" step="1">' +
       '</div></div>';
   }
 }

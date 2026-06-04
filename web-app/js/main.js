@@ -169,10 +169,32 @@ function handleCSV(file) {
 }
 
 // ── XLSX path: runs in a Web Worker to avoid main-thread memory limits ───────
+function fallbackXLSXMainThreadFromFile(file, reason) {
+  if (reason) console.warn('Falling back to main-thread XLSX parse:', reason);
+  updateLoaderMsg('Retrying parse on main thread…');
+
+  var retryReader = new FileReader();
+  retryReader.onload = function (evt) {
+    try {
+      handleXLSXMainThread(evt.target.result, file.name);
+    } catch (fallbackErr) {
+      restoreUploadSection();
+      console.error(fallbackErr);
+      alert('Error reading Excel file: ' + fallbackErr.message);
+    }
+  };
+  retryReader.onerror = function (evtErr) {
+    restoreUploadSection();
+    alert('Error reading Excel file: ' + (evtErr && evtErr.message ? evtErr.message : 'Failed to read file'));
+  };
+  retryReader.readAsArrayBuffer(file);
+}
+
 function handleXLSX(file) {
   var reader = new FileReader();
   reader.onload = function (e) {
     var buffer = e.target.result;
+    var isFirefox = typeof navigator !== 'undefined' && /firefox/i.test(navigator.userAgent || '');
 
     // Try Worker first (better memory headroom, non-blocking)
     var workerSupported = (typeof Worker !== 'undefined');
@@ -199,16 +221,21 @@ function handleXLSX(file) {
 
         worker.onerror = function (err) {
           worker.terminate();
-          // Worker failed (e.g. file:// blocked importScripts) — fall back to main thread
-          console.warn('Worker failed, falling back to main thread:', err.message);
-          handleXLSXMainThread(buffer, file.name);
+          // Worker failed (e.g. file:// blocked importScripts) — re-read safely for fallback
+          fallbackXLSXMainThreadFromFile(file, err && err.message ? err.message : 'Worker runtime error');
         };
 
-        // Transfer the buffer to the worker (zero-copy)
-        worker.postMessage(buffer, [buffer]);
+        // Firefox can report detached ArrayBuffer issues with transferable upload buffers.
+        // Avoid transfer-list semantics there and let structured clone copy the data.
+        if (isFirefox) {
+          worker.postMessage(buffer);
+        } else {
+          worker.postMessage(buffer, [buffer]);
+        }
         return;
       } catch (workerErr) {
-        console.warn('Could not start worker, falling back to main thread:', workerErr.message);
+        fallbackXLSXMainThreadFromFile(file, workerErr && workerErr.message ? workerErr.message : 'Worker start failure');
+        return;
       }
     }
 
@@ -1232,6 +1259,20 @@ function resetApp() {
 window.APP_DATA        = APP_DATA;
 window.resetApp        = resetApp;
 window.renderActiveTab = renderActiveTab;
+
+// Deep-link to Details tab with preset filters
+// preset: object with boolean flags matching filter IDs, e.g. { uc2550: true }
+window.navigateToDetails = function (preset) {
+  var btn = document.querySelector('[data-bs-target="#tab-details"]');
+  if (!btn) return;
+  window._detDeepLink = preset;
+  var detPane = document.getElementById("tab-details");
+  if (detPane && detPane.classList.contains("active")) {
+    renderDetails(APP_DATA);
+  } else {
+    new bootstrap.Tab(btn).show();
+  }
+};
 
 // Deep-link to Customer tab with a pre-filtered customer name
 window.navigateToCustomer = function (crName) {
