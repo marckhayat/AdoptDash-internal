@@ -4,9 +4,11 @@
 
 var _cpiChart1 = null;
 var _cpiChart2 = null;
+var _cpiChart2b = null;
 var _cpiChart3 = null;
 var _cpiChart4 = null;
 var _cpiChart5 = null;
+var _cpiChart6 = null;
 var _cpiChart5Log = false;
 
 function renderCPIAdopt(data) {
@@ -66,16 +68,22 @@ function renderCPIAdopt(data) {
 
   html += '<div class="row g-4 mb-4">';
 
-  // ── Stat charts row: Opt-in Ratio + Incentives
-  html += '<div class="col-12 col-lg-6">';
-  html += '<div class="card shadow-sm h-100"><div class="card-header fw-semibold">Opt-in Ratio <small class="fw-normal">(maximum payout for eligible UCs)</small> <i class="bi bi-info-circle text-muted ms-1" style="font-size:0.75rem;cursor:default" data-bs-toggle="tooltip" data-bs-placement="top" title="Compares the potentially available payout for eligible opted-in UCs to what can still be opted-in."></i></div><div class="card-body">';
-  html += '<div class="chart-container" style="min-height:220px;height:220px"><canvas id="cpi-chart1"></canvas></div>';
-  html += '<div id="cpi-ratio-card" class="text-center mt-3"></div>';
+  // ── Stat charts row: Eligible-only pie | Eligible+Expired pie | Earned by Portfolio
+  html += '<div class="col-12 col-lg-4">';
+  html += '<div class="card shadow-sm h-100"><div class="card-header fw-semibold">Incentives <small class="fw-normal">(eligible UCs only)</small> <i class="bi bi-info-circle text-muted ms-1" style="font-size:0.75rem;cursor:default" data-bs-toggle="tooltip" data-bs-placement="top" title="Breakdown of the total revised maximum incentive for currently Eligible deals: Earned, Missed, Potential (opted-in remaining), and Not opted-in."></i></div><div class="card-body">';
+  html += '<div class="chart-container" style="min-height:220px;height:220px"><canvas id="cpi-chart2b"></canvas></div>';
+  html += '<div id="cpi-ratio-elig" class="text-center mt-2"></div>';
   html += '</div></div></div>';
 
-  html += '<div class="col-12 col-lg-6">';
-  html += '<div class="card shadow-sm h-100"><div class="card-header fw-semibold">Incentives <small class="fw-normal">(all opted-in UCs)</small> <i class="bi bi-info-circle text-muted ms-1" style="font-size:0.75rem;cursor:default" data-bs-toggle="tooltip" data-bs-placement="top" title="Shows, for all opted-in UCs, how much incentives were missed, have been estimated earned, remain as potential and the total available incentives."></i></div><div class="card-body">';
+  html += '<div class="col-12 col-lg-4">';
+  html += '<div class="card shadow-sm h-100"><div class="card-header fw-semibold">Incentives <small class="fw-normal">(eligible &amp; expired UCs)</small> <i class="bi bi-info-circle text-muted ms-1" style="font-size:0.75rem;cursor:default" data-bs-toggle="tooltip" data-bs-placement="top" title="Breakdown of the total revised maximum incentive for Eligible and Expired deals: Earned, Missed, Potential (opted-in remaining), and Not opted-in."></i></div><div class="card-body">';
   html += '<div class="chart-container" style="min-height:220px;height:220px"><canvas id="cpi-chart2"></canvas></div>';
+  html += '<div id="cpi-ratio-eligexp" class="text-center mt-2"></div>';
+  html += '</div></div></div>';
+
+  html += '<div class="col-12 col-lg-4">';
+  html += '<div class="card shadow-sm h-100"><div class="card-header fw-semibold">Total Earned by Portfolio <i class="bi bi-info-circle text-muted ms-1" style="font-size:0.75rem;cursor:default" data-bs-toggle="tooltip" data-bs-placement="top" title="Total estimated earned incentives per portfolio (all-time, not filtered by FY)."></i></div><div class="card-body">';
+  html += '<div class="chart-container" style="min-height:220px;height:220px"><canvas id="cpi-chart6"></canvas></div>';
   html += '</div></div></div>';
 
   html += '</div>'; // stat charts row
@@ -136,7 +144,7 @@ function renderCPIAdopt(data) {
       fyYears.add(fy);
     });
   });
-  var fyList = Array.from(fyYears).sort(function (a, b) { return b - a; }); // descending
+  var fyList = Array.from(fyYears).sort(function (a, b) { return a - b; }); // ascending (oldest left, newest right)
 
   // Determine current FY
   var _now = new Date();
@@ -159,7 +167,7 @@ function renderCPIAdopt(data) {
     if (!btn) return;
     _selectedFY = parseInt(btn.dataset.fy, 10);
     fyToggleEl.querySelectorAll("button").forEach(function (b) { b.classList.toggle("active", parseInt(b.dataset.fy, 10) === _selectedFY); });
-    buildCharts(document.getElementById("cpi-portfolio").value, document.getElementById("cpi-offer").value);
+    buildMonthlyCharts(document.getElementById("cpi-portfolio").value, document.getElementById("cpi-offer").value);
   });
 
   // Portfolio change → refresh offer list
@@ -178,12 +186,17 @@ function renderCPIAdopt(data) {
 
   document.getElementById("cpi-log-toggle").addEventListener("change", function () {
     _cpiChart5Log = this.checked;
-    buildCharts(document.getElementById("cpi-portfolio").value, document.getElementById("cpi-offer").value);
+    buildMonthlyCharts(document.getElementById("cpi-portfolio").value, document.getElementById("cpi-offer").value);
   });
 
   buildCharts("", "");
 
   function buildCharts(portfolioFilter, offerFilter) {
+    buildStatCharts(portfolioFilter, offerFilter);
+    buildMonthlyCharts(portfolioFilter, offerFilter);
+  }
+
+  function buildStatCharts(portfolioFilter, offerFilter) {
     // Filter: MaxFlag=Yes, apply portfolio+offer filters
     var subset = data.filter(function (r) {
       if (norm(r["Maximum Incentive Deal Flag"]) !== "YES") return false;
@@ -199,11 +212,15 @@ function renderCPIAdopt(data) {
     var potRemain   = 0;
     var revMax      = 0;
     var missedIncent = 0;
+    var totalMax    = 0; // Revised Max for all eligible/expired deals (the 100%)
 
     subset.forEach(function (r) {
       var maxIncentive = parseFloat(r["Revised Maximum Incentive Amount"]) || 0;
       var isEligible  = norm(r["Stage"]) === "ELIGIBLE";
+      var isExpired   = norm(r["Stage"]) === "EXPIRED";
       var isOptedIn   = norm(r["Adopt Rebate Opt-In Status"]) === "OPTED IN";
+
+      if (isEligible || isExpired) totalMax += maxIncentive;
 
       if (isEligible) {
         eligPayout += maxIncentive;
@@ -216,7 +233,6 @@ function renderCPIAdopt(data) {
         if (isEligible) {
           potRemain += maxIncentive;
         }
-        var isExpired = norm(r["Stage"]) === "EXPIRED";
         if (isEligible || isExpired) {
           revMax += maxIncentive;
         }
@@ -226,39 +242,36 @@ function renderCPIAdopt(data) {
     var notOptedPayout = Math.max(0, eligPayout - optedPayout);
     var ratio = eligPayout > 0 ? optedPayout / eligPayout : 0;
 
-    // ── Chart 1: Horizontal stacked bar — Opted-in vs Still Available
-    if (_cpiChart1) { _cpiChart1.destroy(); _cpiChart1 = null; }
-    var ctx1 = document.getElementById("cpi-chart1").getContext("2d");
-    _cpiChart1 = new Chart(ctx1, {
-      type: "bar",
+    // ── Chart 2: Pie — breakdown of total max incentive (eligible/expired)
+    // 100% = totalMax; slices: Earned | Missed | Opted-in remaining | Not opted-in
+    var optedInRemain = Math.max(0, revMax - estEarned - missedIncent);
+    var notOptedInMax = Math.max(0, totalMax - revMax);
+    if (_cpiChart2) { _cpiChart2.destroy(); _cpiChart2 = null; }
+    var ctx2 = document.getElementById("cpi-chart2").getContext("2d");
+    _cpiChart2 = new Chart(ctx2, {
+      type: "doughnut",
       data: {
-        labels: ["Payout"],
-        datasets: [
-          { label: "Opted-in",           data: [optedPayout],   backgroundColor: "#00BCF2" },
-          { label: "Still available",    data: [notOptedPayout], backgroundColor: "#C7E0F4" }
-        ]
+        labels: ["Earned", "Missed", "Potential", "Not opted-in"],
+        datasets: [{
+          data: [estEarned, missedIncent, optedInRemain, notOptedInMax],
+          backgroundColor: ["#107C10", "#D13438", "#00BCF2", "#D0D0D0"],
+          borderWidth: 1
+        }]
       },
       options: {
-        indexAxis: "y",
         responsive: true,
         maintainAspectRatio: false,
-        scales: {
-          x: {
-            stacked: true,
-            ticks: { callback: function (v) {
-              if (Math.abs(v)>=1000000) return "$"+(v/1000000).toFixed(1)+"M";
-              if (Math.abs(v)>=1000)    return "$"+(v/1000).toFixed(0)+"K";
-              return "$"+Math.round(v).toLocaleString();
-            }}
-          },
-          y: { stacked: true }
-        },
         plugins: {
-          legend: { position: "bottom" },
+          legend: { position: "bottom", labels: { boxWidth: 12, font: { size: 11 } } },
           tooltip: {
             callbacks: {
               label: function (ctx) {
-                return ctx.dataset.label + ": $" + Math.round(ctx.raw).toLocaleString();
+                var v = ctx.raw;
+                var pct = totalMax > 0 ? " (" + Math.round(v / totalMax * 100) + "%)" : "";
+                var fmt = Math.abs(v) >= 1000000 ? "$"+(v/1000000).toFixed(2)+"M"
+                        : Math.abs(v) >= 1000    ? "$"+(v/1000).toFixed(1)+"K"
+                        : "$"+Math.round(v).toLocaleString();
+                return ctx.label + ": " + fmt + pct;
               }
             }
           }
@@ -266,55 +279,157 @@ function renderCPIAdopt(data) {
       }
     });
 
-    // Ratio card
-    document.getElementById("cpi-ratio-card").innerHTML =
-      '<div class="metric-card d-inline-block px-4">' +
-      '<div class="metric-value" style="color:var(--cisco-blue)">' + fmtPct(ratio) + '</div>' +
-      '<div class="metric-label">Opt-in Rate (by payout value)</div>' +
-      '</div>' +
-      '<div class="d-flex gap-3 justify-content-center mt-2">' +
-      '<small class="text-muted">Eligible: ' + fmtCurrency(eligPayout) + '</small>' +
-      '<small class="text-muted">Opted-in: ' + fmtCurrency(optedPayout) + '</small>' +
-      '</div>';
+    // Opt-in ratio callout for eligible+expired chart
+    var eligExpRatio = totalMax > 0 ? Math.round(revMax / totalMax * 100) : 0;
+    document.getElementById("cpi-ratio-eligexp").innerHTML =
+      '<span style="font-size:1rem;font-weight:600;color:#00BCF2">' + eligExpRatio + '% opted-in</span>' +
+      '<span class="text-muted small ms-2">(' + fmtCurrency(revMax) + ' / ' + fmtCurrency(totalMax) + ')</span>';
 
-    // ── Chart 2: Clustered bar — Earned vs Potential Remaining
-    if (_cpiChart2) { _cpiChart2.destroy(); _cpiChart2 = null; }
-    var ctx2 = document.getElementById("cpi-chart2").getContext("2d");
-    _cpiChart2 = new Chart(ctx2, {
-      type: "bar",
+    // ── Chart 2b: Pie — same breakdown but eligible-only (no expired)
+    var eligEstEarned   = 0;
+    var eligMissed      = 0;
+    var eligRevMax      = 0;
+    var eligTotalMax    = 0;
+    subset.forEach(function (r) {
+      var maxIncentive = parseFloat(r["Revised Maximum Incentive Amount"]) || 0;
+      var isEligible  = norm(r["Stage"]) === "ELIGIBLE";
+      var isOptedIn   = norm(r["Adopt Rebate Opt-In Status"]) === "OPTED IN";
+      if (!isEligible) return;
+      eligTotalMax += maxIncentive;
+      if (isOptedIn) {
+        eligRevMax      += maxIncentive;
+        eligEstEarned   += parseFloat(r["Estimated Earned Incentives"]) || 0;
+        eligMissed      += parseFloat(r["Missed Incentives"]) || 0;
+      }
+    });
+    var eligOptedInRemain = Math.max(0, eligRevMax - eligEstEarned - eligMissed);
+    var eligNotOptedIn    = Math.max(0, eligTotalMax - eligRevMax);
+    if (_cpiChart2b) { _cpiChart2b.destroy(); _cpiChart2b = null; }
+    var ctx2b = document.getElementById("cpi-chart2b").getContext("2d");
+    _cpiChart2b = new Chart(ctx2b, {
+      type: "doughnut",
       data: {
-        labels: [""],
-        datasets: [
-          { label: "Missed Incentives",             data: [missedIncent], backgroundColor: "#D13438" },
-          { label: "Estimated Earned",              data: [estEarned],    backgroundColor: "#107C10" },
-          { label: "Potential Remaining",           data: [potRemain],    backgroundColor: "#00BCF2" },
-          { label: "Revised Maximum Incentives",    data: [revMax],       backgroundColor: "#E55400" }
-        ]
+        labels: ["Earned", "Missed", "Potential", "Not opted-in"],
+        datasets: [{
+          data: [eligEstEarned, eligMissed, eligOptedInRemain, eligNotOptedIn],
+          backgroundColor: ["#107C10", "#D13438", "#00BCF2", "#D0D0D0"],
+          borderWidth: 1
+        }]
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        scales: {
-          x: { ticks: { font: { size: 11 } } },
-          y: {
-            ticks: { callback: function (v) {
-              if (Math.abs(v)>=1000000) return "$"+(v/1000000).toFixed(1)+"M";
-              if (Math.abs(v)>=1000)    return "$"+(v/1000).toFixed(0)+"K";
-              return "$"+Math.round(v).toLocaleString();
-            }}
-          }
-        },
         plugins: {
-          legend: { position: "bottom" },
+          legend: { position: "bottom", labels: { boxWidth: 12, font: { size: 11 } } },
           tooltip: {
             callbacks: {
               label: function (ctx) {
-                return ctx.dataset.label + ": $" + Math.round(ctx.raw).toLocaleString();
+                var v = ctx.raw;
+                var pct = eligTotalMax > 0 ? " (" + Math.round(v / eligTotalMax * 100) + "%)" : "";
+                var fmt = Math.abs(v) >= 1000000 ? "$"+(v/1000000).toFixed(2)+"M"
+                        : Math.abs(v) >= 1000    ? "$"+(v/1000).toFixed(1)+"K"
+                        : "$"+Math.round(v).toLocaleString();
+                return ctx.label + ": " + fmt + pct;
               }
             }
           }
         }
       }
+    });
+
+    // Opt-in ratio callout for eligible-only chart
+    var eligOnlyRatio = eligTotalMax > 0 ? Math.round(eligRevMax / eligTotalMax * 100) : 0;
+    document.getElementById("cpi-ratio-elig").innerHTML =
+      '<span style="font-size:1rem;font-weight:600;color:#00BCF2">' + eligOnlyRatio + '% opted-in</span>' +
+      '<span class="text-muted small ms-2">(' + fmtCurrency(eligRevMax) + ' / ' + fmtCurrency(eligTotalMax) + ')</span>';
+
+    // ── Chart 6: Total Earned by Portfolio (all-time, not FY-filtered)
+    var PORTFOLIO_COLORS = {
+      "Networking":               "#00BCF2",
+      "Security":                 "#E55400",
+      "Cloud + AI Infrastructure":"#6BB700",
+      "Collaboration":            "#7B3F91"
+    };
+    var EARN_STAGES = [
+      { flagField: "Stage Completion Flag(onboard)", dateField: "Stage Completion Date(onboard)", amtField: "Estimated Incentive Amount(Onboard)" },
+      { flagField: "Stage Completion Flag(Use)",     dateField: "Stage Completion Date(Use)",     amtField: "Estimated Incentive Amount(Use)"     },
+      { flagField: "Stage Completion Flag(Engage)",  dateField: "Stage Completion Date(Engage)",  amtField: "Estimated Incentive Amount(Engage)"  },
+      { flagField: "Stage Completion Flag(Adopt)",   dateField: "Stage Completion Date(Adopt)",   amtField: "Estimated Incentive Amount(Adopt)"   }
+    ];
+    var allEarnByPortfolio = {};
+    var allEarnPortfolios = portfolioFilter ? [portfolioFilter] : portfolios;
+    allEarnPortfolios.forEach(function (p) { allEarnByPortfolio[p] = 0; });
+    subset.forEach(function (r) {
+      if (!r["Earned?"]) return;
+      var p = r["Deal CPI Portfolio"];
+      if (!p || allEarnByPortfolio[p] === undefined) return;
+      var lciStart = new Date(r["Adopt Rebate Start Date"]);
+      var expiry   = new Date(r["Deal Incentive Expiry Date"]);
+      if (isNaN(lciStart.getTime()) || isNaN(expiry.getTime())) return;
+      EARN_STAGES.forEach(function (s) {
+        if (norm(r[s.flagField]) !== "YES") return;
+        var d = new Date(r[s.dateField]);
+        if (isNaN(d.getTime()) || d < lciStart || d > expiry) return;
+        allEarnByPortfolio[p] += parseFloat(r[s.amtField]) || 0;
+      });
+    });
+    var chart6Portfolios = allEarnPortfolios.filter(function (p) { return allEarnByPortfolio[p] > 0; });
+    chart6Portfolios.sort(function (a, b) { return allEarnByPortfolio[b] - allEarnByPortfolio[a]; });
+    var chart6Colors = chart6Portfolios.map(function (p, idx) {
+      var fallback = ["#00BCF2","#E55400","#6BB700","#7B3F91","#FF8C00","#005B99"];
+      return PORTFOLIO_COLORS[p] || fallback[idx % fallback.length];
+    });
+    if (_cpiChart6) { _cpiChart6.destroy(); _cpiChart6 = null; }
+    var ctx6 = document.getElementById("cpi-chart6").getContext("2d");
+    _cpiChart6 = new Chart(ctx6, {
+      type: "bar",
+      data: {
+        labels: chart6Portfolios,
+        datasets: [{
+          label: "Earned",
+          data: chart6Portfolios.map(function (p) { return allEarnByPortfolio[p]; }),
+          backgroundColor: chart6Colors
+        }]
+      },
+      options: {
+        indexAxis: "y",
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          x: {
+            beginAtZero: true,
+            ticks: { callback: function (v) {
+              if (Math.abs(v) >= 1000000) return "$"+(v/1000000).toFixed(1)+"M";
+              if (Math.abs(v) >= 1000)    return "$"+(v/1000).toFixed(0)+"K";
+              return "$"+Math.round(v).toLocaleString();
+            }}
+          },
+          y: { grid: { display: false } }
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: function (ctx) {
+                var v = ctx.raw;
+                var fmt = Math.abs(v) >= 1000000 ? "$"+(v/1000000).toFixed(2)+"M"
+                        : Math.abs(v) >= 1000    ? "$"+(v/1000).toFixed(1)+"K"
+                        : "$"+Math.round(v).toLocaleString();
+                return "Earned: " + fmt;
+              }
+            }
+          }
+        }
+      }
+    });
+  }  // end buildStatCharts
+
+  function buildMonthlyCharts(portfolioFilter, offerFilter) {
+    var subset = data.filter(function (r) {
+      if (norm(r["Maximum Incentive Deal Flag"]) !== "YES") return false;
+      if (portfolioFilter && r["Deal CPI Portfolio"] !== portfolioFilter) return false;
+      if (offerFilter     && r["Track"] !== offerFilter)                   return false;
+      return true;
     });
 
     // ── Chart 3: Opt-in trend — deals opted-in per month, per portfolio
@@ -488,14 +603,13 @@ function renderCPIAdopt(data) {
     });
 
     // ── Chart 5: Monthly Estimated Earned Incentives (Portfolio)
-    // Logic mirrors the Excel SUMPRODUCT formula:
-    // For each month and each Portfolio, sum each stage's incentive amount where
-    // Earned?=TRUE and that stage's completion date falls within the month.
+    // Mirror the exact per-stage conditions used in transform.js step 13:
+    //   Stage Completion Flag = YES, completionDate >= lciStart, completionDate <= expiry
     var EARN_STAGES = [
-      { dateField: "Stage Completion Date(onboard)", amtField: "Estimated Incentive Amount(Onboard)" },
-      { dateField: "Stage Completion Date(Use)",     amtField: "Estimated Incentive Amount(Use)"     },
-      { dateField: "Stage Completion Date(Engage)",  amtField: "Estimated Incentive Amount(Engage)"  },
-      { dateField: "Stage Completion Date(Adopt)",   amtField: "Estimated Incentive Amount(Adopt)"   }
+      { flagField: "Stage Completion Flag(onboard)", dateField: "Stage Completion Date(onboard)", amtField: "Estimated Incentive Amount(Onboard)" },
+      { flagField: "Stage Completion Flag(Use)",     dateField: "Stage Completion Date(Use)",     amtField: "Estimated Incentive Amount(Use)"     },
+      { flagField: "Stage Completion Flag(Engage)",  dateField: "Stage Completion Date(Engage)",  amtField: "Estimated Incentive Amount(Engage)"  },
+      { flagField: "Stage Completion Flag(Adopt)",   dateField: "Stage Completion Date(Adopt)",   amtField: "Estimated Incentive Amount(Adopt)"   }
     ];
 
     // Use the same portfolio list as Charts 3 & 4
@@ -509,9 +623,14 @@ function renderCPIAdopt(data) {
       if (!r["Earned?"]) return;
       var p = r["Deal CPI Portfolio"];
       if (!p || !earnedByPortfolio[p]) return;
+      var lciStart = new Date(r["Adopt Rebate Start Date"]);
+      var expiry   = new Date(r["Deal Incentive Expiry Date"]);
+      if (isNaN(lciStart.getTime()) || isNaN(expiry.getTime())) return;
       EARN_STAGES.forEach(function (s) {
+        if (norm(r[s.flagField]) !== "YES") return;
         var d = new Date(r[s.dateField]);
         if (isNaN(d.getTime())) return;
+        if (d < lciStart || d > expiry) return;
         var amt = parseFloat(r[s.amtField]) || 0;
         if (amt === 0) return;
         for (var i = 0; i < 12; i++) {
@@ -541,7 +660,7 @@ function renderCPIAdopt(data) {
                      : Math.abs(earnTotal) >= 1000    ? "$" + (earnTotal / 1000).toFixed(1) + "K"
                      : "$" + Math.round(earnTotal).toLocaleString();
     var totalEl = document.getElementById("cpi-chart5-total");
-    if (totalEl) totalEl.textContent = "Total: " + earnTotalFmt;
+    if (totalEl) { totalEl.textContent = "Total: " + earnTotalFmt; totalEl.style.fontSize = "1rem"; totalEl.style.fontWeight = "600"; totalEl.style.color = "#555"; }
 
     if (_cpiChart5) { _cpiChart5.destroy(); _cpiChart5 = null; }
     var ctx5 = document.getElementById("cpi-chart5").getContext("2d");
