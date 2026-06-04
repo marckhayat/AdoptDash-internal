@@ -7,7 +7,7 @@ var APP_DATA = null;
 var APP_FILE_META = null;
 var APP_IS_DISTI = false;
 var APP_MULTI_SESSIONS = null; // { sessions: [...], fileMeta: {...} }
-var APP_VERSION = "v6.3";
+var APP_VERSION = "v6.3.1";
 
 // Workspan column names used to auto-detect the header row
 var KNOWN_COLUMNS = [
@@ -1218,6 +1218,7 @@ function showDataNotifications(data) {
       cls: "notif-expiry",
       icon: "bi-clock-history text-warning",
       title: "Expiring Soon",
+      emptyMsg: "Nothing expiring in the coming 14 days.",
       body: expiringSoon > 0
         ? "<strong>" + expiringSoon.toLocaleString() + "</strong> opted-in deal" + (expiringSoon !== 1 ? "s" : "") + " expir" + (expiringSoon !== 1 ? "e" : "es") + " within 14 days"
         : null
@@ -1227,7 +1228,7 @@ function showDataNotifications(data) {
   notifs.forEach(function(n) {
     var hasData = !!n.body;
     var extraCls = hasData ? n.cls : "notif-zero";
-    var bodyHtml = hasData ? n.body : '<span class="text-muted">Nothing to report in the past 14 days.</span>';
+    var bodyHtml = hasData ? n.body : '<span class="text-muted">' + (n.emptyMsg || "Nothing to report in the past 14 days.") + '</span>';
     var html =
       '<div id="' + n.id + '" class="toast show mb-2 ' + extraCls + '" role="alert" data-bs-autohide="false">' +
         '<div class="toast-header">' +
