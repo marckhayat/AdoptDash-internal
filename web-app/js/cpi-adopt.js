@@ -102,7 +102,10 @@ function renderCPIAdopt(data) {
   html += '</div>';
 
   html += '<div class="col-12 col-lg-4">';
-  html += '<div class="fw-semibold small mb-2">Monthly Estimated Earned Incentives <i class="bi bi-info-circle text-muted" style="font-size:0.75rem;cursor:default" data-bs-toggle="tooltip" data-bs-placement="top" title="Amount of estimated earned incentives during the selected fiscal year."></i></div>';
+  html += '<div class="fw-semibold small mb-2 d-flex justify-content-between align-items-center">';
+  html += '<span>Monthly Estimated Earned Incentives <i class="bi bi-info-circle text-muted" style="font-size:0.75rem;cursor:default" data-bs-toggle="tooltip" data-bs-placement="top" title="Amount of estimated earned incentives during the selected fiscal year."></i></span>';
+  html += '<span id="cpi-chart5-total" class="text-muted fw-normal"></span>';
+  html += '</div>';
   html += '<div class="chart-container" style="min-height:260px;height:260px"><canvas id="cpi-chart5"></canvas></div>';
   html += '</div>';
 
@@ -528,6 +531,17 @@ function renderCPIAdopt(data) {
         backgroundColor: color
       };
     });
+
+    // Compute grand total across all portfolios and months
+    var earnTotal = 0;
+    earnPortfolios.forEach(function (p) {
+      earnedByPortfolio[p].forEach(function (v) { earnTotal += v; });
+    });
+    var earnTotalFmt = Math.abs(earnTotal) >= 1000000 ? "$" + (earnTotal / 1000000).toFixed(2) + "M"
+                     : Math.abs(earnTotal) >= 1000    ? "$" + (earnTotal / 1000).toFixed(1) + "K"
+                     : "$" + Math.round(earnTotal).toLocaleString();
+    var totalEl = document.getElementById("cpi-chart5-total");
+    if (totalEl) totalEl.textContent = "Total: " + earnTotalFmt;
 
     if (_cpiChart5) { _cpiChart5.destroy(); _cpiChart5 = null; }
     var ctx5 = document.getElementById("cpi-chart5").getContext("2d");
