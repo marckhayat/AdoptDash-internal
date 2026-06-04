@@ -64,45 +64,100 @@ function renderCPIAdopt(data) {
   html += '</select></div>';
   html += '</div>';
 
-  html += '<div class="row g-4" style="align-items:stretch">';
+  html += '<div class="row g-4 mb-4">';
 
-  // ── Column 1: Opt-in Ratio + Opt-in Trend
-  html += '<div class="col-12 col-lg-4 d-flex flex-column gap-4">';
-  html += '<div class="card shadow-sm"><div class="card-header fw-semibold">Opt-in Ratio <small class="fw-normal">(maximum payout for eligible UCs)</small> <i class="bi bi-info-circle text-muted ms-1" style="font-size:0.75rem;cursor:default" data-bs-toggle="tooltip" data-bs-placement="top" title="Compares the potentially available payout for eligible opted-in UCs to what can still be opted-in."></i></div><div class="card-body">';
+  // ── Stat charts row: Opt-in Ratio + Incentives
+  html += '<div class="col-12 col-lg-6">';
+  html += '<div class="card shadow-sm h-100"><div class="card-header fw-semibold">Opt-in Ratio <small class="fw-normal">(maximum payout for eligible UCs)</small> <i class="bi bi-info-circle text-muted ms-1" style="font-size:0.75rem;cursor:default" data-bs-toggle="tooltip" data-bs-placement="top" title="Compares the potentially available payout for eligible opted-in UCs to what can still be opted-in."></i></div><div class="card-body">';
   html += '<div class="chart-container" style="min-height:220px;height:220px"><canvas id="cpi-chart1"></canvas></div>';
   html += '<div id="cpi-ratio-card" class="text-center mt-3"></div>';
-  html += '</div></div>';
-  html += '<div class="card shadow-sm flex-grow-1"><div class="card-header fw-semibold">Monthly Opt-in Trend <i class="bi bi-info-circle text-muted ms-1" style="font-size:0.75rem;cursor:default" data-bs-toggle="tooltip" data-bs-placement="top" title="Number of opt-ins during the past 12 months."></i></div><div class="card-body">';
-  html += '<div class="chart-container" style="min-height:260px;height:260px"><canvas id="cpi-chart3"></canvas></div>';
-  html += '</div></div>';
-  html += '</div>';
+  html += '</div></div></div>';
 
-  // ── Column 2: Incentives + Progression Trend
-  html += '<div class="col-12 col-lg-4 d-flex flex-column gap-4">';
-  html += '<div class="card shadow-sm"><div class="card-header fw-semibold">Incentives <small class="fw-normal">(all opted-in UCs)</small> <i class="bi bi-info-circle text-muted ms-1" style="font-size:0.75rem;cursor:default" data-bs-toggle="tooltip" data-bs-placement="top" title="Shows, for all opted-in UCs, how much incentives were missed, have been estimated earned, remain as potential and the total available incentives."></i></div><div class="card-body">';
+  html += '<div class="col-12 col-lg-6">';
+  html += '<div class="card shadow-sm h-100"><div class="card-header fw-semibold">Incentives <small class="fw-normal">(all opted-in UCs)</small> <i class="bi bi-info-circle text-muted ms-1" style="font-size:0.75rem;cursor:default" data-bs-toggle="tooltip" data-bs-placement="top" title="Shows, for all opted-in UCs, how much incentives were missed, have been estimated earned, remain as potential and the total available incentives."></i></div><div class="card-body">';
   html += '<div class="chart-container" style="min-height:220px;height:220px"><canvas id="cpi-chart2"></canvas></div>';
+  html += '</div></div></div>';
+
+  html += '</div>'; // stat charts row
+
+  // ── Monthly charts group with shared FY toggle
+  html += '<div class="card shadow-sm mb-2">';
+  html += '<div class="card-header fw-semibold d-flex align-items-center justify-content-between flex-wrap gap-2">';
+  html += '<span>Monthly Trends</span>';
+  html += '<div class="d-flex align-items-center gap-2">';
+  html += '<div class="btn-group btn-group-sm" id="cpi-fy-toggle" role="group"></div>';
+  html += '<div class="form-check form-switch mb-0 ms-2"><input class="form-check-input" type="checkbox" id="cpi-log-toggle"><label class="form-check-label small" for="cpi-log-toggle">Log scale</label></div>';
   html += '</div></div>';
-  html += '<div class="card shadow-sm flex-grow-1"><div class="card-header fw-semibold">Monthly Deal Progression Trend <small class="fw-normal">(opted-in UCs)</small> <i class="bi bi-info-circle text-muted ms-1" style="font-size:0.75rem;cursor:default" data-bs-toggle="tooltip" data-bs-placement="top" title="Number of UCs that have progressed during the past 12 months. No double-count within a month."></i></div><div class="card-body">';
+  html += '<div class="card-body">';
+  html += '<div class="row g-4">';
+
+  html += '<div class="col-12 col-lg-4">';
+  html += '<div class="fw-semibold small mb-2">Monthly Opt-in Trend <i class="bi bi-info-circle text-muted" style="font-size:0.75rem;cursor:default" data-bs-toggle="tooltip" data-bs-placement="top" title="Number of opt-ins during the selected fiscal year."></i></div>';
+  html += '<div class="chart-container" style="min-height:260px;height:260px"><canvas id="cpi-chart3"></canvas></div>';
+  html += '</div>';
+
+  html += '<div class="col-12 col-lg-4">';
+  html += '<div class="fw-semibold small mb-2">Monthly Deal Progression Trend <small class="fw-normal">(opted-in UCs)</small> <i class="bi bi-info-circle text-muted" style="font-size:0.75rem;cursor:default" data-bs-toggle="tooltip" data-bs-placement="top" title="Number of UCs that have progressed during the selected fiscal year. No double-count within a month."></i></div>';
   html += '<div class="chart-container" style="min-height:260px;height:260px"><canvas id="cpi-chart4"></canvas></div>';
-  html += '</div></div>';
   html += '</div>';
 
-  // ── Column 3: Earned incentives by technology (tall)
-  html += '<div class="col-12 col-lg-4 d-flex flex-column">';
-  html += '<div class="card shadow-sm flex-grow-1"><div class="card-header fw-semibold d-flex justify-content-between align-items-center">';
-  html += '<span>Monthly Estimated Earned Incentives <i class="bi bi-info-circle text-muted ms-1" style="font-size:0.75rem;cursor:default" data-bs-toggle="tooltip" data-bs-placement="top" title="Amount of estimated earned incentives during the past 12 months."></i></span>';
-  html += '<div class="form-check form-switch mb-0 ms-3"><input class="form-check-input" type="checkbox" id="cpi-log-toggle"><label class="form-check-label small" for="cpi-log-toggle">Log scale</label></div>';
-  html += '</div><div class="card-body">';
-  html += '<div class="chart-container" style="min-height:580px;height:580px"><canvas id="cpi-chart5"></canvas></div>';
-  html += '</div></div>';
+  html += '<div class="col-12 col-lg-4">';
+  html += '<div class="fw-semibold small mb-2">Monthly Estimated Earned Incentives <i class="bi bi-info-circle text-muted" style="font-size:0.75rem;cursor:default" data-bs-toggle="tooltip" data-bs-placement="top" title="Amount of estimated earned incentives during the selected fiscal year."></i></div>';
+  html += '<div class="chart-container" style="min-height:260px;height:260px"><canvas id="cpi-chart5"></canvas></div>';
   html += '</div>';
 
-  html += '</div>'; // main row
+  html += '</div>'; // inner row
+  html += '</div></div>'; // card-body + card
 
   el.innerHTML = html;
 
   // Initialise tooltips
   el.querySelectorAll("[data-bs-toggle='tooltip']").forEach(function (t) { new bootstrap.Tooltip(t, { html: false }); });
+
+  // ── Compute available FY years from data date fields
+  // FY N = Aug (N-1) → Jul N.  e.g. FY26 = Aug 2025 → Jul 2026
+  var DATE_FIELDS_FOR_FY = [
+    "Adopt Rebate Start Date",
+    "Stage Completion Date(onboard)",
+    "Stage Completion Date(Use)",
+    "Stage Completion Date(Engage)",
+    "Stage Completion Date(Adopt)"
+  ];
+  var fyYears = new Set();
+  data.forEach(function (r) {
+    DATE_FIELDS_FOR_FY.forEach(function (f) {
+      var d = new Date(r[f]);
+      if (isNaN(d.getTime())) return;
+      // FY year: if month >= July (7), FY = year+1, else FY = year
+      var fy = d.getMonth() >= 7 ? d.getFullYear() + 1 : d.getFullYear();
+      fyYears.add(fy);
+    });
+  });
+  var fyList = Array.from(fyYears).sort(function (a, b) { return b - a; }); // descending
+
+  // Determine current FY
+  var _now = new Date();
+  var _currentFY = _now.getMonth() >= 7 ? _now.getFullYear() + 1 : _now.getFullYear();
+  var _selectedFY = fyList.indexOf(_currentFY) !== -1 ? _currentFY : (fyList[0] || _currentFY);
+
+  // Build FY toggle buttons
+  var fyToggleEl = document.getElementById("cpi-fy-toggle");
+  fyList.forEach(function (fy) {
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "btn btn-outline-primary" + (fy === _selectedFY ? " active" : "");
+    btn.textContent = "FY" + String(fy).slice(-2);
+    btn.dataset.fy = fy;
+    fyToggleEl.appendChild(btn);
+  });
+
+  fyToggleEl.addEventListener("click", function (e) {
+    var btn = e.target.closest("button[data-fy]");
+    if (!btn) return;
+    _selectedFY = parseInt(btn.dataset.fy, 10);
+    fyToggleEl.querySelectorAll("button").forEach(function (b) { b.classList.toggle("active", parseInt(b.dataset.fy, 10) === _selectedFY); });
+    buildCharts(document.getElementById("cpi-portfolio").value, document.getElementById("cpi-offer").value);
+  });
 
   // Portfolio change → refresh offer list
   document.getElementById("cpi-portfolio").addEventListener("change", function () {
@@ -267,12 +322,13 @@ function renderCPIAdopt(data) {
       "Collaboration":            "#7B3F91"
     };
 
-    // Build 12 month buckets ending with the current month
-    var now = new Date();
+    // Build 12 month buckets for the selected FY (Aug → Jul)
+    // FY N: months Aug(N-1), Sep(N-1), ..., Jul(N)
+    var fyStartYear = _selectedFY - 1; // Aug of this year starts the FY
     var monthLabels = [];
     var monthStarts = [];
-    for (var mi = 11; mi >= 0; mi--) {
-      var mDate = new Date(now.getFullYear(), now.getMonth() - mi, 1);
+    for (var mi = 0; mi < 12; mi++) {
+      var mDate = new Date(fyStartYear, 7 + mi, 1); // month 7 = August; JS Date handles overflow into next year
       monthLabels.push(mDate.toLocaleString("default", { month: "short" }) + " '" + String(mDate.getFullYear()).slice(-2));
       monthStarts.push(mDate);
     }

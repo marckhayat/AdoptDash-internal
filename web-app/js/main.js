@@ -541,7 +541,7 @@ function restoreUploadSection(cachedEntries) {
     '<div class="card shadow-sm border-warning mb-3">' +
     '<div class="card-header bg-warning bg-opacity-10 fw-semibold" style="font-size:0.9rem"><i class="bi bi-lock-fill me-2 text-warning"></i>Cisco-internal</div>' +
     '<div class="card-body p-4 text-center">' +
-    '<p class="text-muted small mb-3">Load a CPI data file from the shared OneDrive folder, filtered to a specific BE GEO ID.</p>' +
+    '<p class="text-muted small mb-3">Load a CPI data file from the shared OneDrive folder.</p>' +
     '<div class="mb-3 text-start">'+
     '<label class="form-label small fw-semibold mb-1"><i class="bi bi-person-badge-fill me-1"></i>Your Cisco username</label>' +
     '<div class="input-group input-group-sm" style="max-width:420px">' +
