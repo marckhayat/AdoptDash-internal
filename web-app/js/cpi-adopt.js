@@ -82,7 +82,7 @@ function renderCPIAdopt(data) {
   html += '</div></div></div>';
 
   html += '<div class="col-12 col-lg-4">';
-  html += '<div class="card shadow-sm h-100"><div class="card-header fw-semibold">Total Earned by Portfolio <i class="bi bi-info-circle text-muted ms-1" style="font-size:0.75rem;cursor:default" data-bs-toggle="tooltip" data-bs-placement="top" title="Total estimated earned incentives per portfolio (all-time, not filtered by FY)."></i></div><div class="card-body">';
+  html += '<div class="card shadow-sm h-100"><div class="card-header fw-semibold d-flex justify-content-between align-items-center"><span>Total Earned by Portfolio <i class="bi bi-info-circle text-muted ms-1" style="font-size:0.75rem;cursor:default" data-bs-toggle="tooltip" data-bs-placement="top" title="Total estimated earned incentives per portfolio (all-time, not filtered by FY)."></i></span><span id="cpi-chart6-total" class="fw-normal text-muted"></span></div><div class="card-body">';
   html += '<div class="chart-container" style="min-height:220px;height:220px"><canvas id="cpi-chart6"></canvas></div>';
   html += '</div></div></div>';
 
@@ -375,6 +375,12 @@ function renderCPIAdopt(data) {
     });
     var chart6Portfolios = allEarnPortfolios.filter(function (p) { return allEarnByPortfolio[p] > 0; });
     chart6Portfolios.sort(function (a, b) { return allEarnByPortfolio[b] - allEarnByPortfolio[a]; });
+    var chart6GrandTotal = chart6Portfolios.reduce(function (s, p) { return s + allEarnByPortfolio[p]; }, 0);
+    var chart6TotalFmt = Math.abs(chart6GrandTotal) >= 1000000 ? "$"+(chart6GrandTotal/1000000).toFixed(2)+"M"
+                       : Math.abs(chart6GrandTotal) >= 1000    ? "$"+(chart6GrandTotal/1000).toFixed(1)+"K"
+                       : "$"+Math.round(chart6GrandTotal).toLocaleString();
+    var t6El = document.getElementById("cpi-chart6-total");
+    if (t6El) { t6El.textContent = "Total: " + chart6TotalFmt; t6El.style.fontSize = "1rem"; t6El.style.fontWeight = "600"; t6El.style.color = "#555"; }
     var chart6Colors = chart6Portfolios.map(function (p, idx) {
       var fallback = ["#00BCF2","#E55400","#6BB700","#7B3F91","#FF8C00","#005B99"];
       return PORTFOLIO_COLORS[p] || fallback[idx % fallback.length];
