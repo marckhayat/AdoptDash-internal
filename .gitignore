@@ -1,9 +1,0 @@
-*.xlsm
-*.xlsx
-*.vba
-dashboard-context.md
-mapping.txt
-AdoptionDashboard_PBI/
-optimized_code*.vba
-Dashboard testing.py
-gcm-diagnose.log
