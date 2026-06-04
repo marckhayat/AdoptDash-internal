@@ -7,7 +7,7 @@ var APP_DATA = null;
 var APP_FILE_META = null;
 var APP_IS_DISTI = false;
 var APP_MULTI_SESSIONS = null; // { sessions: [...], fileMeta: {...} }
-var APP_VERSION = "v6.2";
+var APP_VERSION = "v6.3";
 
 // Workspan column names used to auto-detect the header row
 var KNOWN_COLUMNS = [
@@ -453,6 +453,7 @@ function restoreUploadSection(cachedEntries) {
   });
 
   // ── Compute week options: 2026W11 → current ISO week ──────────────────────
+  var savedRegion = localStorage.getItem("lci-region") || "EMEA";
   function getISOWeek(date) {
     var d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
     var day = d.getUTCDay() || 7;
@@ -556,8 +557,8 @@ function restoreUploadSection(cachedEntries) {
     '<div class="row g-2 mb-3 align-items-end">' +
     '<div class="col-auto"><label class="form-label small fw-semibold mb-1">Region</label>' +
     '<select id="lci-region" class="form-select form-select-sm">' +
-    '<option value="EMEA">EMEA</option><option value="AMER">AMER</option><option value="APJC">APJC</option><option value="DISTI">DISTI</option>' +
-    '</select></div>' +
+    ['EMEA','AMER','APJC','DISTI'].map(function(r){ return '<option value="'+r+'"'+(r===savedRegion?' selected':'')+'>'+r+'</option>'; }).join('') +
+    '</select></div>'+
     '<div class="col-auto"><label class="form-label small fw-semibold mb-1">Week</label>' +
     '<select id="lci-week" class="form-select form-select-sm">' + weekOptions + '</select></div>' +
     '<div class="col"><label class="form-label small fw-semibold mb-1">BE GEO ID(s) <span class="fw-normal text-muted" style="font-size:0.75rem">— Separate multiple IDs with comma or space.</span></label>' +
@@ -833,7 +834,10 @@ function restoreUploadSection(cachedEntries) {
   }
 
   ["lci-region","lci-week"].forEach(function (id) {
-    document.getElementById(id).addEventListener("change", updateLciHint);
+    document.getElementById(id).addEventListener("change", function () {
+      if (id === "lci-region") localStorage.setItem("lci-region", this.value);
+      updateLciHint();
+    });
   });
   updateLciHint();
 
