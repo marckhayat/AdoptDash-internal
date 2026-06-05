@@ -49,8 +49,6 @@ The dashboard loads data from a **Workspan export** (report 19849 for Partners, 
 - **File upload** — drag and drop or browse for a CSV/Excel Workspan export
 - **API** — connect directly to Workspan APIs to pull data without manual exports
 
-> The app runs entirely in your browser. No data is sent to any server.
-
 ---
 
 ## Requirements
@@ -62,7 +60,7 @@ The dashboard loads data from a **Workspan export** (report 19849 for Partners, 
 
 ## Releases & Updates
 
-The app automatically checks for new versions on load and notifies you if an update is available.
+The app automatically checks for new versions on load and notifies you if an update is available. This check only queries the public GitHub Releases API to compare version numbers — no usage data, user information, or IP addresses are ever collected or transmitted.
 
 All releases are available on the [Releases](https://github.com/marckhayat/AdoptDash/releases) page, each with a downloadable ZIP of the full app.
 
