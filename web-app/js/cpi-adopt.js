@@ -91,7 +91,7 @@ function renderCPIAdopt(data) {
   // ── Monthly charts group with shared FY toggle
   html += '<div class="card shadow-sm mb-2">';
   html += '<div class="card-header fw-semibold d-flex align-items-center justify-content-between flex-wrap gap-2">';
-  html += '<span>Monthly Trends</span>';
+  html += '<span>Monthly Trends <small class="fw-normal">for Opted-in UCs</small></span>';
   html += '<div class="d-flex align-items-center gap-2">';
   html += '<div class="btn-group btn-group-sm" id="cpi-fy-toggle" role="group"></div>';
   html += '<div class="form-check form-switch mb-0 ms-2"><input class="form-check-input" type="checkbox" id="cpi-log-toggle"><label class="form-check-label small" for="cpi-log-toggle">Log scale</label></div>';
@@ -100,18 +100,18 @@ function renderCPIAdopt(data) {
   html += '<div class="row g-4">';
 
   html += '<div class="col-12 col-lg-4">';
-  html += '<div class="fw-semibold small mb-2">Monthly Opt-in Trend <i class="bi bi-info-circle text-muted" style="font-size:0.75rem;cursor:default" data-bs-toggle="tooltip" data-bs-placement="top" title="Number of opt-ins during the selected fiscal year."></i></div>';
+  html += '<div class="fw-semibold small mb-2">Opt-in <i class="bi bi-info-circle text-muted" style="font-size:0.75rem;cursor:default" data-bs-toggle="tooltip" data-bs-placement="top" title="Number of opt-ins during the selected fiscal year."></i></div>';
   html += '<div class="chart-container" style="min-height:260px;height:260px"><canvas id="cpi-chart3"></canvas></div>';
   html += '</div>';
 
   html += '<div class="col-12 col-lg-4">';
-  html += '<div class="fw-semibold small mb-2">Monthly Deal Progression Trend <small class="fw-normal">(opted-in UCs)</small> <i class="bi bi-info-circle text-muted" style="font-size:0.75rem;cursor:default" data-bs-toggle="tooltip" data-bs-placement="top" title="Number of UCs that have progressed during the selected fiscal year. No double-count within a month."></i></div>';
+  html += '<div class="fw-semibold small mb-2">Use Case Progression <i class="bi bi-info-circle text-muted" style="font-size:0.75rem;cursor:default" data-bs-toggle="tooltip" data-bs-placement="top" title="Number of UCs that have progressed during the selected fiscal year. No double-count within a month."></i></div>';
   html += '<div class="chart-container" style="min-height:260px;height:260px"><canvas id="cpi-chart4"></canvas></div>';
   html += '</div>';
 
   html += '<div class="col-12 col-lg-4">';
   html += '<div class="fw-semibold small mb-2 d-flex justify-content-between align-items-center">';
-  html += '<span>Monthly Estimated Earned Incentives <i class="bi bi-info-circle text-muted" style="font-size:0.75rem;cursor:default" data-bs-toggle="tooltip" data-bs-placement="top" title="Amount of estimated earned incentives during the selected fiscal year."></i></span>';
+  html += '<span>Estimated Earned Incentives <i class="bi bi-info-circle text-muted" style="font-size:0.75rem;cursor:default" data-bs-toggle="tooltip" data-bs-placement="top" title="Amount of estimated earned incentives during the selected fiscal year."></i></span>';
   html += '<span id="cpi-chart5-total" class="text-muted fw-normal"></span>';
   html += '</div>';
   html += '<div class="chart-container" style="min-height:260px;height:260px"><canvas id="cpi-chart5"></canvas></div>';
