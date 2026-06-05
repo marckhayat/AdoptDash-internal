@@ -6,10 +6,11 @@
 // =============================================================================
 
 var IDB = (function () {
-  var DB_NAME    = "AdoptionDashboard";
-  var DB_VERSION = 1;
-  var STORE      = "datasets";
-  var _db        = null;
+  var DB_NAME      = "AdoptionDashboard";
+  var DB_VERSION   = 2;
+  var STORE        = "datasets";
+  var HANDLE_STORE = "fileHandles";
+  var _db          = null;
 
   function open() {
     return new Promise(function (resolve, reject) {
@@ -19,6 +20,9 @@ var IDB = (function () {
         var db = e.target.result;
         if (!db.objectStoreNames.contains(STORE)) {
           db.createObjectStore(STORE, { keyPath: "type" });
+        }
+        if (!db.objectStoreNames.contains(HANDLE_STORE)) {
+          db.createObjectStore(HANDLE_STORE, { keyPath: "type" });
         }
       };
       req.onsuccess  = function (e) { _db = e.target.result; resolve(_db); };
@@ -95,5 +99,53 @@ var IDB = (function () {
     });
   }
 
-  return { save: save, load: load, remove: remove, loadAll: loadAll, clearAll: clearAll, requestPersistence: requestPersistence };
+  function saveHandle(type, handle) {
+    return open().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        var tx    = db.transaction(HANDLE_STORE, "readwrite");
+        var store = tx.objectStore(HANDLE_STORE);
+        var req   = store.put({ type: type, handle: handle });
+        req.onsuccess = resolve;
+        req.onerror   = function (e) { reject(e.target.error); };
+      });
+    });
+  }
+
+  function loadHandle(type) {
+    return open().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        var tx    = db.transaction(HANDLE_STORE, "readonly");
+        var store = tx.objectStore(HANDLE_STORE);
+        var req   = store.get(type);
+        req.onsuccess = function (e) { resolve(e.target.result ? e.target.result.handle : null); };
+        req.onerror   = function (e) { reject(e.target.error); };
+      });
+    });
+  }
+
+  function removeHandle(type) {
+    return open().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        var tx    = db.transaction(HANDLE_STORE, "readwrite");
+        var store = tx.objectStore(HANDLE_STORE);
+        var req   = store.delete(type);
+        req.onsuccess = resolve;
+        req.onerror   = function (e) { reject(e.target.error); };
+      });
+    });
+  }
+
+  function clearAllHandles() {
+    return open().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        var tx    = db.transaction(HANDLE_STORE, "readwrite");
+        var store = tx.objectStore(HANDLE_STORE);
+        var req   = store.clear();
+        req.onsuccess = resolve;
+        req.onerror   = function (e) { reject(e.target.error); };
+      });
+    });
+  }
+
+  return { save: save, load: load, remove: remove, loadAll: loadAll, clearAll: clearAll, requestPersistence: requestPersistence, saveHandle: saveHandle, loadHandle: loadHandle, removeHandle: removeHandle, clearAllHandles: clearAllHandles };
 })();
