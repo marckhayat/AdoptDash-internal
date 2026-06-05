@@ -5,6 +5,32 @@
 // Output: array of enriched row objects with all computed columns
 // =============================================================================
 
+// ── Shared string sanitizer (applied to every string value before processing) ─
+function sanitizeValue(v) {
+  if (typeof v !== "string") return v;
+  // BOM and zero-width characters
+  v = v.replace(/^\uFEFF/, "");
+  v = v.replace(/[\u200B\u200C\u200D\u200E\u200F\uFEFF]/g, "");
+  // Smart quotes → straight quotes
+  v = v.replace(/[\u2018\u2019]/g, "'");
+  v = v.replace(/[\u201C\u201D]/g, '"');
+  // Non-breaking and special spaces → regular space
+  v = v.replace(/[\u00A0\u2002\u2003\u2009\u202F]/g, " ");
+  // Control characters (tabs, carriage returns, null bytes, etc.) → space
+  v = v.replace(/[\r\t\u0000-\u001F\u007F]/g, " ");
+  // Collapse multiple spaces
+  v = v.replace(/ {2,}/g, " ");
+  return v.trim();
+}
+
+function sanitizeRow(row) {
+  var out = {};
+  Object.keys(row).forEach(function(k) {
+    out[k] = sanitizeValue(row[k]);
+  });
+  return out;
+}
+
 function transformData(rawRows) {
 
   // ── Helpers ──────────────────────────────────────────────────────────────
@@ -125,7 +151,7 @@ function transformData(rawRows) {
 
   // ── Main transformation ───────────────────────────────────────────────────
   return rawRows.map(function (raw) {
-    var r = Object.assign({}, raw); // shallow copy
+    var r = sanitizeRow(Object.assign({}, raw)); // sanitize all string values first
 
     // Map disti columns to standard names
     if (window.APP_IS_DISTI) {

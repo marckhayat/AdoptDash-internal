@@ -17,10 +17,8 @@ function wsCleanHtml(text) {
   }
   text = text.replace(/<(p|br|div|li|tr)[^>]*>/gi, " ");
   text = text.replace(/<[^>]+>/g, "");
-  text = text.replace(/\xa0/g," ").replace(/\u2003/g," ").replace(/\u2002/g," ");
-  text = text.replace(/\?/g, "");
-  text = text.replace(/\s+/g, " ");
-  return text.trim();
+  // sanitizeValue handles the rest (spaces, control chars, smart quotes, zero-width, BOM)
+  return sanitizeValue(text);
 }
 
 function wsCleanColumnNames(row) {
