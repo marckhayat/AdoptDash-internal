@@ -77,13 +77,13 @@ function renderCPIAdopt(data) {
   html += '</div></div></div>';
 
   html += '<div class="col-12 col-lg-4">';
-  html += '<div class="card shadow-sm h-100"><div class="card-header fw-semibold d-flex justify-content-between align-items-center"><span>Total Estimated Earned by Portfolio <i class="bi bi-info-circle text-muted ms-1" style="font-size:0.75rem;cursor:default" data-bs-toggle="tooltip" data-bs-placement="top" title="Total estimated earned incentives per portfolio (all-time, not filtered by FY)."></i></span><span id="cpi-chart6-total" class="fw-normal text-muted"></span></div><div class="card-body">';
-  html += '<div class="chart-container" style="min-height:220px;height:220px"><canvas id="cpi-chart6"></canvas></div>';
+  html += '<div class="card shadow-sm h-100"><div class="card-header fw-semibold d-flex justify-content-between align-items-center"><span>Current Potential Incentives <i class="bi bi-info-circle text-muted ms-1" style="font-size:0.75rem;cursor:default" data-bs-toggle="tooltip" data-bs-placement="top" title="Remaining potential incentives for opted-in Eligible deals, per portfolio."></i></span><span id="cpi-chart7-total" class="fw-normal text-muted"></span></div><div class="card-body">';
+  html += '<div class="chart-container" style="min-height:220px;height:220px"><canvas id="cpi-chart7"></canvas></div>';
   html += '</div></div></div>';
 
   html += '<div class="col-12 col-lg-4">';
-  html += '<div class="card shadow-sm h-100"><div class="card-header fw-semibold d-flex justify-content-between align-items-center"><span>Potential Incentives by Portfolio <i class="bi bi-info-circle text-muted ms-1" style="font-size:0.75rem;cursor:default" data-bs-toggle="tooltip" data-bs-placement="top" title="Remaining potential incentives for opted-in Eligible deals, per portfolio."></i></span><span id="cpi-chart7-total" class="fw-normal text-muted"></span></div><div class="card-body">';
-  html += '<div class="chart-container" style="min-height:220px;height:220px"><canvas id="cpi-chart7"></canvas></div>';
+  html += '<div class="card shadow-sm h-100"><div class="card-header fw-semibold d-flex justify-content-between align-items-center"><span>Total Estimated Earned Incentives <i class="bi bi-info-circle text-muted ms-1" style="font-size:0.75rem;cursor:default" data-bs-toggle="tooltip" data-bs-placement="top" title="Total estimated earned incentives per portfolio (all-time, not filtered by FY)."></i></span><span id="cpi-chart6-total" class="fw-normal text-muted"></span></div><div class="card-body">';
+  html += '<div class="chart-container" style="min-height:220px;height:220px"><canvas id="cpi-chart6"></canvas></div>';
   html += '</div></div></div>';
 
   html += '</div>'; // stat charts row

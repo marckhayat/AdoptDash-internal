@@ -7,7 +7,7 @@ var APP_DATA = null;
 var APP_FILE_META = null;
 var APP_IS_DISTI = false;
 var APP_MULTI_SESSIONS = null; // { sessions: [...], fileMeta: {...} }
-var APP_VERSION = "v6.3.3";
+var APP_VERSION = "v6.3.4";
 document.addEventListener("DOMContentLoaded", function () {
   var el = document.getElementById("app-version-label");
   if (el) el.textContent = APP_VERSION;
