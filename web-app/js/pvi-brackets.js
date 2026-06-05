@@ -8,7 +8,7 @@
 
 (function () {
 
-  // Onboard: score 2 = ≤10%, score 3 = >10-15%, ..., score 10 = >45%
+  // Onboard: score 2 = 0-10%, score 3 = >10-15%, ..., score 10 = >45%
   function onboardBrackets() {
     return [
       { gt: 0.45, score: 10 },
@@ -19,11 +19,11 @@
       { gt: 0.20, score: 5  },
       { gt: 0.15, score: 4  },
       { gt: 0.10, score: 3  },
-      { gt: 0,    score: 2  }
+      { gt: -1,   score: 2  }
     ];
   }
 
-  // Adopt: score 5 = ≤3%, score 6 = >3-6%, ..., score 10 = >15%
+  // Adopt: score 5 = 0-3%, score 6 = >3-6%, ..., score 10 = >15%
   function adoptBrackets() {
     return [
       { gt: 0.15, score: 10 },
@@ -31,7 +31,7 @@
       { gt: 0.09, score: 8  },
       { gt: 0.06, score: 7  },
       { gt: 0.03, score: 6  },
-      { gt: 0,    score: 5  }
+      { gt: -1,   score: 5  }
     ];
   }
 

@@ -55,7 +55,7 @@ function renderLifecycle(data) {
 
   // ── HTML
   var html = '<div class="disclaimer-card mb-3">';
-  html += 'Shows net booking value of maximum-incentive deals booked within the past 18 fiscal months, grouped by current lifecycle stage.';
+  html += 'The chart below depicts lifecycle progression using the net booking value of eligible SKUs. One use case per offer and CR Party ID is selected: preference is given to opted-in use cases, otherwise, the highest-incentive use case is chosen.';
   html += '</div>';
 
   html += '<div class="slicer-row mb-3">';
