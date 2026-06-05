@@ -144,35 +144,90 @@ function processPartnerFile(file) {
 
 
 // ── CSV path: PapaParse streams the file — handles millions of rows ──────────
-function handleCSV(file) {
-  Papa.parse(file, {
-    header: true,
-    skipEmptyLines: true,
-    dynamicTyping: false,  // keep raw strings; transform.js handles types
-    worker: false,
-    step: null,
-    complete: function(results) {
-      if (!results.data || results.data.length === 0) {
-        restoreUploadSection();
-        alert("The CSV file appears to be empty or has no data rows.");
-        return;
-      }
-      updateLoaderMsg("Processing " + results.data.length.toLocaleString() + " rows…");
-      setTimeout(function() {
-        try {
-          APP_DATA = transformData(results.data);
-          finishLoad(file.name, APP_DATA.length, false, "ws-" + file.name);
-        } catch(err) {
-          restoreUploadSection([]);
-          console.error(err);
-          alert("Error processing data: " + err.message);
+
+// Workspan CSV exports quote every field but does NOT escape inner double-quotes
+// as "" (RFC 4180). The only real field-closing quote is one immediately followed
+// by , \r \n or end-of-string. Every other " inside a field is a literal character
+// and gets escaped as "" so PapaParse can handle it correctly.
+function fixUnescapedCsvQuotes(text) {
+  var out = [];
+  var i = 0;
+  var len = text.length;
+  while (i < len) {
+    var ch = text[i];
+    if (ch === '"') {
+      out.push('"');
+      i++;
+      // Scan inside a quoted field
+      while (i < len) {
+        var c = text[i];
+        if (c === '"') {
+          var next = i + 1 < len ? text[i + 1] : null;
+          if (next === null || next === ',' || next === '\r' || next === '\n') {
+            // Only a real field-closing quote if followed by delimiter/newline/end
+            out.push('"');
+            i++;
+            break;
+          } else {
+            // Literal " inside the field — escape it
+            out.push('""');
+            i++;
+          }
+        } else {
+          out.push(c);
+          i++;
         }
-      }, 50);
-    },
-    error: function(err) {
-      restoreUploadSection();
-      alert("Error reading CSV: " + err.message);
+      }
+    } else {
+      out.push(ch);
+      i++;
     }
+  }
+  return out.join('');
+}
+
+function readFileAsText(file) {
+  return new Promise(function (resolve, reject) {
+    var reader = new FileReader();
+    reader.onload  = function (e) { resolve(e.target.result); };
+    reader.onerror = function ()  { reject(new Error('Failed to read file as text')); };
+    reader.readAsText(file);
+  });
+}
+
+function handleCSV(file) {
+  readFileAsText(file).then(function (rawText) {
+    var text = fixUnescapedCsvQuotes(rawText);
+    Papa.parse(text, {
+      header: true,
+      skipEmptyLines: true,
+      dynamicTyping: false,  // keep raw strings; transform.js handles types
+      complete: function(results) {
+        if (!results.data || results.data.length === 0) {
+          restoreUploadSection();
+          alert("The CSV file appears to be empty or has no data rows.");
+          return;
+        }
+        updateLoaderMsg("Processing " + results.data.length.toLocaleString() + " rows…");
+        setTimeout(function() {
+          try {
+            APP_DATA = transformData(results.data);
+            finishLoad(file.name, APP_DATA.length, false, "ws-" + file.name);
+          } catch(err) {
+            restoreUploadSection([]);
+            console.error(err);
+            alert("Error processing data: " + err.message);
+          }
+        }, 50);
+      },
+      error: function(err) {
+        restoreUploadSection();
+        alert("Error reading CSV: " + err.message);
+      }
+    });
+  }).catch(function (err) {
+    restoreUploadSection();
+    alert("Error reading CSV file: " + err.message);
   });
 }
 
@@ -1123,12 +1178,13 @@ function processCpiFile(file, region, week, idsToLoad) {
   }
 
   showLoader("Reading CPI file…");
-  Papa.parse(file, {
-    header: true,
-    skipEmptyLines: true,
-    dynamicTyping: false,
-    worker: false,
-    complete: function (results) {
+  readFileAsText(file).then(function (rawText) {
+    var text = fixUnescapedCsvQuotes(rawText);
+    Papa.parse(text, {
+      header: true,
+      skipEmptyLines: true,
+      dynamicTyping: false,
+      complete: function (results) {
       try {
         if (!results.data || results.data.length === 0) throw new Error("No data found in CSV.");
 
@@ -1218,6 +1274,11 @@ function processCpiFile(file, region, week, idsToLoad) {
       alert("Error reading CSV: " + err.message);
     }
   });
+  }).catch(function (err) {
+    PENDING_FILE_HANDLE = null;
+    IDB.loadAll().then(function(en) { restoreUploadSection(en); });
+    alert("Error reading CPI file: " + err.message);
+  });
 }
 
 // ── Refresh a session from its stored FileSystemFileHandle ───────────────────
@@ -1254,38 +1315,44 @@ function refreshFromHandle(type) {
 
 function refreshCpiFromHandle(file, geoId) {
   showLoader("Re-reading CPI file…");
-  Papa.parse(file, {
-    header: true,
-    skipEmptyLines: true,
-    dynamicTyping: false,
-    worker: false,
-    complete: function (results) {
-      try {
-        if (!results.data || results.data.length === 0) throw new Error("No data found in CSV.");
-        var rows = results.data.filter(function(r) {
-          return String(r["BE GEO ID"] || "").trim() === geoId;
-        });
-        if (rows.length === 0) throw new Error("No data found for BE GEO ID " + geoId + " in this file.");
-        var rawKeys = Object.keys(results.data[0] || {});
-        var rawDistiKey = rawKeys.find(function(k) { return k.trim().toLowerCase() === "disti name"; });
-        var rawIsDisti = rawDistiKey && results.data.some(function(r) {
-          return r[rawDistiKey] && String(r[rawDistiKey]).trim() !== "";
-        });
-        window.APP_IS_DISTI = !!rawIsDisti;
-        APP_DATA = transformData(rows);
-        APP_FILE_META = { name: file.name, lastModified: file.lastModified ? new Date(file.lastModified) : null };
-        finishLoad(file.name + " · BE GEO ID " + geoId, APP_DATA.length, false, "cpi-" + geoId);
-      } catch (err) {
+  readFileAsText(file).then(function (rawText) {
+    var text = fixUnescapedCsvQuotes(rawText);
+    Papa.parse(text, {
+      header: true,
+      skipEmptyLines: true,
+      dynamicTyping: false,
+      complete: function (results) {
+        try {
+          if (!results.data || results.data.length === 0) throw new Error("No data found in CSV.");
+          var rows = results.data.filter(function(r) {
+            return String(r["BE GEO ID"] || "").trim() === geoId;
+          });
+          if (rows.length === 0) throw new Error("No data found for BE GEO ID " + geoId + " in this file.");
+          var rawKeys = Object.keys(results.data[0] || {});
+          var rawDistiKey = rawKeys.find(function(k) { return k.trim().toLowerCase() === "disti name"; });
+          var rawIsDisti = rawDistiKey && results.data.some(function(r) {
+            return r[rawDistiKey] && String(r[rawDistiKey]).trim() !== "";
+          });
+          window.APP_IS_DISTI = !!rawIsDisti;
+          APP_DATA = transformData(rows);
+          APP_FILE_META = { name: file.name, lastModified: file.lastModified ? new Date(file.lastModified) : null };
+          finishLoad(file.name + " · BE GEO ID " + geoId, APP_DATA.length, false, "cpi-" + geoId);
+        } catch (err) {
+          PENDING_FILE_HANDLE = null;
+          IDB.loadAll().then(function(en) { restoreUploadSection(en); });
+          alert("Error refreshing CPI data: " + err.message);
+        }
+      },
+      error: function (err) {
         PENDING_FILE_HANDLE = null;
         IDB.loadAll().then(function(en) { restoreUploadSection(en); });
-        alert("Error refreshing CPI data: " + err.message);
+        alert("Error reading file: " + err.message);
       }
-    },
-    error: function (err) {
-      PENDING_FILE_HANDLE = null;
-      IDB.loadAll().then(function(en) { restoreUploadSection(en); });
-      alert("Error reading file: " + err.message);
-    }
+    });
+  }).catch(function (err) {
+    PENDING_FILE_HANDLE = null;
+    IDB.loadAll().then(function(en) { restoreUploadSection(en); });
+    alert("Error reading file: " + err.message);
   });
 }
 
