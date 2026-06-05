@@ -2,12 +2,20 @@
 // main.js — Application entry point
 // =============================================================================
 
+// Global error handler — logs full stack to console for debugging
+window.addEventListener("error", function (e) {
+  console.error("[AdoptDash error]", e.message, "\nat", e.filename, "line", e.lineno, "\n", e.error && e.error.stack ? e.error.stack : "(no stack)");
+});
+window.addEventListener("unhandledrejection", function (e) {
+  console.error("[AdoptDash unhandled promise rejection]", e.reason && e.reason.stack ? e.reason.stack : e.reason);
+});
+
 // Store file metadata globally so tabs can access it
 var APP_DATA = null;
 var APP_FILE_META = null;
 var APP_IS_DISTI = false;
 var APP_MULTI_SESSIONS = null; // { sessions: [...], fileMeta: {...} }
-var APP_VERSION = "v6.4";
+var APP_VERSION = "v6.5";
 // Holds a FileSystemFileHandle from showOpenFilePicker() to be persisted after load
 var PENDING_FILE_HANDLE = null;
 document.addEventListener("DOMContentLoaded", function () {
@@ -550,8 +558,8 @@ function restoreUploadSection(cachedEntries) {
     '<div class="col-12 col-lg-6">' +
 
     // Partner upload card
-    '<div class="card shadow-sm mb-3">' +
-    '<div class="card-header fw-semibold" style="font-size:0.9rem"><i class="bi bi-people-fill me-2 text-primary"></i>Partners</div>' +
+    '<div class="card shadow-sm border-primary mb-3">' +
+    '<div class="card-header bg-primary bg-opacity-10 fw-semibold" style="font-size:0.9rem"><i class="bi bi-people-fill me-2 text-primary"></i>Partners</div>' +
     '<div class="card-body p-4 text-center">' +
     // Toggle tabs
     '<ul class="nav nav-pills mb-3 justify-content-center" id="ws-load-tabs">' +
@@ -614,17 +622,21 @@ function restoreUploadSection(cachedEntries) {
     '<div class="card shadow-sm border-warning mb-3">' +
     '<div class="card-header bg-warning bg-opacity-10 fw-semibold" style="font-size:0.9rem"><i class="bi bi-lock-fill me-2 text-warning"></i>Cisco-internal</div>' +
     '<div class="card-body p-4 text-center">' +
-    '<p class="text-muted small mb-3">Load a CPI data file from the shared OneDrive folder. <i class="bi bi-browser-chrome me-1"></i><span class="text-muted">Chrome recommended for the best experience.</span></p>' +
+    '<p class="small mb-3"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="16" height="16" style="vertical-align:-2px;margin-right:4px"><path d="M50,0 A50,50 0 0,1 93.3,75 L50,50Z" fill="#EA4335"/><path d="M93.3,75 A50,50 0 0,1 6.7,75 L50,50Z" fill="#FBBC05"/><path d="M6.7,75 A50,50 0 0,1 50,0 L50,50Z" fill="#34A853"/><circle cx="50" cy="50" r="33" fill="white"/><circle cx="50" cy="50" r="20" fill="#4285F4"/></svg><strong>Chrome recommended for the best experience.</strong></p>' +
+    '<p class="text-muted small mb-3">Load a CPI data file from the shared OneDrive folder.</p>' +
     '<div class="mb-3 text-start">'+
     '<label class="form-label small fw-semibold mb-1"><i class="bi bi-person-badge-fill me-1"></i>Your Cisco username</label>' +
     '<div class="input-group input-group-sm" style="max-width:420px">' +
     '<input type="text" id="lci-username" class="form-control form-control-sm" placeholder="e.g. jsmith" style="font-family:monospace"/>' +
     '</div>' +
-    '<div class="mt-2 collapse" id="lci-path-advanced">'+
-    '<label class="form-label small fw-semibold mb-1"><i class="bi bi-folder me-1"></i>Full base path <span class="text-muted fw-normal">(auto-filled, override if needed)</span></label>' +
+    '<div class="mt-2" id="lci-path-advanced">'+
+    '<label class="form-label small fw-semibold mb-1"><i class="bi bi-folder me-1"></i>Base folder <span class="text-muted fw-normal">(auto-filled from username, or pick manually)</span></label>' +
+    '<div class="d-flex gap-2 align-items-center">' +
     '<input type="text" id="lci-basepath" class="form-control form-control-sm" style="font-family:monospace;font-size:0.78rem"/>' +
+    '<button id="lci-browse-folder-btn" class="btn btn-sm btn-outline-secondary flex-shrink-0" title="Browse for folder"><i class="bi bi-folder2-open"></i></button>' +
     '</div>' +
-    '<a href="#" class="small" id="lci-toggle-advanced">Advanced: edit full path manually</a>' +
+    '</div>' +
+    '<a href="#" class="small" id="lci-toggle-advanced">Advanced: set base folder</a>' +
     '</div>' +
     '<div class="row g-2 mb-3 align-items-end">' +
     '<div class="col-auto"><label class="form-label small fw-semibold mb-1">Region</label>' +
@@ -882,8 +894,8 @@ function restoreUploadSection(cachedEntries) {
   function buildBasePath(username) {
     if (!username) return "";
     return isMac
-      ? "/Users/" + username + "/Library/CloudStorage/OneDrive-Cisco/Documents - CX Partner Success TEAM/PCSS Team/Dashboards and Reporting Metrics/Adoption Dashboard"
-      : "C:\\Users\\" + username + "\\OneDrive - Cisco\\Documents - CX Partner Success TEAM\\PCSS Team\\Dashboards and Reporting Metrics\\Adoption Dashboard";
+      ? "/Users/" + username + "/Library/CloudStorage/OneDrive-Cisco/CXPO TEAM - Adoption Dashboard"
+      : "C:\\Users\\" + username + "\\OneDrive - Cisco\\CXPO TEAM - Adoption Dashboard";
   }
 
   // Restore saved username and base path
@@ -897,9 +909,30 @@ function restoreUploadSection(cachedEntries) {
   document.getElementById("lci-toggle-advanced").addEventListener("click", function (e) {
     e.preventDefault();
     var el = document.getElementById("lci-path-advanced");
-    var isShown = el.classList.contains("show");
-    el.classList.toggle("show", !isShown);
-    this.textContent = isShown ? "Advanced: edit full path manually" : "Hide full path";
+    var isShown = el.style.display !== "none" && el.offsetParent !== null;
+    el.style.display = isShown ? "none" : "block";
+    this.textContent = isShown ? "Advanced: set base folder" : "Hide";
+  });
+  // Hide by default
+  document.getElementById("lci-path-advanced").style.display = "none";
+
+  // Folder picker button — stores directory handle for direct file access
+  document.getElementById("lci-browse-folder-btn").addEventListener("click", function () {
+    if (typeof window.showDirectoryPicker !== "function") {
+      alert("Folder picker is only supported in Chrome/Edge. Please type the path manually.");
+      return;
+    }
+    window.showDirectoryPicker({ mode: "read" }).then(function (dirHandle) {
+      IDB.saveHandle("lci-dir-handle", dirHandle).catch(function(){});
+      // Update the basepath field with the folder name as confirmation
+      var el = document.getElementById("lci-basepath");
+      el.value = dirHandle.name + " (folder selected)";
+      el.style.color = "green";
+      localStorage.removeItem("lci-basepath"); // don't override with stale string
+      updateLciHint();
+    }).catch(function (err) {
+      if (err.name !== "AbortError") alert("Could not open folder picker: " + err.message);
+    });
   });
 
   // Username input → auto-build base path
@@ -1179,8 +1212,8 @@ function processCpiFile(file, region, week, idsToLoad) {
 
   showLoader("Reading CPI file…");
   readFileAsText(file).then(function (rawText) {
-    var text = fixUnescapedCsvQuotes(rawText);
-    Papa.parse(text, {
+    // CPI files are Cisco-internal and properly formatted — skip the Workspan quote fix
+    Papa.parse(rawText, {
       header: true,
       skipEmptyLines: true,
       dynamicTyping: false,
@@ -1316,8 +1349,7 @@ function refreshFromHandle(type) {
 function refreshCpiFromHandle(file, geoId) {
   showLoader("Re-reading CPI file…");
   readFileAsText(file).then(function (rawText) {
-    var text = fixUnescapedCsvQuotes(rawText);
-    Papa.parse(text, {
+    Papa.parse(rawText, {
       header: true,
       skipEmptyLines: true,
       dynamicTyping: false,
