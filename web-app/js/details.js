@@ -25,7 +25,7 @@ function renderDetails(data) {
     if (!v) return "";
     var d = (v instanceof Date) ? v : (typeof v === "number" ? new Date(Math.round((v-25569)*86400*1000)) : new Date(v));
     if (isNaN(d.getTime())) return String(v);
-    return d.toLocaleDateString("en-GB");
+    return d.toLocaleDateString(window.APP_LOCALE);
   }
 
   function toDate(x) {
@@ -233,8 +233,8 @@ function renderDetails(data) {
       fillEl.style.left  = ((fromVal - min) / (max - min) * 100) + "%";
       fillEl.style.right = ((max - toVal)   / (max - min) * 100) + "%";
     }
-    if (fromLbl) fromLbl.textContent = new Date(fromVal * 86400000).toLocaleDateString("en-GB");
-    if (toLbl)   toLbl.textContent   = new Date(toVal   * 86400000).toLocaleDateString("en-GB");
+    if (fromLbl) fromLbl.textContent = new Date(fromVal * 86400000).toLocaleDateString(window.APP_LOCALE);
+    if (toLbl)   toLbl.textContent   = new Date(toVal   * 86400000).toLocaleDateString(window.APP_LOCALE);
   }
 
   // Wire up filters
@@ -832,8 +832,8 @@ function renderDetails(data) {
     var minDay = epochDay(bounds.min), maxDay = epochDay(bounds.max);
     return '<div class="date-slider-group">' +
       '<div class="slider-val-display">' +
-      '<span id="' + prefix + '-from-lbl">' + bounds.min.toLocaleDateString("en-GB") + '</span>' +
-      '<span id="' + prefix + '-to-lbl">'   + bounds.max.toLocaleDateString("en-GB") + '</span>' +
+      '<span id="' + prefix + '-from-lbl">' + bounds.min.toLocaleDateString(window.APP_LOCALE) + '</span>' +
+      '<span id="' + prefix + '-to-lbl">'   + bounds.max.toLocaleDateString(window.APP_LOCALE) + '</span>' +
       '</div>' +
       '<div class="dual-range-wrap">' +
       '<div class="dual-range-track"></div>' +
@@ -998,7 +998,7 @@ function renderDetails(data) {
 
         // Filename
         var beGeoStr = Array.from(new Set(data.map(function(r){ return String(r["BE GEO ID"]||""); }).filter(Boolean))).join("-") || "export";
-        var dateStr = new Date().toLocaleDateString(undefined, { year:"numeric", month:"2-digit", day:"2-digit" })
+        var dateStr = new Date().toLocaleDateString(window.APP_LOCALE, { year:"numeric", month:"2-digit", day:"2-digit" })
           .replace(/\//g,"-").replace(/\./g,"-");
         XLS.utils.book_append_sheet(wb, ws, "Details");
         XLS.writeFile(wb, "AdoptDash_Details_" + beGeoStr + "_" + dateStr + ".xlsx");

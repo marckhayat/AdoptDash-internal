@@ -618,7 +618,7 @@ function renderOverview(data) {
 
         var beGeoStr = beGeoIds.length > 0 ? beGeoIds.join("-") : "unknown";
         var today = new Date();
-        var dateStr = today.toLocaleDateString(undefined, { year:"numeric", month:"2-digit", day:"2-digit" })
+        var dateStr = today.toLocaleDateString(window.APP_LOCALE, { year:"numeric", month:"2-digit", day:"2-digit" })
                            .replace(/\//g,"-").replace(/\./g,"-");
         XLS.utils.book_append_sheet(wb, ws, "Overview");
         XLS.writeFile(wb, "AdoptDash_Overview_" + beGeoStr + "_" + dateStr + ".xlsx");

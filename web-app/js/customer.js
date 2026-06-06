@@ -25,7 +25,7 @@ function renderCustomer(data) {
     if (!v) return "";
     var d = (v instanceof Date) ? v : (typeof v === "number" ? new Date(Math.round((v-25569)*86400*1000)) : new Date(v));
     if (isNaN(d.getTime())) return String(v);
-    return d.toLocaleDateString("en-GB");
+    return d.toLocaleDateString(window.APP_LOCALE);
   }
 
   function toDate(x) {
@@ -394,7 +394,7 @@ function renderCustomer(data) {
         ws["!rows"] = sheetData.map(function (_, ri) { return ri === 0 ? { hpt: 30 } : { hpt: 18 }; });
 
         var beGeoStr = Array.from(new Set(data.map(function (r) { return String(r["BE GEO ID"] || ""); }).filter(Boolean))).join("-") || "export";
-        var dateStr = new Date().toLocaleDateString(undefined, { year:"numeric", month:"2-digit", day:"2-digit" }).replace(/\//g,"-").replace(/\./g,"-");
+        var dateStr = new Date().toLocaleDateString(window.APP_LOCALE, { year:"numeric", month:"2-digit", day:"2-digit" }).replace(/\//g,"-").replace(/\./g,"-");
         XLS.utils.book_append_sheet(wb, ws, "Customers");
         XLS.writeFile(wb, "AdoptDash_Customers_" + beGeoStr + "_" + dateStr + ".xlsx");
       } catch (err) {
