@@ -53,8 +53,8 @@ The dashboard loads data from a **Workspan export** (report 19849 for Partners, 
 
 ## Requirements
 
-- A modern browser (Chrome, Edge, Firefox, Safari)
-- No installation or internet connection required after download
+- A modern browser (Chrome recommended for the best experience)
+- The app loads several libraries from CDN (Bootstrap, Chart.js, SheetJS, xlsx-js-style, PapaParse). Without internet, the app will not load.
 
 ---
 

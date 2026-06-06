@@ -116,9 +116,29 @@ function renderLifecycle(data) {
     buildChart(portfolioSel.value, this.value);
   });
 
-  buildChart("", "");
+  // Restore persisted filter state
+  var _lcSaved = window.APP_FILTER_STATE && window.APP_FILTER_STATE.lifecycle;
+  if (_lcSaved) {
+    if (_lcSaved.portfolio) {
+      portfolioSel.value = _lcSaved.portfolio;
+      var _lcOffers = Array.from(new Set(data.filter(function(r){ return r["Deal CPI Portfolio"] === _lcSaved.portfolio; }).map(function(r){ return r["Track"]; }))).sort();
+      offerSel.innerHTML = '<option value="">All Offers</option>';
+      _lcOffers.forEach(function(o){ offerSel.innerHTML += '<option value="'+o.replace(/"/g,'&quot;')+'">'+o+'</option>'; });
+    }
+    if (_lcSaved.offer) offerSel.value = _lcSaved.offer;
+    if (_lcSaved.chartMode) {
+      chartMode = _lcSaved.chartMode;
+      btnColumn.className    = chartMode === "column"    ? "btn btn-cisco" : "btn btn-outline-secondary";
+      btnWaterfall.className = chartMode === "waterfall" ? "btn btn-cisco" : "btn btn-outline-secondary";
+    }
+  }
+
+  buildChart(portfolioSel.value, offerSel.value);
 
   function buildChart(portfolioFilter, offerFilter) {
+    if (window.APP_FILTER_STATE) {
+      window.APP_FILTER_STATE.lifecycle = { portfolio: portfolioFilter, offer: offerFilter, chartMode: chartMode };
+    }
     var now    = new Date();
     var cutoff = new Date(now.getFullYear(), now.getMonth() - 17, 1);
 

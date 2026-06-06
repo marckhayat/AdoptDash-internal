@@ -13,9 +13,10 @@ window.addEventListener("unhandledrejection", function (e) {
 // Store file metadata globally so tabs can access it
 var APP_DATA = null;
 var APP_FILE_META = null;
+var APP_FILTER_STATE = { details: null, lifecycle: null, cpiAdopt: null, customer: null };
 var APP_IS_DISTI = false;
 var APP_MULTI_SESSIONS = null; // { sessions: [...], fileMeta: {...} }
-var APP_VERSION = "v6.5";
+var APP_VERSION = "v6.6";
 // Holds a FileSystemFileHandle from showOpenFilePicker() to be persisted after load
 var PENDING_FILE_HANDLE = null;
 document.addEventListener("DOMContentLoaded", function () {
@@ -1569,6 +1570,7 @@ function resetApp() {
   // Clear all tab panes and hide tab content until data is loaded
   APP_DATA = null;
   window.APP_DATA = null;
+  APP_FILTER_STATE = { details: null, lifecycle: null, cpiAdopt: null, customer: null };
   document.getElementById("mainTabContent").classList.add("d-none");
   ["tab-overview","tab-details","tab-customer","tab-pvi","tab-lifecycle","tab-cpi-adopt"].forEach(function (id) {
     var pane = document.getElementById(id);
@@ -1591,6 +1593,7 @@ function resetApp() {
 }
 
 window.APP_DATA        = APP_DATA;
+window.APP_FILTER_STATE = APP_FILTER_STATE;
 window.resetApp        = resetApp;
 window.renderActiveTab = renderActiveTab;
 

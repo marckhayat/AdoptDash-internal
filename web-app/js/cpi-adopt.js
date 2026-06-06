@@ -167,6 +167,7 @@ function renderCPIAdopt(data) {
     if (!btn) return;
     _selectedFY = parseInt(btn.dataset.fy, 10);
     fyToggleEl.querySelectorAll("button").forEach(function (b) { b.classList.toggle("active", parseInt(b.dataset.fy, 10) === _selectedFY); });
+    if (window.APP_FILTER_STATE && window.APP_FILTER_STATE.cpiAdopt) window.APP_FILTER_STATE.cpiAdopt.selectedFY = _selectedFY;
     buildMonthlyCharts(document.getElementById("cpi-portfolio").value, document.getElementById("cpi-offer").value);
   });
 
@@ -186,12 +187,44 @@ function renderCPIAdopt(data) {
 
   document.getElementById("cpi-log-toggle").addEventListener("change", function () {
     _cpiChart5Log = this.checked;
+    if (window.APP_FILTER_STATE && window.APP_FILTER_STATE.cpiAdopt) window.APP_FILTER_STATE.cpiAdopt.logScale = _cpiChart5Log;
     buildMonthlyCharts(document.getElementById("cpi-portfolio").value, document.getElementById("cpi-offer").value);
   });
 
-  buildCharts("", "");
+  // Restore persisted filter state
+  var _cpiSaved = window.APP_FILTER_STATE && window.APP_FILTER_STATE.cpiAdopt;
+  if (_cpiSaved) {
+    var _cpiPfEl = document.getElementById("cpi-portfolio");
+    var _cpiOfEl = document.getElementById("cpi-offer");
+    if (_cpiSaved.portfolio && _cpiPfEl) {
+      _cpiPfEl.value = _cpiSaved.portfolio;
+      _cpiOfEl.innerHTML = '<option value="">All Offers</option>';
+      Array.from(offersByPortfolio[_cpiSaved.portfolio] || []).sort().forEach(function(o){
+        _cpiOfEl.innerHTML += '<option value="'+o.replace(/"/g,'&quot;')+'">'+o+'</option>';
+      });
+    }
+    if (_cpiSaved.offer && _cpiOfEl) _cpiOfEl.value = _cpiSaved.offer;
+    if (_cpiSaved.selectedFY && fyList.indexOf(_cpiSaved.selectedFY) !== -1) {
+      _selectedFY = _cpiSaved.selectedFY;
+      fyToggleEl.querySelectorAll("button").forEach(function(b){ b.classList.toggle("active", parseInt(b.dataset.fy,10) === _selectedFY); });
+    }
+    if (_cpiSaved.logScale) {
+      _cpiChart5Log = true;
+      var _logEl = document.getElementById("cpi-log-toggle");
+      if (_logEl) _logEl.checked = true;
+    }
+  }
+
+  buildCharts(
+    (document.getElementById("cpi-portfolio") || {value:""}).value,
+    (document.getElementById("cpi-offer")     || {value:""}).value
+  );
 
   function buildCharts(portfolioFilter, offerFilter) {
+    if (window.APP_FILTER_STATE) {
+      var _prevIncentiveMode = window.APP_FILTER_STATE.cpiAdopt && window.APP_FILTER_STATE.cpiAdopt.incentiveMode;
+      window.APP_FILTER_STATE.cpiAdopt = { portfolio: portfolioFilter, offer: offerFilter, selectedFY: _selectedFY, logScale: _cpiChart5Log, incentiveMode: _prevIncentiveMode || "eligible" };
+    }
     buildStatCharts(portfolioFilter, offerFilter);
     buildMonthlyCharts(portfolioFilter, offerFilter);
   }
@@ -255,7 +288,7 @@ function renderCPIAdopt(data) {
     });
 
     // ── Chart 2b: Pie — breakdown using Potential Incentives field, with toggle
-    var _incentiveMode = "eligible";
+    var _incentiveMode = (_cpiSaved && _cpiSaved.incentiveMode) ? _cpiSaved.incentiveMode : "eligible";
     var _incentiveDatasets = {
       "eligible": {
         data:   [eligEarned, eligPotential, eligNotOptedMax, eligMissed],
@@ -339,11 +372,11 @@ function renderCPIAdopt(data) {
     _cpiChart2b = new Chart(ctx2b, {
       type: "doughnut",
       data: {
-        labels: _incentiveDatasets["eligible"].labels.slice(),
-        _optedInSlices: _incentiveDatasets["eligible"].optedInSlices,
+        labels: _incentiveDatasets[_incentiveMode].labels.slice(),
+        _optedInSlices: _incentiveDatasets[_incentiveMode].optedInSlices,
         datasets: [{
-          data: _incentiveDatasets["eligible"].data.slice(),
-          backgroundColor: _incentiveDatasets["eligible"].colors.slice(),
+          data: _incentiveDatasets[_incentiveMode].data.slice(),
+          backgroundColor: _incentiveDatasets[_incentiveMode].colors.slice(),
           borderWidth: 1
         }]
       },
@@ -369,14 +402,17 @@ function renderCPIAdopt(data) {
       },
       plugins: [optedInArcPlugin]
     });
-    renderIncentiveRatio("eligible");
+    renderIncentiveRatio(_incentiveMode);
 
+    // Apply active button state for restored mode
     var incentiveModeEl = document.getElementById("cpi-incentive-mode");
     if (incentiveModeEl) {
+      incentiveModeEl.querySelectorAll("button").forEach(function(b){ b.classList.toggle("active", b.dataset.mode === _incentiveMode); });
       incentiveModeEl.addEventListener("click", function (e) {
         var btn = e.target.closest("button[data-mode]");
         if (!btn) return;
         _incentiveMode = btn.dataset.mode;
+        if (window.APP_FILTER_STATE && window.APP_FILTER_STATE.cpiAdopt) window.APP_FILTER_STATE.cpiAdopt.incentiveMode = _incentiveMode;
         incentiveModeEl.querySelectorAll("button").forEach(function (b) { b.classList.toggle("active", b.dataset.mode === _incentiveMode); });
         var ds = _incentiveDatasets[_incentiveMode];
         _currentIncentiveTotal = ds.total;
