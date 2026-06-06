@@ -62,6 +62,14 @@ function renderDetails(data) {
   var currentStageOrder = ["Purchase","Onboard","Implement","Use","Engage","Adopt","Completed"];
   var ucMissedPreset = false;
 
+  // Restore sort state from saved session (filter DOM restored later, after DOM is built)
+  var _detSaved = window.APP_FILTER_STATE && window.APP_FILTER_STATE.details;
+  var _hadDeepLink = !!window._detDeepLink;
+  if (_detSaved) {
+    if (_detSaved.sortField) sortField = _detSaved.sortField;
+    if (_detSaved.sortDir)   sortDir   = _detSaved.sortDir;
+  }
+
   // ── Summary dedup measures
   function calcSummary(rows) {
     var customers = new Set();
@@ -281,7 +289,7 @@ function renderDetails(data) {
     var offerSel = document.getElementById("filter-offer");
     var prevOffer = offerSel.value;
     var filteredOffers = pf
-      ? CPI_MAPPING.filter(function (e) { return e.portfolio === pf; }).map(function (e) { return e.offer; }).filter(function (o, i, a) { return a.indexOf(o) === i; }).sort()
+      ? Array.from(new Set(data.filter(function(r){ return String(r["Deal CPI Portfolio"]||"") === pf; }).map(function(r){ return String(r["Track"]||""); }).filter(Boolean))).sort()
       : offerList;
     offerSel.innerHTML = '<option value="">All Offers</option>';
     filteredOffers.forEach(function (o) {
@@ -388,9 +396,106 @@ function renderDetails(data) {
     window._detDeepLink = null;
   }
 
+  // Restore persisted filter state if no deep-link was applied
+  if (_detSaved && !_hadDeepLink) {
+    _restoreDetailsState(_detSaved);
+    ["det-bk","det-rs","det-exp"].forEach(updateSliderDisplay);
+    updateStageSliderDisplay();
+  }
+
   applyFiltersAndRender();
 
+  function _restoreDetailsState(st) {
+    // Text inputs
+    var crEl = document.getElementById("filter-crparty");
+    if (crEl && st.crParty) {
+      crEl.value = st.crParty;
+      var crClr = document.getElementById("det-crparty-clear");
+      if (crClr) crClr.classList.remove("d-none");
+    }
+    var ttEl = document.getElementById("filter-2tpartner");
+    if (ttEl && st.twoTPartner) {
+      ttEl.value = st.twoTPartner;
+      var ttClr = document.getElementById("det-2tpartner-clear");
+      if (ttClr) ttClr.classList.remove("d-none");
+    }
+    // Portfolio → repopulate offer list → set offer → set UC → refreshUcDropdown
+    var pfEl = document.getElementById("filter-portfolio");
+    if (pfEl && st.portfolio) {
+      pfEl.value = st.portfolio;
+      var offerSel2 = document.getElementById("filter-offer");
+      if (offerSel2) {
+        var filteredOffers2 = Array.from(new Set(data.filter(function(r){ return String(r["Deal CPI Portfolio"]||"") === st.portfolio; }).map(function(r){ return String(r["Track"]||""); }).filter(Boolean))).sort();
+        offerSel2.innerHTML = '<option value="">All Offers</option>';
+        filteredOffers2.forEach(function(o){ offerSel2.innerHTML += '<option value="'+o.replace(/"/g,'&quot;')+'">'+o+'</option>'; });
+      }
+    }
+    var ofEl = document.getElementById("filter-offer");
+    var ucEl2 = document.getElementById("filter-uc");
+    if (ofEl  && st.offer) ofEl.value  = st.offer;
+    if (ucEl2 && st.uc)    ucEl2.value = st.uc;
+    refreshUcDropdown();
+    // Stage checkboxes
+    if (st.stageChecked && st.stageChecked.length) {
+      document.querySelectorAll('#filter-stage input[type=checkbox]').forEach(function(cb){ cb.checked = st.stageChecked.indexOf(cb.value) !== -1; });
+    }
+    // Opt-In checkboxes
+    if (st.optInChecked && st.optInChecked.length) {
+      document.querySelectorAll('#filter-optin input[type=checkbox]').forEach(function(cb){ cb.checked = st.optInChecked.indexOf(cb.value) !== -1; });
+    }
+    // Boolean checkboxes
+    var _boolMap = { offerOptedInY:"filter-offer-optedin-y", offerOptedInN:"filter-offer-optedin-n",
+      pviEligible:"filter-pvi-Eligible", pviOnboard:"filter-pvi-Onboard", pviAdopt:"filter-pvi-Adopt",
+      newEligible:"filter-new-eligible", expiresSoon:"filter-expires-soon",
+      earned:"filter-earned", ea:"filter-ea", aap:"filter-aap" };
+    Object.keys(_boolMap).forEach(function(key) {
+      var cbEl = document.getElementById(_boolMap[key]);
+      if (cbEl && st[key]) cbEl.checked = true;
+    });
+    // Sliders
+    [["det-bk-from","bkFrom"],["det-bk-to","bkTo"],["det-rs-from","rsFrom"],["det-rs-to","rsTo"],
+     ["det-exp-from","expFrom"],["det-exp-to","expTo"],["det-cs-from","csFrom"],["det-cs-to","csTo"]
+    ].forEach(function(p) {
+      var slEl = document.getElementById(p[0]);
+      if (slEl && st[p[1]] !== null && st[p[1]] !== undefined && st[p[1]] !== "") slEl.value = st[p[1]];
+    });
+    if (st.ucMissedPreset) ucMissedPreset = true;
+  }
+
   function applyFiltersAndRender() {
+    // Persist current filter state so it survives tab switching
+    if (window.APP_FILTER_STATE) {
+      window.APP_FILTER_STATE.details = {
+        sortField:     sortField,
+        sortDir:       sortDir,
+        ucMissedPreset: ucMissedPreset,
+        crParty:       (document.getElementById("filter-crparty")    || {value:""}).value,
+        twoTPartner:   (document.getElementById("filter-2tpartner")  || {value:""}).value,
+        portfolio:     (document.getElementById("filter-portfolio")  || {value:""}).value,
+        offer:         (document.getElementById("filter-offer")      || {value:""}).value,
+        uc:            (document.getElementById("filter-uc")         || {value:""}).value,
+        stageChecked:  getChecked("filter-stage"),
+        optInChecked:  getChecked("filter-optin"),
+        offerOptedInY: !!(document.getElementById("filter-offer-optedin-y") || {}).checked,
+        offerOptedInN: !!(document.getElementById("filter-offer-optedin-n") || {}).checked,
+        pviEligible:   !!(document.getElementById("filter-pvi-Eligible")    || {}).checked,
+        pviOnboard:    !!(document.getElementById("filter-pvi-Onboard")     || {}).checked,
+        pviAdopt:      !!(document.getElementById("filter-pvi-Adopt")       || {}).checked,
+        newEligible:   !!(document.getElementById("filter-new-eligible")    || {}).checked,
+        expiresSoon:   !!(document.getElementById("filter-expires-soon")    || {}).checked,
+        earned:        !!(document.getElementById("filter-earned")          || {}).checked,
+        ea:            !!(document.getElementById("filter-ea")              || {}).checked,
+        aap:           !!(document.getElementById("filter-aap")             || {}).checked,
+        bkFrom:        (document.getElementById("det-bk-from")  || {value:null}).value,
+        bkTo:          (document.getElementById("det-bk-to")    || {value:null}).value,
+        rsFrom:        (document.getElementById("det-rs-from")  || {value:null}).value,
+        rsTo:          (document.getElementById("det-rs-to")    || {value:null}).value,
+        expFrom:       (document.getElementById("det-exp-from") || {value:null}).value,
+        expTo:         (document.getElementById("det-exp-to")   || {value:null}).value,
+        csFrom:        (document.getElementById("det-cs-from")  || {value:null}).value,
+        csTo:          (document.getElementById("det-cs-to")    || {value:null}).value
+      };
+    }
     var twoTVal          = document.getElementById("filter-2tpartner") ? document.getElementById("filter-2tpartner").value.trim().toLowerCase() : "";
     var crPartyVal       = document.getElementById("filter-crparty").value.trim().toLowerCase();
     var stageChecked     = getChecked("filter-stage");
@@ -515,7 +620,13 @@ function renderDetails(data) {
     html += metricCard("$" + Math.round(s.missed).toLocaleString(),    "Total Missed");
     html += metricCard("$" + Math.round(s.potential).toLocaleString(), "Total Potential");
     html += metricCard("$" + Math.round(s.earned).toLocaleString(),    "Total Estimated Earned");
+    html += '<div class="d-flex align-items-center ms-auto">' +
+      '<button id="det-export-btn" class="btn btn-sm btn-outline-success" style="font-size:0.82rem;white-space:nowrap">' +
+      '<i class="bi bi-file-earmark-excel me-1"></i>Export to Excel</button></div>';
     document.getElementById("det-summary").innerHTML = html;
+    document.getElementById("det-export-btn").addEventListener("click", function () {
+      exportDetailsToXlsx(rows);
+    });
   }
 
   function metricCard(value, label) {
@@ -745,6 +856,159 @@ function renderDetails(data) {
       '<input type="range" class="range-from" id="' + prefix + '-from" min="0" max="' + maxIdx + '" value="0"       step="1">' +
       '<input type="range" class="range-to"   id="' + prefix + '-to"   min="0" max="' + maxIdx + '" value="' + maxIdx + '" step="1">' +
       '</div></div>';
+  }
+
+  // ── Export Details to XLSX ──────────────────────────────────────────────────
+  function exportDetailsToXlsx(rows) {
+    var btn = document.getElementById("det-export-btn");
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Exporting…'; }
+
+    setTimeout(function () {
+      try {
+        var XLS = (typeof XLSXStyle !== "undefined") ? XLSXStyle : XLSX;
+        var s = calcSummary(rows);
+
+        // Collect active filter labels
+        var activeFilters = [];
+        var crVal = document.getElementById("filter-crparty") ? document.getElementById("filter-crparty").value.trim() : "";
+        if (crVal) activeFilters.push("Customer/Deal: " + crVal);
+        var ttVal = document.getElementById("filter-2tpartner") ? document.getElementById("filter-2tpartner").value.trim() : "";
+        if (ttVal) activeFilters.push("2T Partner: " + ttVal);
+        var pfVal = document.getElementById("filter-portfolio") ? document.getElementById("filter-portfolio").value : "";
+        if (pfVal) activeFilters.push("Portfolio: " + pfVal);
+        var ofVal = document.getElementById("filter-offer") ? document.getElementById("filter-offer").value : "";
+        if (ofVal) activeFilters.push("Offer: " + ofVal);
+        var ucVal2 = document.getElementById("filter-uc") ? document.getElementById("filter-uc").value : "";
+        if (ucVal2) activeFilters.push("Use Case: " + ucVal2);
+        getChecked("filter-stage").forEach(function(v) { activeFilters.push("Stage: " + v); });
+        getChecked("filter-optin").forEach(function(v) { activeFilters.push("Opt-In: " + v); });
+        if (document.getElementById("filter-new-eligible") && document.getElementById("filter-new-eligible").checked) activeFilters.push("New Eligible");
+        if (document.getElementById("filter-expires-soon") && document.getElementById("filter-expires-soon").checked) activeFilters.push("Expires Soon (<3M)");
+        if (document.getElementById("filter-earned")       && document.getElementById("filter-earned").checked)       activeFilters.push("Earned");
+        if (document.getElementById("filter-ea")           && document.getElementById("filter-ea").checked)           activeFilters.push("EA");
+        if (document.getElementById("filter-aap")          && document.getElementById("filter-aap").checked)          activeFilters.push("AAP");
+
+        // Build sheet rows array
+        var sheetData = [];
+
+        // Summary block (rows 0-2)
+        sheetData.push(["Customers", s.customers,   "", "Total Missed",           "$" + Math.round(s.missed).toLocaleString()]);
+        sheetData.push(["Use Cases", s.useCases,     "", "Total Potential",        "$" + Math.round(s.potential).toLocaleString()]);
+        sheetData.push(["",          "",              "", "Total Estimated Earned", "$" + Math.round(s.earned).toLocaleString()]);
+
+        // Active filters — label in row 3, values in row 4, blank in row 5
+        sheetData.push(["Active Filters"]);
+        sheetData.push([activeFilters.length > 0 ? activeFilters.join("  |  ") : "None"]);
+        sheetData.push([]);
+
+        // Column definitions
+        var has2T = data.some(function(r){ return r["2T Partner Name"] && String(r["2T Partner Name"]).trim() !== ""; });
+        var colDefs = [
+          ...(has2T ? [{ label:"2T Partner Name", field:"2T Partner Name" }] : []),
+          { label:"CR Party Name",           field:"CR Party Name" },
+          { label:"CR Party ID",             field:"CR Party ID" },
+          { label:"CX Customer BU ID",       field:"CX Customer BU ID" },
+          { label:"Offer",                   field:"Track" },
+          { label:"Use Case",                field:"Sub-Track" },
+          { label:"Current Stage",           field:"Current stage" },
+          { label:"Days in Stage",           field:"Days in stage" },
+          { label:"Stage Progress",          field:"Current Stage Progress" },
+          { label:"Pending Tasks",           field:"Current stage pending tasks" },
+          { label:"Deal WS-ID",              field:"Deal WS-ID" },
+          { label:"Deal ID",                 field:"Deal ID" },
+          { label:"Expiry Date",             field:"Deal Incentive Expiry Date", isDate:true },
+          { label:"Missed Incentives",       field:"Missed Incentives",          isCurrency:true },
+          { label:"Potential Incentives",    field:"Potential Incentives",       isCurrency:true },
+          { label:"Est. Earned Incentives",  field:"Estimated Earned Incentives",isCurrency:true },
+          { label:"Opt-In Status",           field:"Adopt Rebate Opt-In Status" },
+          { label:"Stage",                   field:"Stage" },
+          { label:"Earned?",                 field:"Earned?" }
+        ];
+
+        var headerRow = colDefs.map(function(c){ return c.label; });
+        sheetData.push(headerRow);
+        var headerRowIdx = sheetData.length - 1;
+
+        rows.forEach(function(r) {
+          var row = colDefs.map(function(c) {
+            var v = r[c.field];
+            if (c.isCurrency) return (v === null || v === undefined || isNaN(v)) ? 0 : Math.round(v);
+            if (c.isDate) return fmtDate(v);
+            if (c.field === "Earned?") return v === true ? "Yes" : "No";
+            return (v === null || v === undefined) ? "" : String(v);
+          });
+          sheetData.push(row);
+        });
+
+        var wb = XLS.utils.book_new();
+        var ws = XLS.utils.aoa_to_sheet(sheetData);
+
+        // Column widths
+        ws["!cols"] = colDefs.map(function(c) {
+          if (c.isCurrency) return { wch: 22 };
+          if (c.field === "CR Party Name" || c.field === "2T Partner Name") return { wch: 35 };
+          if (c.field === "Deal WS-ID" || c.field === "Track") return { wch: 22 };
+          return { wch: 16 };
+        });
+
+        // Summary label/value styles
+        var summaryLabelStyle = { font: { bold: true, sz: 10 }, fill: { fgColor: { rgb: "E8F0FD" }, patternType: "solid" } };
+        var summaryValStyle   = { font: { sz: 10 }, alignment: { horizontal: "right" } };
+        [[0,0],[0,3],[1,0],[1,3],[2,3]].forEach(function(rc) {
+          var addr = XLS.utils.encode_cell({ r: rc[0], c: rc[1] });
+          if (ws[addr]) ws[addr].s = summaryLabelStyle;
+        });
+        [[0,1],[0,4],[1,1],[1,4],[2,4]].forEach(function(rc) {
+          var addr = XLS.utils.encode_cell({ r: rc[0], c: rc[1] });
+          if (ws[addr]) ws[addr].s = summaryValStyle;
+        });
+        var filterLabelAddr = XLS.utils.encode_cell({ r: 3, c: 0 });
+        if (ws[filterLabelAddr]) ws[filterLabelAddr].s = summaryLabelStyle;
+        var filterAddr = XLS.utils.encode_cell({ r: 4, c: 0 });
+        if (ws[filterAddr]) ws[filterAddr].s = { font: { italic: true, sz: 9, color: { rgb: "666666" } } };
+
+        // Header row style
+        var hdrFont = { bold: true, color: { rgb: "FFFFFF" }, sz: 10 };
+        var hdrFill = { fgColor: { rgb: "1B5FAD" }, patternType: "solid" };
+        headerRow.forEach(function(lbl, ci) {
+          var addr = XLS.utils.encode_cell({ r: headerRowIdx, c: ci });
+          if (!ws[addr]) ws[addr] = { v: lbl, t: "s" };
+          ws[addr].s = { font: hdrFont, fill: hdrFill, alignment: { horizontal: "center", wrapText: true } };
+        });
+
+        // Data rows — alternate shading + currency number format
+        rows.forEach(function(_, ri) {
+          var wsRow = headerRowIdx + 1 + ri;
+          var fillColor = ri % 2 === 0 ? "FFFFFF" : "F5F8FF";
+          colDefs.forEach(function(c, ci) {
+            var addr = XLS.utils.encode_cell({ r: wsRow, c: ci });
+            if (!ws[addr]) ws[addr] = { v: "", t: "s" };
+            ws[addr].s = { fill: { fgColor: { rgb: fillColor }, patternType: "solid" }, font: { sz: 9 } };
+            if (c.isCurrency && ws[addr].t === "n") {
+              ws[addr].z = '"$"#,##0';
+              ws[addr].s.alignment = { horizontal: "right" };
+            }
+          });
+        });
+
+        // Row heights
+        ws["!rows"] = sheetData.map(function(_, ri) {
+          return ri === headerRowIdx ? { hpt: 30 } : { hpt: 18 };
+        });
+
+        // Filename
+        var beGeoStr = Array.from(new Set(data.map(function(r){ return String(r["BE GEO ID"]||""); }).filter(Boolean))).join("-") || "export";
+        var dateStr = new Date().toLocaleDateString(undefined, { year:"numeric", month:"2-digit", day:"2-digit" })
+          .replace(/\//g,"-").replace(/\./g,"-");
+        XLS.utils.book_append_sheet(wb, ws, "Details");
+        XLS.writeFile(wb, "AdoptDash_Details_" + beGeoStr + "_" + dateStr + ".xlsx");
+      } catch(err) {
+        alert("Export failed: " + err.message);
+        console.error(err);
+      } finally {
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-file-earmark-excel me-1"></i>Export to Excel'; }
+      }
+    }, 50);
   }
 }
 

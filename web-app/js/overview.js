@@ -119,6 +119,18 @@ function renderOverview(data) {
 
   el.innerHTML = html;
 
+  // Add export button to the header bar
+  var headerBar = el.querySelector(".border-bottom");
+  if (headerBar) {
+    var exportBtn = document.createElement("button");
+    exportBtn.id = "ovw-export-btn";
+    exportBtn.className = "btn btn-sm btn-outline-success ms-auto";
+    exportBtn.innerHTML = '<i class="bi bi-file-earmark-excel me-1"></i>Export to Excel';
+    exportBtn.style.cssText = "font-size:0.82rem";
+    exportBtn.addEventListener("click", exportOverviewToXlsx);
+    headerBar.appendChild(exportBtn);
+  }
+
   renderTable();
 
   function getFiltered() { return data; }
@@ -394,6 +406,229 @@ function renderOverview(data) {
         }
       });
     }
+  }
+
+  // ── Export overview table to XLSX ─────────────────────────────────────────
+  function exportOverviewToXlsx() {
+    var btn = document.getElementById("ovw-export-btn");
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Exporting…'; }
+
+    setTimeout(function () {
+      try {
+        var fd = data;
+
+        // Column group colors (matching cg1–cg5 CSS shading)
+        var cgFill = {
+          cg1: "FFF3E0",  // orange tint
+          cg2: "E8F5E9",  // green tint
+          cg3: "FFF9C4",  // yellow tint
+          cg4: "FCE4EC",  // pink tint
+          cg5: "E3F2FD"   // blue tint
+        };
+        var colGroup = { E:"cg1",F:"cg1", G:"cg2",H:"cg2", I:"cg3",J:"cg3",K:"cg3", L:"cg4",M:"cg4", N:"cg5",O:"cg5",Q:"cg5" };
+        var cols = ["E","F","G","H","I","J","K","L","M","N","O","Q"];
+        var isCurrency = { F:1,H:1,J:1,K:1,M:1,O:1,Q:1 };
+
+        // Group header labels (plain text)
+        var groupLabels = [
+          "Not opted-in · Eligible","Not opted-in · Eligible","Not opted-in · Eligible · Onboard+Use","Not opted-in · Eligible · Onboard+Use",
+          "Not opted-in · Eligible · Engage","Not opted-in · Eligible · Engage","Not opted-in · Eligible · Engage",
+          "Not opted-in · Adopt/Expired","Not opted-in · Adopt/Expired",
+          "Opted-in","Opted-in","Opted-in"
+        ];
+        var colHeaders = [
+          "Total UC (customer count)","Total Potential Incentives",
+          "UC (customer count)","Potential Incentives",
+          "UC (customer count)","Missed Incentives","Potential Incentives",
+          "UC (customer count)","Missed Incentives",
+          "Active UC","Potential Incentives","Est. Earned Incentives"
+        ];
+
+        // Build grouped data
+        var groups = {};
+        var portfolioOrder = ["Networking","Security","Cloud","Cloud + AI Infrastructure","Collaboration"];
+        fd.forEach(function (r) {
+          var domain = r["Deal CPI Portfolio"] || "(No Portfolio)";
+          var offer  = r["Track"]              || "(No Offer)";
+          var uc     = r["Sub-Track"]          || "(No UC)";
+          var type   = r["Incentive Level"]    || "";
+          if (!groups[domain]) groups[domain] = {};
+          if (!groups[domain][offer]) groups[domain][offer] = {};
+          if (!groups[domain][offer][uc]) groups[domain][offer][uc] = {};
+          if (!groups[domain][offer][uc][type]) groups[domain][offer][uc][type] = [];
+          groups[domain][offer][uc][type].push(r);
+        });
+
+        var domainKeys = Object.keys(groups).sort(function (a, b) {
+          var ai = portfolioOrder.indexOf(a), bi = portfolioOrder.indexOf(b);
+          if (ai === -1 && bi === -1) return a.localeCompare(b);
+          if (ai === -1) return 1; if (bi === -1) return -1;
+          return ai - bi;
+        });
+
+        function calcRow(rows) {
+          var colE_ids = new Set();
+          rows.forEach(function(r){ if (!r["Offer opted-in?"] && (r["Stage"]||"").toUpperCase()==="ELIGIBLE") colE_ids.add(r["CR Party ID"]); });
+          var colE = colE_ids.size;
+          var colF = dedupeSum(rows.filter(function(r){ return !r["Offer opted-in?"] && (r["Stage"]||"").toUpperCase()==="ELIGIBLE"; }), "Potential Incentives");
+          var colG_ids = new Set(); rows.forEach(function(r){ if(r["UC 25-50% eligible w/o opt-in"]) colG_ids.add(r["CR Party ID"]); });
+          var colG = colG_ids.size;
+          var colH = dedupeSum(rows.filter(function(r){ return r["UC 25-50% eligible w/o opt-in"]; }), "Potential Incentives");
+          var colI_ids = new Set(); rows.forEach(function(r){ if(r["UC 75% eligible w/o opt-in"]) colI_ids.add(r["CR Party ID"]); });
+          var colI = colI_ids.size;
+          var colJ = dedupeSum(rows.filter(function(r){ return r["UC 75% eligible w/o opt-in"]; }), "Missed Incentives");
+          var colK = dedupeSum(rows.filter(function(r){ return r["UC 75% eligible w/o opt-in"]; }), "Potential Incentives");
+          var colL_ids = new Set(); rows.forEach(function(r){ if(r["UC progressed and missed w/o opt-in"]) colL_ids.add(r["CR Party ID"]); });
+          var colL = colL_ids.size;
+          var colM = dedupeSum(rows.filter(function(r){ return r["UC progressed and missed w/o opt-in"]; }), "Missed Incentives");
+          var colN = rows.filter(function(r){ return (r["Adopt Rebate Opt-In Status"]||"").toUpperCase()==="OPTED IN" && (r["Stage"]||"").toUpperCase()==="ELIGIBLE"; }).length;
+          var colO = 0; rows.forEach(function(r){ if((r["Adopt Rebate Opt-In Status"]||"").toUpperCase()==="OPTED IN" && (r["Stage"]||"").toUpperCase()==="ELIGIBLE") colO+=(r["Potential Incentives"]||0); });
+          var colP = rows.filter(function(r){ return r["Earned?"]===true; }).length;
+          var colQ = 0; rows.forEach(function(r){ colQ+=(r["Estimated Earned Incentives"]||0); });
+          return [colE,colF,colG,colH,colI,colJ,colK,colL,colM,colN,colO,colQ];
+        }
+        function dedupeSum(rows, field) {
+          var map = {};
+          rows.forEach(function(r){ var k=r["CRPartyID-Offer"]||"", v=r[field]||0; if(map[k]===undefined||v>map[k]) map[k]=v; });
+          var t=0; Object.keys(map).forEach(function(k){ t+=map[k]; }); return t;
+        }
+
+        // Build sheet data array
+        var sheetData = [];
+
+        // Row 1: group headers
+        var grpRow = ["Portfolio / Offer / Use Case"].concat(groupLabels);
+        sheetData.push(grpRow);
+        // Row 2: column headers
+        sheetData.push([""].concat(colHeaders));
+
+        var rowMeta = [null, null]; // track row type for styling
+
+        domainKeys.forEach(function(domain) {
+          sheetData.push([domain].concat(new Array(cols.length).fill("")));
+          rowMeta.push("portfolio");
+          Object.keys(groups[domain]).sort().forEach(function(offer) {
+            sheetData.push(["  " + offer].concat(new Array(cols.length).fill("")));
+            rowMeta.push("offer");
+            Object.keys(groups[domain][offer]).sort().forEach(function(uc) {
+              var ucAllRows = [];
+              Object.keys(groups[domain][offer][uc]).forEach(function(tp){ groups[domain][offer][uc][tp].forEach(function(r){ ucAllRows.push(r); }); });
+              var vals = calcRow(ucAllRows);
+              sheetData.push(["    " + uc].concat(vals));
+              rowMeta.push("uc");
+            });
+          });
+        });
+
+        // Totals row
+        var totalN=0, totalO=0, totalQ=0;
+        fd.forEach(function(r){
+          if((r["Adopt Rebate Opt-In Status"]||"").toUpperCase()==="OPTED IN" && (r["Stage"]||"").toUpperCase()==="ELIGIBLE"){ totalN++; totalO+=(r["Potential Incentives"]||0); }
+          totalQ+=(r["Estimated Earned Incentives"]||0);
+        });
+        var totalsVals = cols.map(function(c){ if(c==="N") return totalN; if(c==="O") return totalO; if(c==="Q") return totalQ; return ""; });
+        sheetData.push(["Totals"].concat(totalsVals));
+        rowMeta.push("totals");
+
+        // Create workbook
+        var XLS = (typeof XLSXStyle !== "undefined") ? XLSXStyle : XLSX;
+        var wb = XLS.utils.book_new();
+        var ws = XLS.utils.aoa_to_sheet(sheetData);
+
+        // Column widths
+        ws["!cols"] = [{ wch: 50 }].concat(cols.map(function(){ return { wch: 22 }; }));
+
+        // Merge group header cells
+        ws["!merges"] = [
+          { s:{r:0,c:1}, e:{r:0,c:2} },   // cg1
+          { s:{r:0,c:3}, e:{r:0,c:4} },   // cg2
+          { s:{r:0,c:5}, e:{r:0,c:7} },   // cg3
+          { s:{r:0,c:8}, e:{r:0,c:9} },   // cg4
+          { s:{r:0,c:10}, e:{r:0,c:12} }  // cg5
+        ];
+
+        // Apply styles using cell-by-cell approach
+        var numFmt = '"$"#,##0';
+        sheetData.forEach(function(row, ri) {
+          row.forEach(function(val, ci) {
+            var addr = XLS.utils.encode_cell({r:ri, c:ci});
+            if (!ws[addr]) ws[addr] = { v: val, t: typeof val === "number" ? "n" : "s" };
+
+            var style = { alignment: { vertical: "center" } };
+
+            if (ri === 0) {
+              // Group header row
+              style.font = { bold: true, sz: 10 };
+              style.alignment = { horizontal: "center", vertical: "center", wrapText: true };
+              if (ci >= 1) {
+                var cKey = cols[ci-1];
+                var cg = colGroup[cKey];
+                style.fill = { fgColor: { rgb: cgFill[cg] }, patternType: "solid" };
+              } else {
+                style.fill = { fgColor: { rgb: "F5F5F5" }, patternType: "solid" };
+              }
+              style.border = { bottom: { style: "thin", color: { rgb: "CCCCCC" } } };
+            } else if (ri === 1) {
+              // Column header row
+              style.font = { bold: true, sz: 9 };
+              style.alignment = { horizontal: "right", vertical: "center", wrapText: true };
+              if (ci >= 1) {
+                var cKey2 = cols[ci-1];
+                var cg2 = colGroup[cKey2];
+                style.fill = { fgColor: { rgb: cgFill[cg2] }, patternType: "solid" };
+              }
+              style.border = { bottom: { style: "medium", color: { rgb: "999999" } } };
+            } else {
+              var rType = rowMeta[ri];
+              if (rType === "portfolio") {
+                style.font = { bold: true, sz: 10 };
+                style.fill = { fgColor: { rgb: "E8E8E8" }, patternType: "solid" };
+              } else if (rType === "offer") {
+                style.font = { bold: true, sz: 9 };
+                style.fill = { fgColor: { rgb: "F5F5F5" }, patternType: "solid" };
+              } else if (rType === "totals") {
+                style.font = { bold: true, sz: 10 };
+                style.fill = { fgColor: { rgb: "EEEEEE" }, patternType: "solid" };
+                style.border = { top: { style: "medium", color: { rgb: "999999" } } };
+              }
+              // Color data cells by column group
+              if (ci >= 1 && (rType === "uc" || rType === "totals")) {
+                var cKey3 = cols[ci-1];
+                var cg3 = colGroup[cKey3];
+                style.fill = { fgColor: { rgb: cgFill[cg3] }, patternType: "solid" };
+              }
+              // Right-align numeric data cells
+              if (ci >= 1 && typeof val === "number") {
+                style.alignment = { horizontal: "right", vertical: "center" };
+                if (isCurrency[cols[ci-1]]) {
+                  ws[addr].z = numFmt;
+                }
+              }
+            }
+            ws[addr].s = style;
+          });
+        });
+
+        // Add row height hints
+        ws["!rows"] = sheetData.map(function(_, ri) {
+          if (ri === 0) return { hpt: 40 };
+          if (ri === 1) return { hpt: 36 };
+          return { hpt: 20 };
+        });
+
+        var beGeoStr = beGeoIds.length > 0 ? beGeoIds.join("-") : "unknown";
+        var today = new Date();
+        var dateStr = today.toLocaleDateString(undefined, { year:"numeric", month:"2-digit", day:"2-digit" })
+                           .replace(/\//g,"-").replace(/\./g,"-");
+        XLS.utils.book_append_sheet(wb, ws, "Overview");
+        XLS.writeFile(wb, "AdoptDash_Overview_" + beGeoStr + "_" + dateStr + ".xlsx");
+      } catch(err) {
+        alert("Export failed: " + err.message);
+        console.error(err);
+      } finally {
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-file-earmark-excel me-1"></i>Export to Excel'; }
+      }
+    }, 50);
   }
 
   function makeSelect(id, label, options) {
