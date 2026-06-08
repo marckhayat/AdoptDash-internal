@@ -1585,11 +1585,15 @@ function showDataNotifications(data) {
 
   // 1. New eligible deals booked in past 14 days with Maximum Incentive Deal Flag = Yes
   var newEligible = 0;
+  var newEligibleKeys = new Set();
   data.forEach(function(r) {
     var bd = pd(r["Booking Date"]);
     if (bd && bd >= past14 && bd <= now &&
         String(r["Stage"] || "").toUpperCase() === "ELIGIBLE" &&
-        String(r["Maximum Incentive Deal Flag"] || "").toUpperCase() === "YES") newEligible++;
+        String(r["Adopt Rebate Opt-In Status"] || "").toUpperCase() === "PENDING") {
+      newEligible++;
+      if (r["CRPartyID-Offer"]) newEligibleKeys.add(r["CRPartyID-Offer"]);
+    }
   });
 
   // 1b. Opt-ins in past 14 days (stage must be Eligible)
@@ -1645,14 +1649,14 @@ function showDataNotifications(data) {
       id: "notif-new",
       cls: "notif-new",
       icon: "bi-star-fill text-primary",
-      title: "New Eligible Deals",
+      title: "New Eligible Opportunities",
       preset: (function() {
         var _today14 = Math.floor(Date.now() / 86400000);
         var _from14  = _today14 - 14;
-        return { stage: ["ELIGIBLE", "PENDING"], bkFrom: _from14, bkTo: _today14 };
+        return { stage: ["ELIGIBLE"], optIn: ["PENDING"], bkFrom: _from14, bkTo: _today14 };
       })(),
       body: newEligible > 0
-        ? "<strong>" + newEligible.toLocaleString() + "</strong> new eligible deal" + (newEligible !== 1 ? "s" : "") + " booked in the past 14 days"
+        ? "<strong>" + newEligible.toLocaleString() + "</strong> new eligible opportunit" + (newEligible !== 1 ? "ies" : "y") + " booked in the past 14 days (" + newEligibleKeys.size.toLocaleString() + " unique)"
         : null
     },
     {
