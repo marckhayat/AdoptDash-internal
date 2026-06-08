@@ -16,7 +16,7 @@ var APP_FILE_META = null;
 var APP_FILTER_STATE = { details: null, lifecycle: null, cpiAdopt: null, customer: null };
 var APP_IS_DISTI = false;
 var APP_MULTI_SESSIONS = null; // { sessions: [...], fileMeta: {...} }
-var APP_VERSION = "v6.6.2";
+var APP_VERSION = "v6.7";
 // Use the browser's preferred language for date formatting (respects user's browser locale setting)
 var APP_LOCALE = navigator.language || undefined;
 // Holds a FileSystemFileHandle from showOpenFilePicker() to be persisted after load
@@ -69,6 +69,22 @@ function updateLoaderMsg(msg) {
   var el = document.getElementById("loader-msg");
   if (el) el.textContent = msg;
 }
+
+function showRefreshToast(msg) {
+  var existing = document.getElementById("refresh-toast");
+  if (existing) existing.remove();
+  var toast = document.createElement("div");
+  toast.id = "refresh-toast";
+  toast.style.cssText = "position:fixed;bottom:1.25rem;right:1.25rem;z-index:9999;background:#fff;border:1px solid #dee2e6;border-radius:.5rem;box-shadow:0 4px 16px rgba(0,0,0,.15);padding:.6rem 1rem;display:flex;align-items:center;gap:.6rem;font-size:.875rem;color:#333;min-width:200px;";
+  toast.innerHTML = '<div class="spinner-border spinner-border-sm text-primary flex-shrink-0" role="status"></div><span id="refresh-toast-msg">' + (msg || "Refreshing\u2026") + '</span>';
+  document.body.appendChild(toast);
+}
+
+function hideRefreshToast() {
+  var t = document.getElementById("refresh-toast");
+  if (t) t.remove();
+}
+
 
 // Find which row in the 2-D array contains the Workspan column headers.
 // Returns the row index, or -1 if nothing plausible is found.
@@ -478,7 +494,8 @@ function finishLoad(filename, rowCount, headerAutoDetected, idbType, loadedAt, f
 
   var activeTab = document.querySelector(".nav-link.active[data-bs-target]");
   renderActiveTab(activeTab ? activeTab.dataset.bsTarget : "#tab-overview");
-  if (!fromCache) showDataNotifications(APP_DATA);
+  if (!fromCache) window._dismissedNotifs = {};
+  showDataNotifications(APP_DATA);
 }
 
 function restoreUploadSection(cachedEntries) {
@@ -491,7 +508,7 @@ function restoreUploadSection(cachedEntries) {
     if (!iso) return "";
     var d = (iso instanceof Date) ? iso : new Date(iso);
     if (isNaN(d.getTime())) return "";
-    return d.toLocaleDateString("en-GB") + " " + d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+    return d.toLocaleDateString(APP_LOCALE) + " " + d.toLocaleTimeString(APP_LOCALE, { hour: "2-digit", minute: "2-digit" });
   }
 
   function resumeCard(entry) {
@@ -506,7 +523,7 @@ function restoreUploadSection(cachedEntries) {
     if (isCpi) {
       if (displayName) html += '<div class="fw-semibold small">' + displayName + '</div>';
     } else {
-      html += '<div class="fw-semibold small">' + entry.meta.filename + '</div>';
+      html += '<div class="fw-semibold small">' + (displayName || entry.meta.filename) + '</div>';
     }
     if (isCpi) {
       html += '<div class="text-muted" style="font-size:0.72rem">BE GEO ID ' + beGeoId + ' &middot; ' + (entry.meta.rowCount||0).toLocaleString() + ' rows</div>';
@@ -680,7 +697,7 @@ function restoreUploadSection(cachedEntries) {
         multiCards = APP_MULTI_SESSIONS.sessions.map(function(sess, i) {
           var name = sess.partnerName ? '<div class="fw-semibold small">' + sess.partnerName + '</div>' : '';
           var loadedAt = APP_MULTI_SESSIONS.loadedAt || null;
-          var dateStr = loadedAt ? (function(iso){ var d=new Date(iso); return isNaN(d)?'':(d.toLocaleDateString('en-GB')+' '+d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})); })(loadedAt) : '';
+          var dateStr = loadedAt ? (function(iso){ var d=new Date(iso); return isNaN(d)?'':(d.toLocaleDateString(APP_LOCALE)+' '+d.toLocaleTimeString(APP_LOCALE,{hour:'2-digit',minute:'2-digit'})); })(loadedAt) : '';
           var hasHandle = !!(APP_MULTI_SESSIONS && APP_MULTI_SESSIONS.hasHandle);
           return '<div class="col-6"><div class="card border-warning mb-0 p-2">' +
             '<div class="d-flex justify-content-between align-items-start gap-2">' +
@@ -701,7 +718,7 @@ function restoreUploadSection(cachedEntries) {
       if (!hasAny) return '';
       return '<div class="card shadow-sm border-warning">' +
         '<div class="card-header bg-warning bg-opacity-10 fw-semibold d-flex justify-content-between align-items-center gap-2" style="font-size:0.85rem"><span><i class="bi bi-lightning-charge-fill me-2 text-warning"></i>Previous sessions</span>' +
-        (isChrome ? '<button id="cpi-refresh-all-btn" class="btn btn-sm btn-outline-success py-0 flex-shrink-0" title="Refresh all previous sessions"><i class="bi bi-arrow-clockwise me-1"></i>Refresh all</button>' : '') +
+        (isChrome ? '<button id="cpi-refresh-all-btn" class="btn btn-sm btn-outline-primary py-0 flex-shrink-0" title="Refresh all previous sessions"><i class="bi bi-arrow-clockwise me-1"></i>Refresh all</button>' : '') +
         '</div>' +
         '<div class="card-body p-2" id="cpi-prev-sessions-body"><div class="row g-2">' +
         multiCards +
@@ -876,7 +893,13 @@ function restoreUploadSection(cachedEntries) {
 
   sec.querySelectorAll(".idb-refresh-btn").forEach(function (btn) {
     btn.addEventListener("click", function () {
-      refreshFromHandle(this.dataset.idbtype);
+      var type = this.dataset.idbtype;
+      showRefreshToast("Refreshing\u2026");
+      refreshFromHandle(type).then(function () {
+        hideRefreshToast();
+      }).catch(function () {
+        hideRefreshToast();
+      });
     });
   });
 
@@ -1328,7 +1351,7 @@ function processCpiFile(file, region, week, idsToLoad) {
 }
 
 // ── Refresh a session from its stored FileSystemFileHandle ───────────────────
-function refreshFromHandle(type) {
+function refreshFromHandle(type, cacheOnly) {
   if (typeof window.showOpenFilePicker === "undefined" && typeof FileSystemFileHandle === "undefined") {
     alert("Your browser does not support the File System Access API. Please use Chrome or Edge to use this feature.");
     return Promise.reject(new Error("File System Access API not supported."));
@@ -1347,11 +1370,14 @@ function refreshFromHandle(type) {
     }).then(function (file) {
       if (type.indexOf("ws-") === 0) {
         PENDING_FILE_HANDLE = handle;
+        if (cacheOnly) {
+          return refreshWsCacheOnly(file, type, handle);
+        }
         processPartnerFile(file);
       } else if (type.indexOf("cpi-") === 0) {
         var geoId = type.replace("cpi-", "");
         PENDING_FILE_HANDLE = handle;
-        refreshCpiFromHandle(file, geoId);
+        return refreshCpiFromHandle(file, geoId, cacheOnly);
       }
     });
   }).catch(function (err) {
@@ -1370,54 +1396,154 @@ function refreshAllPreviousSessions() {
     alert("No previous sessions with saved file handles were found.");
     return;
   }
+  var total = types.length;
+  var completed = 0;
+  showLoader("Refreshing sessions\u2026 (0\u00a0/\u00a0" + total + ")");
   types.reduce(function (chain, type) {
     return chain.then(function () {
-      return refreshFromHandle(type).catch(function (err) {
+      return refreshFromHandle(type, true).catch(function (err) {
         console.warn("Refresh failed for " + type + ":", err);
+      }).then(function () {
+        completed++;
+        updateLoaderMsg("Refreshing sessions\u2026 (" + completed + "\u00a0/\u00a0" + total + ")");
       });
     });
-  }, Promise.resolve());
+  }, Promise.resolve()).then(function () {
+    IDB.loadAll().then(function (en) { restoreUploadSection(en); });
+  });
 }
 
-function refreshCpiFromHandle(file, geoId) {
-  showLoader("Re-reading CPI file…");
-  readFileAsText(file).then(function (rawText) {
-    Papa.parse(rawText, {
-      header: true,
-      skipEmptyLines: true,
-      dynamicTyping: false,
-      complete: function (results) {
-        try {
-          if (!results.data || results.data.length === 0) throw new Error("No data found in CSV.");
-          var rows = results.data.filter(function(r) {
-            return String(r["BE GEO ID"] || "").trim() === geoId;
-          });
-          if (rows.length === 0) throw new Error("No data found for BE GEO ID " + geoId + " in this file.");
-          var rawKeys = Object.keys(results.data[0] || {});
-          var rawDistiKey = rawKeys.find(function(k) { return k.trim().toLowerCase() === "disti name"; });
-          var rawIsDisti = rawDistiKey && results.data.some(function(r) {
-            return r[rawDistiKey] && String(r[rawDistiKey]).trim() !== "";
-          });
-          window.APP_IS_DISTI = !!rawIsDisti;
-          APP_DATA = transformData(rows);
-          APP_FILE_META = { name: file.name, lastModified: file.lastModified ? new Date(file.lastModified) : null };
-          finishLoad(file.name + " · BE GEO ID " + geoId, APP_DATA.length, false, "cpi-" + geoId);
-        } catch (err) {
+// ── Cache-only refresh for ws- sessions (no navigation) ──────────────────────
+function refreshWsCacheOnly(file, idbType, handle) {
+  var ext = file.name.split(".").pop().toLowerCase();
+  if (ext !== "csv") {
+    // XLSX: fall back to normal load (will navigate to dashboard)
+    PENDING_FILE_HANDLE = handle;
+    processPartnerFile(file);
+    return Promise.resolve();
+  }
+  return readFileAsText(file).then(function (rawText) {
+    var text = fixUnescapedCsvQuotes(rawText);
+    return new Promise(function (resolve, reject) {
+      Papa.parse(text, {
+        header: true,
+        skipEmptyLines: true,
+        dynamicTyping: false,
+        complete: function (results) {
+          try {
+            var transformed = transformData(results.data);
+            var isDisti = transformed.some(function (r) {
+              return r["Disti name"] && String(r["Disti name"]).trim() !== "";
+            });
+            var partnerNames = [];
+            transformed.forEach(function (r) { if (r["Partner Name"]) partnerNames.push(String(r["Partner Name"]).trim()); });
+            var uniquePartners = Array.from(new Set(partnerNames)).filter(Boolean);
+            var displayName = uniquePartners.slice(0, 2).join(", ") + (uniquePartners.length > 2 ? " +" + (uniquePartners.length - 2) + " more" : "");
+            var beGeoIds = [];
+            transformed.forEach(function (r) { var v = String(r["BE GEO ID"] || "").trim(); if (v && beGeoIds.indexOf(v) === -1) beGeoIds.push(v); });
+            IDB.save(idbType, transformed, {
+              filename: file.name,
+              rowCount: transformed.length,
+              loadedAt: new Date().toISOString(),
+              displayName: displayName,
+              beGeoIds: beGeoIds,
+              isDisti: isDisti,
+              hasFileHandle: true
+            }).catch(function (e) { console.warn("IDB save failed:", e); });
+            IDB.saveHandle(idbType, handle).catch(function (e) { console.warn("Handle save failed:", e); });
+            PENDING_FILE_HANDLE = null;
+            resolve();
+          } catch (err) {
+            PENDING_FILE_HANDLE = null;
+            reject(err);
+          }
+        },
+        error: function (err) { PENDING_FILE_HANDLE = null; reject(err); }
+      });
+    });
+  });
+}
+
+
+function refreshCpiFromHandle(file, geoId, cacheOnly) {
+  if (!cacheOnly) showLoader("Re-reading CPI file…");
+  return readFileAsText(file).then(function (rawText) {
+    return new Promise(function (resolve, reject) {
+      Papa.parse(rawText, {
+        header: true,
+        skipEmptyLines: true,
+        dynamicTyping: false,
+        complete: function (results) {
+          try {
+            if (!results.data || results.data.length === 0) throw new Error("No data found in CSV.");
+            var rows = results.data.filter(function(r) {
+              return String(r["BE GEO ID"] || "").trim() === geoId;
+            });
+            if (rows.length === 0) throw new Error("No data found for BE GEO ID " + geoId + " in this file.");
+            var rawKeys = Object.keys(results.data[0] || {});
+            var rawDistiKey = rawKeys.find(function(k) { return k.trim().toLowerCase() === "disti name"; });
+            var rawIsDisti = rawDistiKey && results.data.some(function(r) {
+              return r[rawDistiKey] && String(r[rawDistiKey]).trim() !== "";
+            });
+            if (cacheOnly) {
+              var transformed = transformData(rows);
+              var _handle = PENDING_FILE_HANDLE;
+              // Compute displayName so the card title survives a cache-only refresh
+              var displayName = "";
+              if (rawIsDisti) {
+                var distiNames = [];
+                transformed.forEach(function(r) { if (r["Disti name"]) distiNames.push(String(r["Disti name"]).trim()); });
+                var uniqueDisti = Array.from(new Set(distiNames)).filter(Boolean);
+                displayName = uniqueDisti.slice(0, 2).join(", ") + (uniqueDisti.length > 2 ? " +" + (uniqueDisti.length - 2) + " more" : "");
+              } else {
+                var partnerNames = [];
+                transformed.forEach(function(r) { if (r["Partner Name"]) partnerNames.push(String(r["Partner Name"]).trim()); });
+                var uniquePartners = Array.from(new Set(partnerNames)).filter(Boolean);
+                displayName = uniquePartners.slice(0, 2).join(", ") + (uniquePartners.length > 2 ? " +" + (uniquePartners.length - 2) + " more" : "");
+              }
+              var beGeoIds = [];
+              transformed.forEach(function(r) { var v = String(r["BE GEO ID"] || "").trim(); if (v && beGeoIds.indexOf(v) === -1) beGeoIds.push(v); });
+              IDB.save("cpi-" + geoId, transformed, {
+                filename: file.name + " · BE GEO ID " + geoId,
+                rowCount: transformed.length,
+                loadedAt: new Date().toISOString(),
+                isDisti: !!rawIsDisti,
+                displayName: displayName,
+                beGeoIds: beGeoIds,
+                hasFileHandle: !!_handle
+              }).catch(function(e) { console.warn("IDB save failed:", e); });
+              if (_handle) {
+                IDB.saveHandle("cpi-" + geoId, _handle).catch(function(e) { console.warn("Handle save failed:", e); });
+              }
+              PENDING_FILE_HANDLE = null;
+              resolve();
+            } else {
+              window.APP_IS_DISTI = !!rawIsDisti;
+              APP_DATA = transformData(rows);
+              APP_FILE_META = { name: file.name, lastModified: file.lastModified ? new Date(file.lastModified) : null };
+              finishLoad(file.name + " · BE GEO ID " + geoId, APP_DATA.length, false, "cpi-" + geoId);
+              resolve();
+            }
+          } catch (err) {
+            PENDING_FILE_HANDLE = null;
+            IDB.loadAll().then(function(en) { restoreUploadSection(en); });
+            alert("Error refreshing CPI data: " + err.message);
+            reject(err);
+          }
+        },
+        error: function (err) {
           PENDING_FILE_HANDLE = null;
           IDB.loadAll().then(function(en) { restoreUploadSection(en); });
-          alert("Error refreshing CPI data: " + err.message);
+          alert("Error reading file: " + err.message);
+          reject(err);
         }
-      },
-      error: function (err) {
-        PENDING_FILE_HANDLE = null;
-        IDB.loadAll().then(function(en) { restoreUploadSection(en); });
-        alert("Error reading file: " + err.message);
-      }
+      });
     });
   }).catch(function (err) {
     PENDING_FILE_HANDLE = null;
     IDB.loadAll().then(function(en) { restoreUploadSection(en); });
     alert("Error reading file: " + err.message);
+    throw err;
   });
 }
 
@@ -1425,7 +1551,6 @@ function renderActiveTab(target) {
   switch (target) {
     case "#tab-overview":  renderOverview(APP_DATA);  break;
     case "#tab-details":   renderDetails(APP_DATA);   break;
-    case "#tab-customer":  renderCustomer(APP_DATA);  break;
     case "#tab-pvi":       renderPVI(APP_DATA);       break;
     case "#tab-lifecycle": renderLifecycle(APP_DATA); break;
     case "#tab-cpi-adopt": renderCPIAdopt(APP_DATA);  break;
@@ -1437,6 +1562,7 @@ function showDataNotifications(data) {
   var container = document.getElementById("notif-toast-container");
   if (!container || !data) return;
   container.innerHTML = "";
+  var dismissed = window._dismissedNotifs || {};
 
   var now    = new Date();
   var today0 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -1520,6 +1646,11 @@ function showDataNotifications(data) {
       cls: "notif-new",
       icon: "bi-star-fill text-primary",
       title: "New Eligible Deals",
+      preset: (function() {
+        var _today14 = Math.floor(Date.now() / 86400000);
+        var _from14  = _today14 - 14;
+        return { stage: ["ELIGIBLE", "PENDING"], bkFrom: _from14, bkTo: _today14 };
+      })(),
       body: newEligible > 0
         ? "<strong>" + newEligible.toLocaleString() + "</strong> new eligible deal" + (newEligible !== 1 ? "s" : "") + " booked in the past 14 days"
         : null
@@ -1529,6 +1660,11 @@ function showDataNotifications(data) {
       cls: "notif-new",
       icon: "bi-hand-thumbs-up-fill text-primary",
       title: "New Opt-ins",
+      preset: (function() {
+        var _today14rs = Math.floor(Date.now() / 86400000);
+        var _from14rs  = _today14rs - 14;
+        return { optIn: ["OPTED IN", "Eligible"], rsFrom: _from14rs, rsTo: _today14rs };
+      })(),
       body: newOptIns > 0
         ? "<strong>" + newOptIns.toLocaleString() + "</strong> new opt-in" + (newOptIns !== 1 ? "s" : "") + " in the past 14 days"
         : null
@@ -1538,6 +1674,11 @@ function showDataNotifications(data) {
       cls: "notif-earned",
       icon: "bi-piggy-bank-fill text-success",
       title: "New Potential",
+      preset: (function() {
+        var _today14p = Math.floor(Date.now() / 86400000);
+        var _from14p  = _today14p - 14;
+        return { optIn: ["OPTED IN", "Eligible"], rsFrom: _from14p, rsTo: _today14p };
+      })(),
       body: newOptInPotential > 0
         ? "<strong>" + fmtMoney(newOptInPotential) + "</strong> in potential incentives from new opt-ins"
         : null
@@ -1547,6 +1688,12 @@ function showDataNotifications(data) {
       cls: "notif-earned",
       icon: "bi-cash-coin text-success",
       title: "Incentives Earned",
+      alwaysLink: true,
+      preset: (function() {
+        var _todayEa = Math.floor(Date.now() / 86400000);
+        var _from14ea = _todayEa - 14;
+        return { checkboxIds: ["filter-earned"], eaFrom: _from14ea, eaTo: _todayEa };
+      })(),
       body: earnedLast14 > 0
         ? "<strong>" + fmtMoney(earnedLast14) + "</strong> in incentives earned over the past 14 days"
         : null
@@ -1557,6 +1704,11 @@ function showDataNotifications(data) {
       icon: "bi-clock-history text-warning",
       title: "Expiring Soon",
       emptyMsg: "Nothing expiring in the coming 14 days.",
+      preset: (function() {
+        var _todayExp = Math.floor(Date.now() / 86400000);
+        var _to14exp  = _todayExp + 14;
+        return { optIn: ["OPTED IN", "Eligible"], stage: ["Eligible"], expFrom: _todayExp, expTo: _to14exp };
+      })(),
       body: expiringSoon > 0
         ? "<strong>" + expiringSoon.toLocaleString() + "</strong> opted-in deal" + (expiringSoon !== 1 ? "s" : "") + " expir" + (expiringSoon !== 1 ? "e" : "es") + " within 14 days"
         : null
@@ -1564,20 +1716,32 @@ function showDataNotifications(data) {
   ];
 
   notifs.forEach(function(n) {
+    if (dismissed[n.id]) return; // user already closed this one
     var hasData = !!n.body;
+    var isClickable = hasData || !!n.alwaysLink;
     var extraCls = hasData ? n.cls : "notif-zero";
-    var bodyHtml = hasData ? n.body : '<span class="text-muted">' + (n.emptyMsg || "Nothing to report in the past 14 days.") + '</span>';
+    var bodyContent = hasData ? n.body : '<span class="text-muted">' + (n.emptyMsg || "Nothing to report in the past 14 days.") + '</span>';
+    var bodyHtml = isClickable
+      ? '<a href="javascript:void(0)" class="notif-link d-block text-reset text-decoration-none" data-notif-id="' + n.id + '">' + bodyContent + ' <i class="bi bi-arrow-right-circle ms-1" style="font-size:0.8rem;opacity:0.6"></i></a>'
+      : bodyContent;
     var html =
       '<div id="' + n.id + '" class="toast show mb-2 ' + extraCls + '" role="alert" data-bs-autohide="false">' +
         '<div class="toast-header">' +
           '<i class="bi ' + n.icon + ' me-2"></i>' +
           '<strong class="me-auto">' + n.title + '</strong>' +
-
-          '<button type="button" class="btn-close ms-2" onclick="this.closest(\'.toast\').remove()" aria-label="Close"></button>' +
+          '<button type="button" class="btn-close ms-2" onclick="window._dismissNotif(\'' + n.id + '\');this.closest(\'.toast\').remove()" aria-label="Close"></button>' +
         '</div>' +
         '<div class="toast-body small">' + bodyHtml + '</div>' +
       '</div>';
     container.insertAdjacentHTML("beforeend", html);
+    if (isClickable) {
+      var el = container.querySelector('#' + n.id + ' .notif-link');
+      if (el) {
+        (function(preset) {
+          el.addEventListener("click", function() { window.navigateToDetails(preset); });
+        })(n.preset);
+      }
+    }
   });
 }
 
@@ -1602,9 +1766,9 @@ function resetApp() {
   // Clear all tab panes and hide tab content until data is loaded
   APP_DATA = null;
   window.APP_DATA = null;
-  APP_FILTER_STATE = { details: null, lifecycle: null, cpiAdopt: null, customer: null };
+  APP_FILTER_STATE = { details: null, lifecycle: null, cpiAdopt: null };
   document.getElementById("mainTabContent").classList.add("d-none");
-  ["tab-overview","tab-details","tab-customer","tab-pvi","tab-lifecycle","tab-cpi-adopt"].forEach(function (id) {
+  ["tab-overview","tab-details","tab-pvi","tab-lifecycle","tab-cpi-adopt"].forEach(function (id) {
     var pane = document.getElementById(id);
     if (pane) pane.innerHTML = "";
   });
@@ -1629,28 +1793,19 @@ window.APP_FILTER_STATE = APP_FILTER_STATE;
 window.resetApp        = resetApp;
 window.renderActiveTab = renderActiveTab;
 
-// Deep-link to Details tab with preset filters
-// preset: object with boolean flags matching filter IDs, e.g. { uc2550: true }
+window._dismissedNotifs = {};
+window._dismissNotif = function(id) { window._dismissedNotifs[id] = true; };
+
+// Navigate to Details tab with a preset filter
 window.navigateToDetails = function (preset) {
+  window.APP_FILTER_STATE = window.APP_FILTER_STATE || {};
+  window.APP_FILTER_STATE.details = null; // clear saved state so preset takes over
+  window._detDeepLink = preset;
   var btn = document.querySelector('[data-bs-target="#tab-details"]');
   if (!btn) return;
-  window._detDeepLink = preset;
   var detPane = document.getElementById("tab-details");
   if (detPane && detPane.classList.contains("active")) {
     renderDetails(APP_DATA);
-  } else {
-    new bootstrap.Tab(btn).show();
-  }
-};
-
-// Deep-link to Customer tab with a pre-filtered customer name
-window.navigateToCustomer = function (crName) {
-  var btn = document.querySelector('[data-bs-target="#tab-customer"]');
-  if (!btn) return;
-  window._custDeepLink = crName;
-  var custPane = document.getElementById("tab-customer");
-  if (custPane && custPane.classList.contains("active")) {
-    renderCustomer(APP_DATA);
   } else {
     new bootstrap.Tab(btn).show();
   }

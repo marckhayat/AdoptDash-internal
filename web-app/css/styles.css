@@ -338,7 +338,7 @@
 }
 
 /* ── Dimmed row (expired / completed) ───────────────────── */
-.row-dimmed td { background-color: #d0d0d0 !important; }
+.row-dimmed td { background-color: #f0f0f0 !important; color: #999 !important; }
 
 /* -- CPI Adopt: smaller font for parenthesised text in card headers -- */
 #tab-cpi-adopt .card-header small { font-size: 0.78em; }

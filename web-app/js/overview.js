@@ -89,10 +89,10 @@ function renderOverview(data) {
   var fileDateLabel = "";
   var fileDateCaption = "File Date";
   if (window.APP_FILE_META && window.APP_FILE_META.cachedAt) {
-    fileDateLabel = window.APP_FILE_META.cachedAt.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+    fileDateLabel = window.APP_FILE_META.cachedAt.toLocaleDateString(window.APP_LOCALE, { year: "numeric", month: "short", day: "numeric" });
     fileDateCaption = "Cached";
   } else if (window.APP_FILE_META && window.APP_FILE_META.lastModified) {
-    fileDateLabel = window.APP_FILE_META.lastModified.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+    fileDateLabel = window.APP_FILE_META.lastModified.toLocaleDateString(window.APP_LOCALE, { year: "numeric", month: "short", day: "numeric" });
     fileDateCaption = "File Date";
   }
   var fileName  = (window.APP_FILE_META && window.APP_FILE_META.name)  ? window.APP_FILE_META.name  : "";
@@ -287,7 +287,7 @@ function renderOverview(data) {
 
     // Build type badge HTML from the type keys present for a UC
     function typeTags(typeKeys) {
-      return typeKeys.filter(function (tp) { return !!tp; }).map(function (tp) {
+      return typeKeys.filter(function (tp) { return !!tp && tp.trim().toUpperCase() !== "NONE"; }).map(function (tp) {
         var n = tp.trim().toUpperCase();
         var cls = n === "ADVANCED" ? "badge-type-advanced" : "badge-type-standard";
         return '<span class="badge-type ' + cls + '">' + escHtml(tp) + '</span>';

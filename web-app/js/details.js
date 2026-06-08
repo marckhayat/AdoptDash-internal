@@ -60,6 +60,8 @@ function renderDetails(data) {
   var sortField = "CR Party Name";
   var sortDir   = "asc";
   var currentStageOrder = ["Purchase","Onboard","Implement","Use","Engage","Adopt","Completed"];
+  var showCompletionDates = false;
+  var showDealDetails = false;
   var ucMissedPreset = false;
 
   // Restore sort state from saved session (filter DOM restored later, after DOM is built)
@@ -68,6 +70,8 @@ function renderDetails(data) {
   if (_detSaved) {
     if (_detSaved.sortField) sortField = _detSaved.sortField;
     if (_detSaved.sortDir)   sortDir   = _detSaved.sortDir;
+    if (_detSaved.showCompletionDates) showCompletionDates = true;
+    if (_detSaved.showDealDetails)     showDealDetails     = true;
   }
 
   // ── Summary dedup measures
@@ -132,7 +136,22 @@ function renderDetails(data) {
   var dateBounds = {
     bk:  getDateBounds("Booking Date"),
     rs:  getDateBounds("Adopt Rebate Start Date"),
-    exp: getDateBounds("Deal Incentive Expiry Date")
+    exp: getDateBounds("Deal Incentive Expiry Date"),
+    ea:  (function() {
+      var EARN_COLS = ["Stage Completion Date(onboard)", "Stage Completion Date(Use)", "Stage Completion Date(Engage)", "Stage Completion Date(Adopt)"];
+      var mn = null, mx = null;
+      data.forEach(function(r) {
+        var optInDate = toDate(r["Adopt Rebate Start Date"]);
+        EARN_COLS.forEach(function(c) {
+          var d = toDate(r[c]);
+          if (d && (!optInDate || d >= optInDate)) {
+            if (!mn || d < mn) mn = d;
+            if (!mx || d > mx) mx = d;
+          }
+        });
+      });
+      return { min: mn, max: mx };
+    })()
   };
 
   // ── Build initial HTML
@@ -158,7 +177,7 @@ function renderDetails(data) {
   // Quick-toggle filters
   html += '<div class="filter-group">';
   html += '<div class="form-check form-check-sm"><input class="form-check-input" type="checkbox" id="filter-new-eligible"><label class="form-check-label" for="filter-new-eligible">New Eligible' + tip("UCs eligible for opt-in, booked within the past 30 days.") + '</label></div>';
-  html += '<div class="form-check form-check-sm"><input class="form-check-input" type="checkbox" id="filter-expires-soon"><label class="form-check-label" for="filter-expires-soon">Expires Soon (&lt;3M)' + tip("Deals where the incentive expires in less than 3 months.") + '</label></div>';
+  html += '<div class="form-check form-check-sm"><input class="form-check-input" type="checkbox" id="filter-expires-soon"><label class="form-check-label" for="filter-expires-soon">Expires Soon (&lt;1M)' + tip("Deals where the incentive expires in less than 1 month.") + '</label></div>';
   html += '<div class="form-check form-check-sm"><input class="form-check-input" type="checkbox" id="filter-earned"><label class="form-check-label" for="filter-earned">Earned' + tip("Deals where incentives have been earned.") + '</label></div>';
   html += '<div class="form-check form-check-sm"><input class="form-check-input" type="checkbox" id="filter-ea"><label class="form-check-label" for="filter-ea">EA' + tip("EA deals.") + '</label></div>';
   html += '<div class="form-check form-check-sm"><input class="form-check-input" type="checkbox" id="filter-aap"><label class="form-check-label" for="filter-aap">AAP' + tip("Completed the Adoption Accountability Plan.") + '</label></div>';
@@ -173,7 +192,7 @@ function renderDetails(data) {
     "Eligible":     "Can earn incentives on this deal.",
     "Expired":      "The incentive has reached the expiry date.",
     "Not Eligible": "Not eligible for incentives (e.g. all stages completed, another UC opted-in in same offer)."
-  });
+  }, function(o) { return '<span class="stage-badge stage-' + escHtml(o) + '">' + escHtml(o) + '</span>'; });
   html += '<div class="filter-group"><label class="group-label">Current Stage</label>' + makeStageRangeSlider("det-cs", currentStageOrder) + '</div>';
   html += makeCheckboxGroup("Opt-In Status", "filter-optin", optIns, {
     "OPTED IN":  "Deal has been selected for CPI.",
@@ -185,9 +204,10 @@ function renderDetails(data) {
   html += '<div class="filter-group"><label class="group-label">Use Case</label>' + makeDropdown("filter-uc", ucList) + '</div>';
 
   // Date filters
-  html += '<div class="filter-group"><label class="group-label">Booking Date</label>'      + makeDateSlider("det-bk",  dateBounds.bk)  + '</div>';
-  html += '<div class="filter-group"><label class="group-label">Opt-in Date</label>'        + makeDateSlider("det-rs",  dateBounds.rs)  + '</div>';
-  html += '<div class="filter-group"><label class="group-label">Rebate Expiry Date</label>' + makeDateSlider("det-exp", dateBounds.exp) + '</div>';
+  html += '<div class="filter-group"><label class="group-label">Booking Date</label>'          + makeDateSlider("det-bk",  dateBounds.bk)  + '</div>';
+  html += '<div class="filter-group"><label class="group-label">Opt-in Date</label>'            + makeDateSlider("det-rs",  dateBounds.rs)  + '</div>';
+  html += '<div class="filter-group"><label class="group-label">Incentive Expiry Date</label>'  + makeDateSlider("det-exp", dateBounds.exp) + '</div>';
+  html += '<div class="filter-group"><label class="group-label">Earn Date</label>'              + makeDateSlider("det-ea",  dateBounds.ea)  + '</div>';
 
   html += '<button class="btn btn-sm btn-outline-secondary w-100 mt-2" id="det-clear-btn"><i class="bi bi-x-circle me-1"></i>Clear filters</button>';
   html += '</div>'; // /det-filter-body
@@ -212,6 +232,9 @@ function renderDetails(data) {
     filterToggle.classList.toggle("collapsed", isCollapsed);
     filterSidebar.style.minWidth = isCollapsed ? "0" : "";
     document.getElementById("det-filter-label").classList.toggle("d-none", isCollapsed);
+    if (window.APP_FILTER_STATE && window.APP_FILTER_STATE.details) {
+      window.APP_FILTER_STATE.details.filterCollapsed = isCollapsed;
+    }
   });
 
   // Initialise Bootstrap tooltips on info icons
@@ -277,7 +300,7 @@ function renderDetails(data) {
         return String(r["Sub-Track"] || "") === u;
       });
     });
-    ucSel.innerHTML = '<option value="">All Use Cases</option>';
+    ucSel.innerHTML = '<option value="">All</option>';
     filteredUcs.forEach(function (u) {
       ucSel.innerHTML += '<option value="' + u.replace(/"/g, "&quot;") + '"' + (u === prevUc ? ' selected' : '') + '>' + u + '</option>';
     });
@@ -291,7 +314,7 @@ function renderDetails(data) {
     var filteredOffers = pf
       ? Array.from(new Set(data.filter(function(r){ return String(r["Deal CPI Portfolio"]||"") === pf; }).map(function(r){ return String(r["Track"]||""); }).filter(Boolean))).sort()
       : offerList;
-    offerSel.innerHTML = '<option value="">All Offers</option>';
+    offerSel.innerHTML = '<option value="">All</option>';
     filteredOffers.forEach(function (o) {
       offerSel.innerHTML += '<option value="' + o.replace(/"/g, "&quot;") + '"' + (o === prevOffer ? ' selected' : '') + '>' + o + '</option>';
     });
@@ -301,11 +324,12 @@ function renderDetails(data) {
   });
   document.getElementById("filter-offer").addEventListener("change", function () { refreshUcDropdown(); currentPage = 1; applyFiltersAndRender(); });
   document.getElementById("filter-uc").addEventListener("change", function () { currentPage = 1; applyFiltersAndRender(); });
-  ["det-bk","det-rs","det-exp"].forEach(function (prefix) {
+  ["det-bk","det-rs","det-ea","det-exp"].forEach(function (prefix) {
     ["from","to"].forEach(function (side) {
       var el2 = document.getElementById(prefix + "-" + side);
       if (!el2) return;
       el2.addEventListener("input", function () {
+        delete this.dataset.intendedValue; // clear preset override on manual interaction
         var fromEl = document.getElementById(prefix + "-from");
         var toEl   = document.getElementById(prefix + "-to");
         if (fromEl && toEl && parseInt(fromEl.value) > parseInt(toEl.value)) {
@@ -333,8 +357,8 @@ function renderDetails(data) {
       fillEl.style.left  = ((fromVal - min) / (max - min) * 100) + "%";
       fillEl.style.right = ((max - toVal)   / (max - min) * 100) + "%";
     }
-    if (fromLbl) fromLbl.textContent = currentStageOrder[fromVal] || "";
-    if (toLbl)   toLbl.textContent   = currentStageOrder[toVal]   || "";
+    if (fromLbl) fromLbl.innerHTML = stageBadgeHtml(currentStageOrder[fromVal] || "");
+    if (toLbl)   toLbl.innerHTML   = stageBadgeHtml(currentStageOrder[toVal]   || "");
   }
 
   ["det-cs-from", "det-cs-to"].forEach(function (csId) {
@@ -362,14 +386,13 @@ function renderDetails(data) {
     document.getElementById("filter-offer").value = "";
     document.getElementById("filter-uc").value = "";
     refreshUcDropdown();
-    ["det-bk","det-rs","det-exp"].forEach(function (prefix) {
+    ["det-bk","det-rs","det-ea","det-exp"].forEach(function (prefix) {
       var fromEl = document.getElementById(prefix + "-from");
       var toEl   = document.getElementById(prefix + "-to");
       if (fromEl) fromEl.value = fromEl.min;
       if (toEl)   toEl.value   = toEl.max;
       updateSliderDisplay(prefix);
     });
-    ucMissedPreset = false;
     var csFrom = document.getElementById("det-cs-from");
     var csTo   = document.getElementById("det-cs-to");
     if (csFrom) csFrom.value = csFrom.min;
@@ -382,7 +405,8 @@ function renderDetails(data) {
   // Apply deep-link preset if navigated from another tab
   if (window._detDeepLink) {
     var dl = window._detDeepLink;
-    if (dl.stage)         { dl.stage.forEach(function(s) { var _cb3 = document.getElementById("filter-stage-" + s); if (_cb3) _cb3.checked = true; }); }
+    if (dl.checkboxIds) { dl.checkboxIds.forEach(function(id) { var cb = document.getElementById(id); if (cb) cb.checked = true; }); }
+    if (dl.stage)         { dl.stage.forEach(function(s) { document.querySelectorAll('#filter-stage input[type=checkbox]').forEach(function(cb) { if (cb.value.toUpperCase() === s.toUpperCase()) cb.checked = true; }); }); }
     if (dl.ucMissed)      { ucMissedPreset = true; }
     if (dl.optIn)         { dl.optIn.forEach(function(s) { document.querySelectorAll('#filter-optin input[type=checkbox]').forEach(function(cb) { if (cb.value.toUpperCase() === s.toUpperCase()) cb.checked = true; }); }); }
     if (dl.offerOptedInN) { var _cbn = document.getElementById("filter-offer-optedin-n"); if (_cbn) _cbn.checked = true; }
@@ -393,13 +417,41 @@ function renderDetails(data) {
       if (_csTo   && dl.csTo   !== undefined) _csTo.value   = dl.csTo;
       updateStageSliderDisplay();
     }
+    if (dl.bkFrom !== undefined || dl.bkTo !== undefined) {
+      var _bkFrom = document.getElementById("det-bk-from");
+      var _bkTo   = document.getElementById("det-bk-to");
+      if (_bkFrom && dl.bkFrom !== undefined) _bkFrom.value = dl.bkFrom;
+      if (_bkTo   && dl.bkTo   !== undefined) _bkTo.value   = dl.bkTo;
+      updateSliderDisplay("det-bk");
+    }
+    if (dl.rsFrom !== undefined || dl.rsTo !== undefined) {
+      var _rsFrom = document.getElementById("det-rs-from");
+      var _rsTo   = document.getElementById("det-rs-to");
+      if (_rsFrom && dl.rsFrom !== undefined) _rsFrom.value = dl.rsFrom;
+      if (_rsTo   && dl.rsTo   !== undefined) _rsTo.value   = dl.rsTo;
+      updateSliderDisplay("det-rs");
+    }
+    if (dl.eaFrom !== undefined || dl.eaTo !== undefined) {
+      var _eaFrom = document.getElementById("det-ea-from");
+      var _eaTo   = document.getElementById("det-ea-to");
+      if (_eaFrom && dl.eaFrom !== undefined) { _eaFrom.value = dl.eaFrom; _eaFrom.dataset.intendedValue = dl.eaFrom; }
+      if (_eaTo   && dl.eaTo   !== undefined) { _eaTo.value   = dl.eaTo;   _eaTo.dataset.intendedValue   = dl.eaTo; }
+      updateSliderDisplay("det-ea");
+    }
+    if (dl.expFrom !== undefined || dl.expTo !== undefined) {
+      var _expFrom = document.getElementById("det-exp-from");
+      var _expTo   = document.getElementById("det-exp-to");
+      if (_expFrom && dl.expFrom !== undefined) _expFrom.value = dl.expFrom;
+      if (_expTo   && dl.expTo   !== undefined) _expTo.value   = dl.expTo;
+      updateSliderDisplay("det-exp");
+    }
     window._detDeepLink = null;
   }
 
   // Restore persisted filter state if no deep-link was applied
   if (_detSaved && !_hadDeepLink) {
     _restoreDetailsState(_detSaved);
-    ["det-bk","det-rs","det-exp"].forEach(updateSliderDisplay);
+    ["det-bk","det-rs","det-ea","det-exp"].forEach(updateSliderDisplay);
     updateStageSliderDisplay();
   }
 
@@ -426,7 +478,7 @@ function renderDetails(data) {
       var offerSel2 = document.getElementById("filter-offer");
       if (offerSel2) {
         var filteredOffers2 = Array.from(new Set(data.filter(function(r){ return String(r["Deal CPI Portfolio"]||"") === st.portfolio; }).map(function(r){ return String(r["Track"]||""); }).filter(Boolean))).sort();
-        offerSel2.innerHTML = '<option value="">All Offers</option>';
+        offerSel2.innerHTML = '<option value="">All</option>';
         filteredOffers2.forEach(function(o){ offerSel2.innerHTML += '<option value="'+o.replace(/"/g,'&quot;')+'">'+o+'</option>'; });
       }
     }
@@ -454,12 +506,20 @@ function renderDetails(data) {
     });
     // Sliders
     [["det-bk-from","bkFrom"],["det-bk-to","bkTo"],["det-rs-from","rsFrom"],["det-rs-to","rsTo"],
+     ["det-ea-from","eaFrom"],["det-ea-to","eaTo"],
      ["det-exp-from","expFrom"],["det-exp-to","expTo"],["det-cs-from","csFrom"],["det-cs-to","csTo"]
     ].forEach(function(p) {
       var slEl = document.getElementById(p[0]);
       if (slEl && st[p[1]] !== null && st[p[1]] !== undefined && st[p[1]] !== "") slEl.value = st[p[1]];
     });
     if (st.ucMissedPreset) ucMissedPreset = true;
+    // Restore filter pane collapsed state
+    if (st.filterCollapsed) {
+      filterBody.classList.add("d-none");
+      filterToggle.classList.add("collapsed");
+      filterSidebar.style.minWidth = "0";
+      document.getElementById("det-filter-label").classList.add("d-none");
+    }
   }
 
   function applyFiltersAndRender() {
@@ -468,6 +528,8 @@ function renderDetails(data) {
       window.APP_FILTER_STATE.details = {
         sortField:     sortField,
         sortDir:       sortDir,
+        showCompletionDates: showCompletionDates,
+        showDealDetails:     showDealDetails,
         ucMissedPreset: ucMissedPreset,
         crParty:       (document.getElementById("filter-crparty")    || {value:""}).value,
         twoTPartner:   (document.getElementById("filter-2tpartner")  || {value:""}).value,
@@ -490,10 +552,13 @@ function renderDetails(data) {
         bkTo:          (document.getElementById("det-bk-to")    || {value:null}).value,
         rsFrom:        (document.getElementById("det-rs-from")  || {value:null}).value,
         rsTo:          (document.getElementById("det-rs-to")    || {value:null}).value,
+        eaFrom:        (document.getElementById("det-ea-from")  || {value:null}).value,
+        eaTo:          (document.getElementById("det-ea-to")    || {value:null}).value,
         expFrom:       (document.getElementById("det-exp-from") || {value:null}).value,
         expTo:         (document.getElementById("det-exp-to")   || {value:null}).value,
         csFrom:        (document.getElementById("det-cs-from")  || {value:null}).value,
-        csTo:          (document.getElementById("det-cs-to")    || {value:null}).value
+        csTo:          (document.getElementById("det-cs-to")    || {value:null}).value,
+        filterCollapsed: filterBody ? filterBody.classList.contains("d-none") : false
       };
     }
     var twoTVal          = document.getElementById("filter-2tpartner") ? document.getElementById("filter-2tpartner").value.trim().toLowerCase() : "";
@@ -518,6 +583,8 @@ function renderDetails(data) {
     var bkTo    = document.getElementById("det-bk-to");
     var rsFrom  = document.getElementById("det-rs-from");
     var rsTo    = document.getElementById("det-rs-to");
+    var eaFrom  = document.getElementById("det-ea-from");
+    var eaTo    = document.getElementById("det-ea-to");
     var expFrom = document.getElementById("det-exp-from");
     var expTo   = document.getElementById("det-exp-to");
     function sliderVal(el) { return el ? new Date(parseInt(el.value) * 86400000) : null; }
@@ -527,6 +594,13 @@ function renderDetails(data) {
     var bkToDate    = atMax(bkTo)    ? null : sliderVal(bkTo);
     var rsFromDate  = atMin(rsFrom)  ? null : sliderVal(rsFrom);
     var rsToDate    = atMax(rsTo)    ? null : sliderVal(rsTo);
+    var eaFromDate  = atMin(eaFrom)  ? null : sliderVal(eaFrom);
+    var eaToDate    = atMax(eaTo)    ? null : sliderVal(eaTo);
+    var eaActive    = eaFrom && eaTo && !(parseInt(eaFrom.value) === parseInt(eaFrom.min) && parseInt(eaTo.value) === parseInt(eaTo.max));
+    if (eaActive) {
+      eaFromDate = (eaFrom && eaFrom.dataset.intendedValue !== undefined) ? new Date(parseInt(eaFrom.dataset.intendedValue) * 86400000) : sliderVal(eaFrom);
+      eaToDate   = (eaTo   && eaTo.dataset.intendedValue   !== undefined) ? new Date(parseInt(eaTo.dataset.intendedValue)   * 86400000) : sliderVal(eaTo);
+    }
     var expFromDate = atMin(expFrom) ? null : sliderVal(expFrom);
     var expToDate   = atMax(expTo)   ? null : sliderVal(expTo);
     var csFromEl  = document.getElementById("det-cs-from");
@@ -552,7 +626,14 @@ function renderDetails(data) {
       if (pviAdopt         && !r["PVI Adopt"])      return false;
       if (ucMissed         && !r["UC progressed and missed w/o opt-in"]) return false;
       if (newEligible      && !r["New eligible"])                                                         return false;
-      if (expiresSoon      && String(r["Expires <3M?"] || "") !== "Yes")                                  return false;
+      if (expiresSoon) {
+        var _expD = toDate(r["Deal Incentive Expiry Date"]);
+        var _expMidnight = _expD ? new Date(_expD.getFullYear(), _expD.getMonth(), _expD.getDate()) : null;
+        var _today = new Date(); _today.setHours(0,0,0,0);
+        var _in30 = new Date(_today.getTime() + 30 * 86400000);
+        if (!_expMidnight || _expMidnight < _today || _expMidnight >= _in30) return false;
+        if ((r["Stage"] || "").toUpperCase() !== "ELIGIBLE") return false;
+      }
       if (earnedChecked    && r["Earned?"] !== true)                                                        return false;
       if (eaChecked        && String(r["EA Flag"] || "") !== "Yes")                                         return false;
       if (aapChecked       && String(r["AAP Flag"] || "") !== "Yes")                                        return false;
@@ -570,6 +651,19 @@ function renderDetails(data) {
         if (rsFromDate && d2 < rsFromDate) return false;
         if (rsToDate   && d2 > rsToDate)   return false;
       }
+      if (eaActive) {
+        var EARN_COLS2 = ["Stage Completion Date(onboard)", "Stage Completion Date(Use)", "Stage Completion Date(Engage)", "Stage Completion Date(Adopt)"];
+        var _optInDate = toDate(r["Adopt Rebate Start Date"]);
+        var hasEarnDate = EARN_COLS2.some(function(c) {
+          var d4 = toDate(r[c]);
+          if (!d4) return false;
+          if (_optInDate && d4 < _optInDate) return false;
+          if (eaFromDate && d4 < eaFromDate) return false;
+          if (eaToDate   && d4 > eaToDate)   return false;
+          return true;
+        });
+        if (!hasEarnDate) return false;
+      }
       if (expFromDate || expToDate) {
         var d3 = toDate(r["Deal Incentive Expiry Date"]);
         if (d3) {
@@ -580,15 +674,50 @@ function renderDetails(data) {
       return true;
     });
 
+    updateDateSliderBounds();
     applySort();
 
     renderSummary(filteredData);
     renderTable();
   }
 
+  function updateDateSliderBounds() {
+    var EARN_COLS3 = ["Stage Completion Date(onboard)", "Stage Completion Date(Use)", "Stage Completion Date(Engage)", "Stage Completion Date(Adopt)"];
+    var sliderDefs = [
+      { prefix: "det-bk",  get: function(r) { return [toDate(r["Booking Date"])]; } },
+      { prefix: "det-rs",  get: function(r) { return [toDate(r["Adopt Rebate Start Date"])]; } },
+      { prefix: "det-ea",  get: function(r) {
+        var optIn = toDate(r["Adopt Rebate Start Date"]);
+        return EARN_COLS3.map(function(c) { var d = toDate(r[c]); return (d && (!optIn || d >= optIn)) ? d : null; });
+      }},
+      { prefix: "det-exp", get: function(r) { return [toDate(r["Deal Incentive Expiry Date"])]; } }
+    ];
+    sliderDefs.forEach(function(def) {
+      var fromEl = document.getElementById(def.prefix + "-from");
+      var toEl   = document.getElementById(def.prefix + "-to");
+      if (!fromEl || !toEl) return;
+      // Only adapt bounds if this slider is fully open (user hasn't set it manually)
+      var isFullyOpen = parseInt(fromEl.value) === parseInt(fromEl.min) && parseInt(toEl.value) === parseInt(toEl.max);
+      if (!isFullyOpen) return;
+      var mn = null, mx = null;
+      filteredData.forEach(function(r) {
+        def.get(r).forEach(function(d) {
+          if (d) { if (!mn || d < mn) mn = d; if (!mx || d > mx) mx = d; }
+        });
+      });
+      if (!mn || !mx) return;
+      var newMin = epochDay(mn), newMax = epochDay(mx);
+      fromEl.min = newMin; fromEl.max = newMax;
+      toEl.min   = newMin; toEl.max   = newMax;
+      fromEl.value = newMin;
+      toEl.value   = newMax;
+      updateSliderDisplay(def.prefix);
+    });
+  }
+
   function applySort() {
-    var numericFields = { "Potential Incentives": true, "Missed Incentives": true, "Estimated Earned Incentives": true, "Days in stage": true };
-    var dateFields    = { "Deal Incentive Expiry Date": true };
+    var numericFields = { "Potential Incentives": true, "Missed Incentives": true, "Estimated Earned Incentives": true, "Days in stage": true, "Booking Amount - Net to Cisco": true };
+    var dateFields    = { "Deal Incentive Expiry Date": true, "Booking Date": true, "Adopt Rebate Start Date": true };
     filteredData.sort(function (a, b) {
       var av = a[sortField], bv = b[sortField];
       if (sortField === "Current stage") {
@@ -646,21 +775,30 @@ function renderDetails(data) {
     var cols = [
       ...(has2TPartner ? [{ label: "2T Partner Name", field: "2T Partner Name" }] : []),
       { label: "CR Party Name",              field: "CR Party Name",                style: "min-width:180px" },
-      { label: "CR Party ID",                field: "CR Party ID" },
-      { label: "CX Customer<br>BU ID",       field: "CX Customer BU ID",            style: "min-width:80px;max-width:90px" },
-      { label: "Offer",                      field: "Track",                        style: "min-width:130px" },
-      { label: "Use Case",                   field: "Sub-Track" },
-      { label: "Current Stage",              field: "Current stage" },
+      { label: "Use Case",                   field: "Sub-Track",                    style: "min-width:160px" },
+      { label: "Current Stage",              field: "Current stage",                isCurrentStage: true },
+      ...(showCompletionDates ? [
+        { label: "Onboard<br>Completion",    field: "Stage Completion Date(onboard)", isDate: true, isEarnDate: true },
+        { label: "Use<br>Completion",        field: "Stage Completion Date(Use)",     isDate: true, isEarnDate: true },
+        { label: "Engage<br>Completion",     field: "Stage Completion Date(Engage)",  isDate: true, isEarnDate: true },
+        { label: "Adopt<br>Completion",      field: "Stage Completion Date(Adopt)",   isDate: true, isEarnDate: true },
+        { label: "Stages Completed<br>Before Opt-in", field: "_missedStages" },
+      ] : []),
       { label: "Days in Stage",              field: "Days in stage" },
       { label: "Stage Progress",             field: "Current Stage Progress" },
       { label: "Pending Tasks",              field: "Current stage pending tasks",  style: "max-width:80px" },
-      { label: "Deal WS-ID",                 field: "Deal WS-ID",                   style: "min-width:140px", isWsId: true },
-      { label: "Deal ID",                    field: "Deal ID" },
-      { label: "Expiry Date",                field: "Deal Incentive Expiry Date",    isDate: true },
-      { label: "Missed Incentives",          field: "Missed Incentives",             isCurrency: true },
-      { label: "Potential Incentives",       field: "Potential Incentives",          isCurrency: true },
+      { label: "Booking Date",               field: "Booking Date",                 isDate: true, isBookingDate: true },
+      ...(showDealDetails ? [
+        { label: "Deal ID",                  field: "Deal ID" },
+        { label: "Net Booking",              field: "Booking Amount - Net to Cisco", isCurrency: true },
+      ] : []),
+      { label: "Opt-in Date",                field: "Adopt Rebate Start Date",      isDate: true },
+      { label: "Expiry Date",                field: "Deal Incentive Expiry Date",   isDate: true, isExpiry: true },
+      { label: "Missed Incentives",          field: "Missed Incentives",            isCurrency: true },
+      { label: "Potential Incentives",       field: "Potential Incentives",         isCurrency: true },
       { label: "Estimated<br>Earned Incentives", field: "Estimated Earned Incentives", isCurrency: true, style: "min-width:90px;max-width:110px" },
-      { label: "Status",                     field: "_status",                       isStatus: true }
+      { label: "Deal WS-ID",                 field: "Deal WS-ID",                   style: "min-width:140px", isWsId: true },
+      { label: "Status",                     field: "_status",                      isStatus: true }
     ];
 
     var sortableCols = {
@@ -669,12 +807,31 @@ function renderDetails(data) {
       "Potential Incentives": true,
       "Missed Incentives": true,
       "Estimated Earned Incentives": true,
-      "Deal Incentive Expiry Date": true,
+      "Booking Amount - Net to Cisco": true,
       "Days in stage": true,
-      "Current stage": true
+      "Current stage": true,
+      "Booking Date": true,
+      "Adopt Rebate Start Date": true,
+      "Deal Incentive Expiry Date": true
     };
     var thead = "<thead><tr>" + cols.map(function (c) {
       var styleAttr = c.style ? 'style="' + c.style + (sortableCols[c.field] ? ";cursor:pointer;user-select:none" : "") + '"' : '';
+      if (c.isCurrentStage) {
+        var sortIcon = sortField === c.field ? (sortDir === "asc" ? " ▲" : " ▼") : " ⇅";
+        var toggleIcon = showCompletionDates ? "bi-dash-circle" : "bi-plus-circle";
+        var toggleTitle = showCompletionDates ? "Hide completion dates" : "Show completion dates";
+        return '<th style="cursor:pointer;user-select:none;white-space:nowrap" data-sortfield="' + c.field + '">' +
+          c.label + '<span style="font-size:0.7rem;opacity:0.7">' + sortIcon + '</span>' +
+          ' <i class="bi ' + toggleIcon + '" id="det-completion-toggle" title="' + toggleTitle + '" style="font-size:0.8rem;opacity:0.7;cursor:pointer;vertical-align:middle" onclick="event.stopPropagation()"></i></th>';
+      }
+      if (c.isBookingDate) {
+        var bdSortIcon    = sortField === c.field ? (sortDir === "asc" ? " ▲" : " ▼") : " ⇅";
+        var bdToggleIcon  = showDealDetails ? "bi-dash-circle" : "bi-plus-circle";
+        var bdToggleTitle = showDealDetails ? "Hide Deal ID & Net Booking" : "Show Deal ID & Net Booking";
+        return '<th style="white-space:nowrap;cursor:pointer;user-select:none" data-sortfield="' + c.field + '">' +
+          c.label + '<span style="font-size:0.7rem;opacity:0.7">' + bdSortIcon + '</span>' +
+          ' <i class="bi ' + bdToggleIcon + '" id="det-dealdetails-toggle" title="' + bdToggleTitle + '" style="font-size:0.8rem;opacity:0.7;cursor:pointer;vertical-align:middle" onclick="event.stopPropagation()"></i></th>';
+      }
       if (sortableCols[c.field]) {
         var icon = sortField === c.field ? (sortDir === "asc" ? " ▲" : " ▼") : " ⇅";
         if (!styleAttr) styleAttr = 'style="cursor:pointer;user-select:none"';
@@ -690,6 +847,8 @@ function renderDetails(data) {
       tbody += '<tr><td colspan="' + cols.length + '" class="text-center text-muted py-4">No data matching current filters.</td></tr>';
     } else {
       pageRows.forEach(function (r) {
+        var expiryObj = toDate(r["Deal Incentive Expiry Date"]);
+        var isExpiredRow = expiryObj && expiryObj < today;
         var riskClass = stageRisk[r["Current stage"]] || "";
         tbody += '<tr class="' + riskClass + '">';
         cols.forEach(function (c) {
@@ -697,19 +856,29 @@ function renderDetails(data) {
           var cell = "";
           if (c.isCurrency) {
             cell = fmtCurrency(val);
+          } else if (c.isExpiry) {
+            var dObj = toDate(val);
+            var cellStyle = "";
+            if (isExpiredRow) {
+              cellStyle = ' style="background:#f0f0f0;color:#999"';
+            } else if (dObj) {
+              var daysUntil = Math.round((dObj - today) / 86400000);
+              if (daysUntil > 180)     cellStyle = ' style="background:#dff6dd"';
+              else if (daysUntil > 90) cellStyle = ' style="background:#fff4ce"';
+              else if (daysUntil >= 0) cellStyle = ' style="background:#ffe6e6"';
+            }
+            tbody += '<td' + cellStyle + '>' + fmtDate(val) + '</td>';
+            return;
           } else if (c.isDate) {
             cell = '<td>' + fmtDate(val) + '</td>';
             tbody += cell;
             return;
           } else if (c.field === "CR Party Name") {
-            var isOptedIn2 = norm(r["Adopt Rebate Opt-In Status"]) === "OPTED IN";
-            var st2 = norm(r["Stage"]);
-            if (isOptedIn2 && (st2 === "ELIGIBLE" || st2 === "EXPIRED")) {
-              var crNameEsc = escHtml(String(r["CR Party Name"] || ""));
-              cell = '<a href="javascript:void(0)" data-crname="' + crNameEsc + '" style="color:var(--cisco-blue);cursor:pointer" onclick="if(window.navigateToCustomer)window.navigateToCustomer(this.dataset.crname)">' + escHtml(val) + '</a>';
-            } else {
-              cell = escHtml(val);
-            }
+            var crNameEsc = escHtml(String(r["CR Party Name"] || ""));
+            var crId  = escHtml(String(r["CR Party ID"] || ""));
+            var buId  = escHtml(String(r["CX Customer BU ID"] || ""));
+            var subIds = [crId ? "ID: " + crId : "", buId ? "BU: " + buId : ""].filter(Boolean).join(" &middot; ");
+            cell = crNameEsc + (subIds ? '<div style="font-size:0.72rem;color:#888;margin-top:1px">' + subIds + '</div>' : '');
           } else if (c.isWsId) {
             var wsid = val ? String(val) : "";
             cell = wsid ? '<a href="https://app.workspan.com/wsid/' + escHtml(wsid) + '" target="_blank" rel="noopener">' + escHtml(wsid) + '</a>' : '';
@@ -727,7 +896,10 @@ function renderDetails(data) {
           } else if (c.field === "Current stage") {
             cell = '<span class="stage-badge stage-' + escHtml(val) + '">' + escHtml(val) + '</span>';
           } else if (c.field === "Days in stage") {
-            cell = val !== null && val !== undefined ? val : "-";
+            var days = val !== null && val !== undefined ? parseInt(val) : null;
+            var dayColor = days === null ? "" : days > 180 ? "color:#D13438" : days > 90 ? "color:#FF8C00" : "color:#107C10";
+            tbody += '<td style="font-weight:600;' + dayColor + '">' + (days !== null ? days : "-") + '</td>';
+            return;
           } else if (c.field === "Current Stage Progress") {
             var parts = val ? String(val).split("/") : [];
             var x = parseInt(parts[0]), y = parseInt(parts[1]);
@@ -742,6 +914,32 @@ function renderDetails(data) {
             } else {
               cell = "";
             }
+          } else if (c.field === "Sub-Track") {
+            var PORTFOLIO_ABBR = { "NETWORKING": "NET", "SECURITY": "SEC", "CLOUD + AI INFRASTRUCTURE": "CAI", "COLLABORATION": "COL" };
+            var pf2 = String(r["Deal CPI Portfolio"] || "").trim();
+            var pfAbbr = PORTFOLIO_ABBR[pf2.toUpperCase()] || pf2;
+            var offer2 = String(r["Track"] || "").trim();
+            var subLine = [pfAbbr, offer2].filter(Boolean).join(" - ");
+            var ucName2 = escHtml(val);
+            var ucUrl2 = val ? UC_GUIDE_MAP[String(val).trim()] : null;
+            var ucLink = ucUrl2 ? '<a href="' + ucUrl2 + '" target="_blank" rel="noopener">' + ucName2 + '</a>' : ucName2;
+            cell = ucLink + (subLine ? '<div style="font-size:0.72rem;color:#888;margin-top:1px">' + escHtml(subLine) + '</div>' : '');
+          } else if (c.field === "_missedStages") {
+            var optInDate = toDate(r["Adopt Rebate Start Date"]);
+            var msParts = [];
+            [{ name: "Onboard", f: "Stage Completion Date(onboard)" },
+             { name: "Use",     f: "Stage Completion Date(Use)" },
+             { name: "Engage",  f: "Stage Completion Date(Engage)" },
+             { name: "Adopt",   f: "Stage Completion Date(Adopt)" }].forEach(function (s) {
+              var cd = toDate(r[s.f]);
+              if (cd && optInDate && cd < optInDate) msParts.push(s.name);
+            });
+            if (msParts.length === 0) {
+              tbody += '<td class="text-muted">N/A</td>';
+            } else {
+              tbody += '<td><span class="text-danger fw-semibold">' + msParts.join(", ") + '</span></td>';
+            }
+            return;
           } else {
             cell = escHtml(val);
           }
@@ -754,6 +952,24 @@ function renderDetails(data) {
 
     var tableHtml = '<div class="table-wrapper"><table class="table table-sm table-bordered mb-0">' + thead + tbody + '</table></div>';
     document.getElementById("det-table-area").innerHTML = tableHtml;
+
+    // Deal details toggle
+    var dealToggleEl = document.getElementById("det-dealdetails-toggle");
+    if (dealToggleEl) {
+      dealToggleEl.addEventListener("click", function () {
+        showDealDetails = !showDealDetails;
+        applyFiltersAndRender();
+      });
+    }
+
+    // Completion dates toggle
+    var toggleEl = document.getElementById("det-completion-toggle");
+    if (toggleEl) {
+      toggleEl.addEventListener("click", function () {
+        showCompletionDates = !showCompletionDates;
+        applyFiltersAndRender();
+      });
+    }
 
     // Sort on header click
     document.getElementById("det-table-area").querySelectorAll("th[data-sortfield]").forEach(function (th) {
@@ -804,7 +1020,7 @@ function renderDetails(data) {
     return result;
   }
 
-  function makeCheckboxGroup(label, id, options, optionTips) {
+  function makeCheckboxGroup(label, id, options, optionTips, labelHtmlFn) {
     var html = '<div class="filter-group"><label class="group-label">' + label + '</label><div id="' + id + '">';
     options.forEach(function (o) {
       var safeid = id + '-' + escHtml(o).replace(/\s+/g,"-");
@@ -812,8 +1028,9 @@ function renderDetails(data) {
       var tipHtml = tipText
         ? ' <i class="bi bi-info-circle text-muted" style="font-size:0.72rem;cursor:default" data-bs-toggle="tooltip" data-bs-placement="right" title="' + tipText.replace(/"/g,"&quot;") + '"></i>'
         : '';
+      var labelContent = labelHtmlFn ? labelHtmlFn(o) : escHtml(o);
       html += '<div class="form-check form-check-sm"><input class="form-check-input" type="checkbox" value="' + escHtml(o) + '" id="' + safeid + '">' +
-              '<label class="form-check-label" for="' + safeid + '">' + escHtml(o) + tipHtml + '</label></div>';
+              '<label class="form-check-label" for="' + safeid + '">' + labelContent + tipHtml + '</label></div>';
     });
     html += "</div></div>";
     return html;
@@ -843,12 +1060,16 @@ function renderDetails(data) {
       '</div></div>';
   }
 
+  function stageBadgeHtml(name) {
+    return '<span class="stage-badge stage-' + escHtml(name) + '">' + escHtml(name) + '</span>';
+  }
+
   function makeStageRangeSlider(prefix, options) {
     var maxIdx = Math.max(0, options.length - 1);
     return '<div class="date-slider-group">' +
       '<div class="slider-val-display">' +
-      '<span id="' + prefix + '-from-lbl">' + escHtml(options[0] || "") + '</span>' +
-      '<span id="' + prefix + '-to-lbl">'   + escHtml(options[maxIdx] || "") + '</span>' +
+      '<span id="' + prefix + '-from-lbl">' + stageBadgeHtml(options[0] || "") + '</span>' +
+      '<span id="' + prefix + '-to-lbl">'   + stageBadgeHtml(options[maxIdx] || "") + '</span>' +
       '</div>' +
       '<div class="dual-range-wrap">' +
       '<div class="dual-range-track"></div>' +
@@ -883,7 +1104,7 @@ function renderDetails(data) {
         getChecked("filter-stage").forEach(function(v) { activeFilters.push("Stage: " + v); });
         getChecked("filter-optin").forEach(function(v) { activeFilters.push("Opt-In: " + v); });
         if (document.getElementById("filter-new-eligible") && document.getElementById("filter-new-eligible").checked) activeFilters.push("New Eligible");
-        if (document.getElementById("filter-expires-soon") && document.getElementById("filter-expires-soon").checked) activeFilters.push("Expires Soon (<3M)");
+        if (document.getElementById("filter-expires-soon") && document.getElementById("filter-expires-soon").checked) activeFilters.push("Expires Soon (<1M)");
         if (document.getElementById("filter-earned")       && document.getElementById("filter-earned").checked)       activeFilters.push("Earned");
         if (document.getElementById("filter-ea")           && document.getElementById("filter-ea").checked)           activeFilters.push("EA");
         if (document.getElementById("filter-aap")          && document.getElementById("filter-aap").checked)          activeFilters.push("AAP");
@@ -908,6 +1129,7 @@ function renderDetails(data) {
           { label:"CR Party Name",           field:"CR Party Name" },
           { label:"CR Party ID",             field:"CR Party ID" },
           { label:"CX Customer BU ID",       field:"CX Customer BU ID" },
+          { label:"Portfolio",               field:"Deal CPI Portfolio" },
           { label:"Offer",                   field:"Track" },
           { label:"Use Case",                field:"Sub-Track" },
           { label:"Current Stage",           field:"Current stage" },
@@ -916,10 +1138,18 @@ function renderDetails(data) {
           { label:"Pending Tasks",           field:"Current stage pending tasks" },
           { label:"Deal WS-ID",              field:"Deal WS-ID" },
           { label:"Deal ID",                 field:"Deal ID" },
-          { label:"Expiry Date",             field:"Deal Incentive Expiry Date", isDate:true },
-          { label:"Missed Incentives",       field:"Missed Incentives",          isCurrency:true },
-          { label:"Potential Incentives",    field:"Potential Incentives",       isCurrency:true },
-          { label:"Est. Earned Incentives",  field:"Estimated Earned Incentives",isCurrency:true },
+          { label:"Net Booking",             field:"Booking Amount - Net to Cisco", isCurrency:true },
+          { label:"Booking Date",            field:"Booking Date",                isDate:true },
+          { label:"Opt-in Date",             field:"Adopt Rebate Start Date",     isDate:true },
+          { label:"Expiry Date",             field:"Deal Incentive Expiry Date",  isDate:true },
+          { label:"Onboard Completion",      field:"Stage Completion Date(onboard)", isDate:true },
+          { label:"Use Completion",          field:"Stage Completion Date(Use)",     isDate:true },
+          { label:"Engage Completion",       field:"Stage Completion Date(Engage)",  isDate:true },
+          { label:"Adopt Completion",        field:"Stage Completion Date(Adopt)",   isDate:true },
+          { label:"Stages Completed Before Opt-in", field:"_missedStages" },
+          { label:"Missed Incentives",       field:"Missed Incentives",           isCurrency:true },
+          { label:"Potential Incentives",    field:"Potential Incentives",        isCurrency:true },
+          { label:"Est. Earned Incentives",  field:"Estimated Earned Incentives", isCurrency:true },
           { label:"Opt-In Status",           field:"Adopt Rebate Opt-In Status" },
           { label:"Stage",                   field:"Stage" },
           { label:"Earned?",                 field:"Earned?" }
@@ -935,6 +1165,18 @@ function renderDetails(data) {
             if (c.isCurrency) return (v === null || v === undefined || isNaN(v)) ? 0 : Math.round(v);
             if (c.isDate) return fmtDate(v);
             if (c.field === "Earned?") return v === true ? "Yes" : "No";
+            if (c.field === "_missedStages") {
+              var optInDate = toDate(r["Adopt Rebate Start Date"]);
+              var msParts = [];
+              [{ name: "Onboard", f: "Stage Completion Date(onboard)" },
+               { name: "Use",     f: "Stage Completion Date(Use)" },
+               { name: "Engage",  f: "Stage Completion Date(Engage)" },
+               { name: "Adopt",   f: "Stage Completion Date(Adopt)" }].forEach(function (s) {
+                var cd = toDate(r[s.f]);
+                if (cd && optInDate && cd < optInDate) msParts.push(s.name);
+              });
+              return msParts.length ? msParts.join(", ") : "N/A";
+            }
             return (v === null || v === undefined) ? "" : String(v);
           });
           sheetData.push(row);
@@ -948,6 +1190,7 @@ function renderDetails(data) {
           if (c.isCurrency) return { wch: 22 };
           if (c.field === "CR Party Name" || c.field === "2T Partner Name") return { wch: 35 };
           if (c.field === "Deal WS-ID" || c.field === "Track") return { wch: 22 };
+          if (c.field === "_missedStages") return { wch: 30 };
           return { wch: 16 };
         });
 

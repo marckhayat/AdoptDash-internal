@@ -236,11 +236,12 @@ function transformData(rawRows) {
       r["1st stage?"] = norm(r["Stage Completion Flag(onboard)"]) === "YES";
     }
 
-    // Step 9: Expires <3M?
-    var in3Months = new Date(today.getTime());
-    in3Months.setMonth(in3Months.getMonth() + 3);
+    // Step 9: Expires <1M?
+    var in1Month = new Date(today.getTime());
+    in1Month.setMonth(in1Month.getMonth() + 1);
     var expiryDate = toDate(r["Deal Incentive Expiry Date"]);
-    r["Expires <3M?"] = (expiryDate !== null && expiryDate < in3Months) ? "Yes" : "No";
+    var expiryMidnight = expiryDate ? new Date(expiryDate.getFullYear(), expiryDate.getMonth(), expiryDate.getDate()) : null;
+    r["Expires <3M?"] = (expiryMidnight !== null && expiryMidnight >= today && expiryMidnight < in1Month) ? "Yes" : "No";
 
     // Step 10: Offer opted-in?
     r["Offer opted-in?"] = optedInKeys.has(r["CRPartyID-Offer"]);

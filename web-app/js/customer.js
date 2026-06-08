@@ -189,8 +189,7 @@ function renderCustomer(data) {
     pageRows.forEach(function (r) {
       var expiryObj = toDate(r["Deal Incentive Expiry Date"]);
       var isExpired = expiryObj && expiryObj < today;
-      var isCompleted = norm(r["Current stage"]) === "COMPLETED";
-      tbody += '<tr' + ((isExpired || isCompleted) ? ' class="row-dimmed"' : '') + '>';
+      tbody += '<tr>';
       cols.forEach(function (c) {
         var val = r[c.field];
         if (c.isMissedFlag) {
@@ -218,7 +217,9 @@ function renderCustomer(data) {
         } else if (c.isExpiry) {
           var dObj = toDate(val);
           var cellStyle = "";
-          if (dObj && !isExpired) {
+          if (isExpired) {
+            cellStyle = ' style="background:#f0f0f0;color:#999"';
+          } else if (dObj) {
             var daysUntil = Math.round((dObj - today) / 86400000);
             if (daysUntil > 180)     cellStyle = ' style="background:#dff6dd"';
             else if (daysUntil > 90) cellStyle = ' style="background:#fff4ce"';
