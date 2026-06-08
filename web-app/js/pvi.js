@@ -6,7 +6,7 @@ function renderPVI(data) {
   var el = document.getElementById("tab-pvi");
   if (!el) return;
 
-  var DOMAINS = ["Networking", "Security", "Cloud + AI Infrastructure"];
+  var PORTFOLIOS = ["Networking", "Security", "Cloud + AI Infrastructure"];
 
   function norm(x) {
     if (x === null || x === undefined) return "";
@@ -44,11 +44,11 @@ function renderPVI(data) {
     return total;
   }
 
-  // ── Compute PVI metrics per domain
-  function computeDomain(domain) {
-    var eligRows    = data.filter(function (r) { return r["PVI Eligible"] === true && norm(r["Deal CPI Portfolio"]) === norm(domain); });
-    var onbRows     = data.filter(function (r) { return r["PVI Onboard"]  === true && norm(r["Deal CPI Portfolio"]) === norm(domain); });
-    var adpRows     = data.filter(function (r) { return r["PVI Adopt"]    === true && norm(r["Deal CPI Portfolio"]) === norm(domain); });
+  // ── Compute PVI metrics per portfolio
+  function computeDomain(portfolio) {
+    var eligRows    = data.filter(function (r) { return r["PVI Eligible"] === true && norm(r["Deal CPI Portfolio"]) === norm(portfolio); });
+    var onbRows     = data.filter(function (r) { return r["PVI Onboard"]  === true && norm(r["Deal CPI Portfolio"]) === norm(portfolio); });
+    var adpRows     = data.filter(function (r) { return r["PVI Adopt"]    === true && norm(r["Deal CPI Portfolio"]) === norm(portfolio); });
 
     var eligUC      = new Set(eligRows.map(function (r) { return r["CRPartyID-Offer"]; })).size;
     var eligBook    = sumBooking(eligRows);
@@ -60,11 +60,11 @@ function renderPVI(data) {
     var onbRatio    = eligBook > 0 ? onbBook / eligBook : null;
     var adpRatio    = eligBook > 0 ? adpBook / eligBook : null;
 
-    var onbScore    = eligBook > 0 ? lookupPVIScore(domain, "Onboard", onbRatio) : null;
-    var adpScore    = eligBook > 0 ? lookupPVIScore(domain, "Adopt",   adpRatio) : null;
+    var onbScore    = eligBook > 0 ? lookupPVIScore(portfolio, "Onboard", onbRatio) : null;
+    var adpScore    = eligBook > 0 ? lookupPVIScore(portfolio, "Adopt",   adpRatio) : null;
     var totalScore  = (onbScore !== null && adpScore !== null) ? (onbScore + adpScore) / 2 : null;
 
-    return { domain, eligUC, eligBook, onbUC, onbBook, adpUC, adpBook, onbRatio, adpRatio, onbScore, adpScore, totalScore };
+    return { portfolio, eligUC, eligBook, onbUC, onbBook, adpUC, adpBook, onbRatio, adpRatio, onbScore, adpScore, totalScore };
   }
 
   // ── Build HTML
@@ -73,12 +73,12 @@ function renderPVI(data) {
   html += 'The below is an indication of the Engagement score based on current CPI performance. Score may differ slightly from PXP due to the timing of data capture.';
   html += '</div>';
 
-  html += '<div class="row g-3" id="pvi-domains">';
-  DOMAINS.forEach(function (domain, i) {
-    var slug = domain.replace(/\s+/g, "-").replace(/[^a-zA-Z0-9-]/g, "");
+  html += '<div class="row g-3" id="pvi-portfolios">';
+  PORTFOLIOS.forEach(function (portfolio, i) {
+    var slug = portfolio.replace(/\s+/g, "-").replace(/[^a-zA-Z0-9-]/g, "");
     html += '<div class="col-12 col-lg-4">';
     html += '<div class="card h-100 shadow-sm">';
-    html += '<div class="card-header fw-bold" style="background:var(--cisco-dark);color:#fff">' + domain + '</div>';
+    html += '<div class="card-header fw-bold" style="background:var(--cisco-dark);color:#fff">' + portfolio + '</div>';
     html += '<div class="card-body p-3">';
     html += '<div id="pvi-metrics-' + slug + '"></div>';
     html += '<hr/>';
@@ -108,10 +108,10 @@ function renderPVI(data) {
 
   el.innerHTML = html;
 
-  // ── Render each domain
-  DOMAINS.forEach(function (domain) {
-    var slug = domain.replace(/\s+/g, "-").replace(/[^a-zA-Z0-9-]/g, "");
-    var m = computeDomain(domain);
+  // ── Render each portfolio
+  PORTFOLIOS.forEach(function (portfolio) {
+    var slug = portfolio.replace(/\s+/g, "-").replace(/[^a-zA-Z0-9-]/g, "");
+    var m = computeDomain(portfolio);
 
     var noData = m.eligUC === 0;
     var naStr  = '<span class="text-muted">N/A</span>';
@@ -142,8 +142,8 @@ function renderPVI(data) {
         document.getElementById("sim-result-" + slug).innerHTML = '<p class="text-muted small">No eligible booking to simulate against.</p>';
         return;
       }
-      var simOnbScore = lookupPVIScore(domain, "Onboard", onbPct);
-      var simAdpScore = lookupPVIScore(domain, "Adopt",   adpPct);
+      var simOnbScore = lookupPVIScore(portfolio, "Onboard", onbPct);
+      var simAdpScore = lookupPVIScore(portfolio, "Adopt",   adpPct);
       var simTotal    = (simOnbScore + simAdpScore) / 2;
       var html = '<div class="d-flex gap-3 flex-wrap">';
       html += '<div class="text-center"><div class="small text-muted">Sim Onboard</div><div style="font-size:1.4rem">' + simOnbScore + '</div></div>';

@@ -1,6 +1,6 @@
 // =============================================================================
 // mapping.js — Static reference data derived from mapping.xlsx (Ref sheet)
-// Columns: Domain (Portfolio), Offer, Use Case, Type, Guide
+// Columns: Portfolio (Portfolio), Offer, Use Case, Type, Guide
 // =============================================================================
 
 var CPI_MAPPING = [

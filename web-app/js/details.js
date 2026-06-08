@@ -180,7 +180,7 @@ function renderDetails(data) {
     "OPTED OUT": "Deal has been de-selected.",
     "PENDING":   "Opt-in is possible."
   });
-  html += '<div class="filter-group"><label class="group-label">Portfolio' + tip("The technology domain that encompasses offers and UCs.") + '</label>' + makeDropdown("filter-portfolio", portfolios) + '</div>';
+  html += '<div class="filter-group"><label class="group-label">Portfolio' + tip("The technology portfolio that encompasses offers and UCs.") + '</label>' + makeDropdown("filter-portfolio", portfolios) + '</div>';
   html += '<div class="filter-group"><label class="group-label">Offer' + tip("The main solution that was sold to the customer.") + '</label>' + makeDropdown("filter-offer", offerList) + '</div>';
   html += '<div class="filter-group"><label class="group-label">Use Case</label>' + makeDropdown("filter-uc", ucList) + '</div>';
 

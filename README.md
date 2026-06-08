@@ -22,7 +22,7 @@ The Adoption Dashboard helps Cisco partners:
 
 | Tab | Description |
 |-----|-------------|
-| **Overview** | Summary pivot by Domain → Offer → Use Case |
+| **Overview** | Summary pivot by Portfolio → Offer → Use Case |
 | **Details** | Row-level deal view with inline definitions |
 | **Customer** | Customer-level adoption breakdown |
 | **PVI** | Partner Value Index Engagement score calculator |

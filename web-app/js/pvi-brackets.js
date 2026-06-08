@@ -1,5 +1,5 @@
 // =============================================================================
-// pvi-brackets.js — PVI scoring brackets (per-domain, per-metric)
+// pvi-brackets.js — PVI scoring brackets (per-portfolio, per-metric)
 // =============================================================================
 // Bracket format: sorted descending by gt (greater-than threshold).
 // lookupPVIScore returns the score of the first bracket where ratio > gt.
@@ -35,7 +35,7 @@
     ];
   }
 
-  // Per-domain brackets — kept separate so they can diverge in the future
+  // Per-portfolio brackets — kept separate so they can diverge in the future
   var BRACKETS = {
     "Networking": {
       "Onboard": onboardBrackets(),
@@ -51,11 +51,11 @@
     }
   };
 
-  // Returns score for given domain + metric + ratio.
+  // Returns score for given portfolio + metric + ratio.
   // Brackets are sorted descending; first match where ratio > gt wins.
-  function lookupPVIScore(domain, metric, ratio) {
+  function lookupPVIScore(portfolio, metric, ratio) {
     if (ratio === null || ratio === undefined || isNaN(ratio)) return null;
-    var domainBrackets = BRACKETS[domain];
+    var domainBrackets = BRACKETS[portfolio];
     if (!domainBrackets) return null;
     var brackets = domainBrackets[metric];
     if (!brackets) return null;

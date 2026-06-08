@@ -55,7 +55,7 @@ function renderLifecycle(data) {
 
   // ── HTML
   var html = '<div class="disclaimer-card mb-3">';
-  html += 'The chart below depicts lifecycle progression using the net booking value of eligible SKUs. One use case per offer and CR Party ID is selected: preference is given to opted-in use cases, otherwise, the highest-incentive use case is chosen.';
+  html += 'The chart below depicts lifecycle progression using the net booking value of eligible SKUs. Only deals booked within the last 18 fiscal months are included. One use case per offer and CR Party ID is selected: preference is given to opted-in use cases, otherwise, the highest-incentive use case is chosen.';
   html += '</div>';
 
   html += '<div class="slicer-row mb-3">';

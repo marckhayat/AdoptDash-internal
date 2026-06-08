@@ -141,15 +141,15 @@ function renderOverview(data) {
     // ── Build grouped structure: Portfolio → Offer → UC → Type
     var groups = {};
     fd.forEach(function (r) {
-      var domain = r["Deal CPI Portfolio"] || "(No Portfolio)";
+      var portfolio = r["Deal CPI Portfolio"] || "(No Portfolio)";
       var offer  = r["Track"]              || "(No Offer)";
       var uc     = r["Sub-Track"]          || "(No UC)";
       var type   = r["Incentive Level"]    || "";
-      if (!groups[domain]) groups[domain] = {};
-      if (!groups[domain][offer]) groups[domain][offer] = {};
-      if (!groups[domain][offer][uc]) groups[domain][offer][uc] = {};
-      if (!groups[domain][offer][uc][type]) groups[domain][offer][uc][type] = [];
-      groups[domain][offer][uc][type].push(r);
+      if (!groups[portfolio]) groups[portfolio] = {};
+      if (!groups[portfolio][offer]) groups[portfolio][offer] = {};
+      if (!groups[portfolio][offer][uc]) groups[portfolio][offer][uc] = {};
+      if (!groups[portfolio][offer][uc][type]) groups[portfolio][offer][uc][type] = [];
+      groups[portfolio][offer][uc][type].push(r);
     });
 
     // ── Column calculators
@@ -304,24 +304,24 @@ function renderOverview(data) {
       return ai - bi;
     });
     var pIdx = 0;
-    domainKeys.forEach(function (domain) {
+    domainKeys.forEach(function (portfolio) {
       var pKey = "p" + pIdx;
-      tbody += '<tr class="ovw-domain-row" data-portfolio="' + pKey + '">' +
-        '<td colspan="13"><span class="ovw-chevron">&#9660;</span>' + escHtml(domain) + '</td></tr>';
+      tbody += '<tr class="ovw-portfolio-row" data-portfolio="' + pKey + '">' +
+        '<td colspan="13"><span class="ovw-chevron">&#9660;</span>' + escHtml(portfolio) + '</td></tr>';
 
-      var offerKeys = Object.keys(groups[domain]).sort();
+      var offerKeys = Object.keys(groups[portfolio]).sort();
       var oIdx = 0;
       offerKeys.forEach(function (offer) {
         var oKey = pKey + "o" + oIdx;
         tbody += '<tr class="ovw-offer-row" data-portfolio="' + pKey + '" data-offer="' + oKey + '">' +
           '<td colspan="' + (cols.length + 1) + '" style="padding-left:1.2rem"><span class="ovw-chevron">&#9660;</span>' + escHtml(offer) + '</td></tr>';
 
-        var ucKeys = Object.keys(groups[domain][offer]).sort();
+        var ucKeys = Object.keys(groups[portfolio][offer]).sort();
         ucKeys.forEach(function (uc) {
           var ucAllRows = [];
-          var typeKeys  = Object.keys(groups[domain][offer][uc]).sort();
+          var typeKeys  = Object.keys(groups[portfolio][offer][uc]).sort();
           typeKeys.forEach(function (tp) {
-            groups[domain][offer][uc][tp].forEach(function (r) { ucAllRows.push(r); });
+            groups[portfolio][offer][uc][tp].forEach(function (r) { ucAllRows.push(r); });
           });
           var ucCalc = calcRow(ucAllRows);
           tbody += '<tr class="ovw-uc-row" data-portfolio="' + pKey + '" data-offer="' + oKey + '"><td style="padding-left:2rem">' +
@@ -371,7 +371,7 @@ function renderOverview(data) {
         var tr = e.target.closest("tr");
         if (!tr) return;
 
-        if (tr.classList.contains("ovw-domain-row")) {
+        if (tr.classList.contains("ovw-portfolio-row")) {
           var pKey = tr.dataset.portfolio;
           var nowCollapsed = !collapseState["p:" + pKey];
           collapseState["p:" + pKey] = nowCollapsed;
@@ -448,15 +448,15 @@ function renderOverview(data) {
         var groups = {};
         var portfolioOrder = ["Networking","Security","Cloud","Cloud + AI Infrastructure","Collaboration"];
         fd.forEach(function (r) {
-          var domain = r["Deal CPI Portfolio"] || "(No Portfolio)";
+          var portfolio = r["Deal CPI Portfolio"] || "(No Portfolio)";
           var offer  = r["Track"]              || "(No Offer)";
           var uc     = r["Sub-Track"]          || "(No UC)";
           var type   = r["Incentive Level"]    || "";
-          if (!groups[domain]) groups[domain] = {};
-          if (!groups[domain][offer]) groups[domain][offer] = {};
-          if (!groups[domain][offer][uc]) groups[domain][offer][uc] = {};
-          if (!groups[domain][offer][uc][type]) groups[domain][offer][uc][type] = [];
-          groups[domain][offer][uc][type].push(r);
+          if (!groups[portfolio]) groups[portfolio] = {};
+          if (!groups[portfolio][offer]) groups[portfolio][offer] = {};
+          if (!groups[portfolio][offer][uc]) groups[portfolio][offer][uc] = {};
+          if (!groups[portfolio][offer][uc][type]) groups[portfolio][offer][uc][type] = [];
+          groups[portfolio][offer][uc][type].push(r);
         });
 
         var domainKeys = Object.keys(groups).sort(function (a, b) {
@@ -504,15 +504,15 @@ function renderOverview(data) {
 
         var rowMeta = [null, null]; // track row type for styling
 
-        domainKeys.forEach(function(domain) {
-          sheetData.push([domain].concat(new Array(cols.length).fill("")));
+        domainKeys.forEach(function(portfolio) {
+          sheetData.push([portfolio].concat(new Array(cols.length).fill("")));
           rowMeta.push("portfolio");
-          Object.keys(groups[domain]).sort().forEach(function(offer) {
+          Object.keys(groups[portfolio]).sort().forEach(function(offer) {
             sheetData.push(["  " + offer].concat(new Array(cols.length).fill("")));
             rowMeta.push("offer");
-            Object.keys(groups[domain][offer]).sort().forEach(function(uc) {
+            Object.keys(groups[portfolio][offer]).sort().forEach(function(uc) {
               var ucAllRows = [];
-              Object.keys(groups[domain][offer][uc]).forEach(function(tp){ groups[domain][offer][uc][tp].forEach(function(r){ ucAllRows.push(r); }); });
+              Object.keys(groups[portfolio][offer][uc]).forEach(function(tp){ groups[portfolio][offer][uc][tp].forEach(function(r){ ucAllRows.push(r); }); });
               var vals = calcRow(ucAllRows);
               sheetData.push(["    " + uc].concat(vals));
               rowMeta.push("uc");

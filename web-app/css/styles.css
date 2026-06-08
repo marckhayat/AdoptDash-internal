@@ -174,7 +174,7 @@
 }
 
 /* ── Overview table specific ─────────────────────────────── */
-.ovw-domain-row td { background: #1B2A3B !important; color: #fff; font-weight: 700; cursor: pointer; user-select: none; }
+.ovw-portfolio-row td { background: #1B2A3B !important; color: #fff; font-weight: 700; cursor: pointer; user-select: none; }
 .ovw-offer-row td  { background: #e8f0f7 !important; font-weight: 600; cursor: pointer; user-select: none; }
 .ovw-uc-row td     { background: #f4f8fc; }
 .ovw-chevron { display: inline-block; transition: transform 0.15s ease; font-size: 0.75em; margin-right: 4px; }
