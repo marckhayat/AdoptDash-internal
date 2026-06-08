@@ -243,6 +243,8 @@ function renderDetails(data) {
   });
 
   // ── Slider display updater(defined here so it's available to all wiring below)
+  var _sliderLastMoved = {}; // tracks "from" or "to" per prefix
+
   function updateSliderDisplay(prefix) {
     var fromEl  = document.getElementById(prefix + "-from");
     var toEl    = document.getElementById(prefix + "-to");
@@ -255,6 +257,15 @@ function renderDetails(data) {
     if (fillEl && max > min) {
       fillEl.style.left  = ((fromVal - min) / (max - min) * 100) + "%";
       fillEl.style.right = ((max - toVal)   / (max - min) * 100) + "%";
+    }
+    // When thumbs overlap, raise the last-moved thumb so it stays grabbable
+    if (fromVal === toVal) {
+      var last = _sliderLastMoved[prefix] || "from";
+      fromEl.style.zIndex = (last === "from") ? "5" : "";
+      toEl.style.zIndex   = (last === "to")   ? "5" : "";
+    } else {
+      fromEl.style.zIndex = "";
+      toEl.style.zIndex   = "";
     }
     if (fromLbl) fromLbl.textContent = new Date(fromVal * 86400000).toLocaleDateString(window.APP_LOCALE);
     if (toLbl)   toLbl.textContent   = new Date(toVal   * 86400000).toLocaleDateString(window.APP_LOCALE);
@@ -329,7 +340,8 @@ function renderDetails(data) {
       var el2 = document.getElementById(prefix + "-" + side);
       if (!el2) return;
       el2.addEventListener("input", function () {
-        delete this.dataset.intendedValue; // clear preset override on manual interaction
+        delete this.dataset.intendedValue;
+        _sliderLastMoved[prefix] = side;
         var fromEl = document.getElementById(prefix + "-from");
         var toEl   = document.getElementById(prefix + "-to");
         if (fromEl && toEl && parseInt(fromEl.value) > parseInt(toEl.value)) {
@@ -357,6 +369,14 @@ function renderDetails(data) {
       fillEl.style.left  = ((fromVal - min) / (max - min) * 100) + "%";
       fillEl.style.right = ((max - toVal)   / (max - min) * 100) + "%";
     }
+    if (fromVal === toVal) {
+      var last = _sliderLastMoved["det-cs"] || "from";
+      fromEl.style.zIndex = (last === "from") ? "5" : "";
+      toEl.style.zIndex   = (last === "to")   ? "5" : "";
+    } else {
+      fromEl.style.zIndex = "";
+      toEl.style.zIndex   = "";
+    }
     if (fromLbl) fromLbl.innerHTML = stageBadgeHtml(currentStageOrder[fromVal] || "");
     if (toLbl)   toLbl.innerHTML   = stageBadgeHtml(currentStageOrder[toVal]   || "");
   }
@@ -365,6 +385,8 @@ function renderDetails(data) {
     var csEl = document.getElementById(csId);
     if (!csEl) return;
     csEl.addEventListener("input", function () {
+      var side   = csId === "det-cs-from" ? "from" : "to";
+      _sliderLastMoved["det-cs"] = side;
       var fromEl = document.getElementById("det-cs-from");
       var toEl   = document.getElementById("det-cs-to");
       if (fromEl && toEl && parseInt(fromEl.value) > parseInt(toEl.value)) {
