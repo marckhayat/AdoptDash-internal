@@ -485,6 +485,7 @@ function restoreUploadSection(cachedEntries) {
   cachedEntries = cachedEntries || [];
   var sec = document.getElementById("upload-section");
   sec.classList.remove("d-none");
+  var isChrome = typeof navigator !== 'undefined' && /chrome/i.test(navigator.userAgent || '') && !/edg/i.test(navigator.userAgent || '');
 
   function fmtDate(iso) {
     if (!iso) return "";
@@ -536,7 +537,7 @@ function restoreUploadSection(cachedEntries) {
     else if (e.type.indexOf("cpi-") === 0 && multiGeoIds.indexOf(e.type) === -1) cpiEntries.push(e);
   });
 
-  // ── Compute week options: 2026W11 → current ISO week ──────────────────────
+  // ── Compute week options: Latest, then previous weeks down to 2026W23 ─────
   var savedRegion = localStorage.getItem("lci-region") || "EMEA";
   function getISOWeek(date) {
     var d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
@@ -547,7 +548,7 @@ function restoreUploadSection(cachedEntries) {
   }
   var now = getISOWeek(new Date());
   var weekOptions = '<option value="">Latest</option>';
-  for (var w = 11; w <= now.week; w++) {
+  for (var w = now.week - 1; w >= 23; w--) {
     var wLabel = now.year + "W" + (w < 10 ? "0" + w : w);
     weekOptions += '<option value="' + wLabel + '">' + wLabel + '</option>';
   }
@@ -699,8 +700,10 @@ function restoreUploadSection(cachedEntries) {
       var hasAny = cpiEntries.length > 0 || multiCards;
       if (!hasAny) return '';
       return '<div class="card shadow-sm border-warning">' +
-        '<div class="card-header bg-warning bg-opacity-10 fw-semibold" style="font-size:0.85rem"><i class="bi bi-lightning-charge-fill me-2 text-warning"></i>Previous sessions</div>' +
-        '<div class="card-body p-2"><div class="row g-2">' +
+        '<div class="card-header bg-warning bg-opacity-10 fw-semibold d-flex justify-content-between align-items-center gap-2" style="font-size:0.85rem"><span><i class="bi bi-lightning-charge-fill me-2 text-warning"></i>Previous sessions</span>' +
+        (isChrome ? '<button id="cpi-refresh-all-btn" class="btn btn-sm btn-outline-success py-0 flex-shrink-0" title="Refresh all previous sessions"><i class="bi bi-arrow-clockwise me-1"></i>Refresh all</button>' : '') +
+        '</div>' +
+        '<div class="card-body p-2" id="cpi-prev-sessions-body"><div class="row g-2">' +
         multiCards +
         cpiEntries.map(resumeCard).join("") +
         '</div></div></div>';
@@ -876,6 +879,13 @@ function restoreUploadSection(cachedEntries) {
       refreshFromHandle(this.dataset.idbtype);
     });
   });
+
+  var cpiRefreshAllBtn = document.getElementById("cpi-refresh-all-btn");
+  if (cpiRefreshAllBtn) {
+    cpiRefreshAllBtn.addEventListener("click", function () {
+      refreshAllPreviousSessions();
+    });
+  }
 
   document.getElementById("clear-all-btn").addEventListener("click", function () {
     if (!confirm("This will delete all cached sessions and your saved username. Continue?")) return;
@@ -1321,12 +1331,12 @@ function processCpiFile(file, region, week, idsToLoad) {
 function refreshFromHandle(type) {
   if (typeof window.showOpenFilePicker === "undefined" && typeof FileSystemFileHandle === "undefined") {
     alert("Your browser does not support the File System Access API. Please use Chrome or Edge to use this feature.");
-    return;
+    return Promise.reject(new Error("File System Access API not supported."));
   }
-  IDB.loadHandle(type).then(function (handle) {
+  return IDB.loadHandle(type).then(function (handle) {
     if (!handle) {
       alert("No file handle saved for this session. Re-upload the file to enable one-click refresh.");
-      return;
+      throw new Error("No file handle saved for this session.");
     }
     return handle.queryPermission({ mode: "read" }).then(function (perm) {
       if (perm === "granted") return perm;
@@ -1346,7 +1356,27 @@ function refreshFromHandle(type) {
     });
   }).catch(function (err) {
     alert("Could not refresh from file: " + err.message);
+    throw err;
   });
+}
+
+function refreshAllPreviousSessions() {
+  var body = document.getElementById("cpi-prev-sessions-body");
+  if (!body) return;
+  var types = Array.prototype.map.call(body.querySelectorAll(".idb-refresh-btn[data-idbtype]"), function (btn) {
+    return btn.dataset.idbtype;
+  }).filter(Boolean);
+  if (types.length === 0) {
+    alert("No previous sessions with saved file handles were found.");
+    return;
+  }
+  types.reduce(function (chain, type) {
+    return chain.then(function () {
+      return refreshFromHandle(type).catch(function (err) {
+        console.warn("Refresh failed for " + type + ":", err);
+      });
+    });
+  }, Promise.resolve());
 }
 
 function refreshCpiFromHandle(file, geoId) {
