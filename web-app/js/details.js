@@ -181,7 +181,6 @@ function renderDetails(data) {
   html += '<div class="form-check form-check-sm"><input class="form-check-input" type="checkbox" id="filter-earned"><label class="form-check-label" for="filter-earned">Earned' + tip("Deals where incentives have been earned.") + '</label></div>';
   html += '<div class="form-check form-check-sm"><input class="form-check-input" type="checkbox" id="filter-ea"><label class="form-check-label" for="filter-ea">EA' + tip("EA deals.") + '</label></div>';
   html += '<div class="form-check form-check-sm"><input class="form-check-input" type="checkbox" id="filter-aap"><label class="form-check-label" for="filter-aap">AAP' + tip("Completed the Adoption Accountability Plan.") + '</label></div>';
-  html += '<div class="form-check form-check-sm"><input class="form-check-input" type="checkbox" id="filter-max"><label class="form-check-label" for="filter-max">Max' + tip("UC opted-in or with highest incentive amount.") + '</label></div>';
   html += '<div class="d-flex gap-2 align-items-center mt-1 mb-0" style="font-size:0.78rem"><span class="text-muted">Offer opted-in:' + tip("Any UC opted-in within this offer.") + '</span>';
   html += '<div class="form-check form-check-sm mb-0"><input class="form-check-input" type="checkbox" id="filter-offer-optedin-y" value="Y"><label class="form-check-label" for="filter-offer-optedin-y">Y</label></div>';
   html += '<div class="form-check form-check-sm mb-0"><input class="form-check-input" type="checkbox" id="filter-offer-optedin-n" value="N"><label class="form-check-label" for="filter-offer-optedin-n">N</label></div>';
@@ -500,7 +499,7 @@ function renderDetails(data) {
     var _boolMap = { offerOptedInY:"filter-offer-optedin-y", offerOptedInN:"filter-offer-optedin-n",
       pviEligible:"filter-pvi-Eligible", pviOnboard:"filter-pvi-Onboard", pviAdopt:"filter-pvi-Adopt",
       newEligible:"filter-new-eligible", expiresSoon:"filter-expires-soon",
-      earned:"filter-earned", ea:"filter-ea", aap:"filter-aap", max:"filter-max" };
+      earned:"filter-earned", ea:"filter-ea", aap:"filter-aap" };
     Object.keys(_boolMap).forEach(function(key) {
       var cbEl = document.getElementById(_boolMap[key]);
       if (cbEl && st[key]) cbEl.checked = true;
@@ -549,7 +548,6 @@ function renderDetails(data) {
         earned:        !!(document.getElementById("filter-earned")          || {}).checked,
         ea:            !!(document.getElementById("filter-ea")              || {}).checked,
         aap:           !!(document.getElementById("filter-aap")             || {}).checked,
-        max:           !!(document.getElementById("filter-max")             || {}).checked,
         bkFrom:        (document.getElementById("det-bk-from")  || {value:null}).value,
         bkTo:          (document.getElementById("det-bk-to")    || {value:null}).value,
         rsFrom:        (document.getElementById("det-rs-from")  || {value:null}).value,
@@ -581,7 +579,6 @@ function renderDetails(data) {
     var earnedChecked    = document.getElementById("filter-earned").checked;
     var eaChecked        = document.getElementById("filter-ea").checked;
     var aapChecked       = document.getElementById("filter-aap").checked;
-    var maxChecked       = document.getElementById("filter-max").checked;
     var bkFrom  = document.getElementById("det-bk-from");
     var bkTo    = document.getElementById("det-bk-to");
     var rsFrom  = document.getElementById("det-rs-from");
@@ -642,7 +639,6 @@ function renderDetails(data) {
       if (earnedChecked    && r["Earned?"] !== true)                                                        return false;
       if (eaChecked        && String(r["EA Flag"] || "") !== "Yes")                                         return false;
       if (aapChecked       && String(r["AAP Flag"] || "") !== "Yes")                                        return false;
-      if (maxChecked       && String(r["Maximum Incentive Deal Flag"] || "").toUpperCase() !== "YES")      return false;
 
       if (bkFromDate || bkToDate) {
         var d = toDate(r["Booking Date"]);
@@ -1114,7 +1110,6 @@ function renderDetails(data) {
         if (document.getElementById("filter-earned")       && document.getElementById("filter-earned").checked)       activeFilters.push("Earned");
         if (document.getElementById("filter-ea")           && document.getElementById("filter-ea").checked)           activeFilters.push("EA");
         if (document.getElementById("filter-aap")          && document.getElementById("filter-aap").checked)          activeFilters.push("AAP");
-        if (document.getElementById("filter-max")          && document.getElementById("filter-max").checked)          activeFilters.push("Max");
 
         // Build sheet rows array
         var sheetData = [];
