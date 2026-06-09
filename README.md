@@ -24,7 +24,6 @@ The Adoption Dashboard helps Cisco partners:
 |-----|-------------|
 | **Overview** | Summary pivot by Portfolio → Offer → Use Case |
 | **Details** | Row-level deal view with inline definitions |
-| **Customer** | Customer-level adoption breakdown |
 | **PVI** | Partner Value Index Engagement score calculator |
 | **Lifecycle** | Offer lifecycle progression charts (last 18 months) |
 | **CPI Adopt** | Incentive performance charts — earned, potential, missed, opt-in ratios |
@@ -33,8 +32,8 @@ The Adoption Dashboard helps Cisco partners:
 
 ## Getting Started
 
-1. **Download** the latest release from the [Releases](https://github.com/marckhayat/AdoptDash/releases/latest) page
-2. **Extract** the ZIP and open `index.html` in your browser (no server needed)
+1. **Open the app** at [marckhayat.github.io/AdoptDash](https://marckhayat.github.io/AdoptDash/) — always the latest version, no install needed
+2. **Or download** the latest release from the [Releases](https://github.com/marckhayat/AdoptDash/releases/latest) page and open `index.html` locally
 3. **Load your CPI data file** — a Workspan export (report 19849 for Partners, 21766 for Distributors)
 4. Explore your data across the dashboard tabs
 
