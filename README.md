@@ -30,6 +30,26 @@ The Adoption Dashboard helps Cisco partners:
 
 ---
 
+## Accessing the App via GitHub Pages
+
+The easiest way to use the Adoption Dashboard is directly through its GitHub Pages URL:
+
+**[marckhayat.github.io/AdoptDash](https://marckhayat.github.io/AdoptDash/)**
+
+No installation, no download — just open the link and you're always on the latest version.
+
+### How your data is handled
+
+When you load a Workspan export into the dashboard, **all data processing happens entirely within your browser**. The file you upload is read directly into your browser's memory using standard browser APIs (the JavaScript `FileReader` and `SheetJS` library). It is never uploaded, transmitted, or sent anywhere — not to GitHub, not to any third-party service, and not to Cisco.
+
+GitHub Pages is a **static file host**: it serves the HTML, CSS, and JavaScript files that make up the app, in the same way a web server would deliver a webpage. Once those files are loaded in your browser, GitHub's involvement ends entirely. GitHub has no access to anything that happens inside the app after that point — including any data you load.
+
+The only outbound network call the app makes is a lightweight version check against the GitHub Releases API (to notify you when an update is available). This call contains **no user data, no file contents, and no identifiable information**.
+
+> In short: GitHub hosts the app, not your data. Your Workspan data never leaves your machine.
+
+---
+
 ## Getting Started
 
 1. **Open the app** at [marckhayat.github.io/AdoptDash](https://marckhayat.github.io/AdoptDash/) — always the latest version, no install needed
