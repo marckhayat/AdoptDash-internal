@@ -895,8 +895,11 @@ function restoreUploadSection(cachedEntries) {
     btn.addEventListener("click", function () {
       var type = this.dataset.idbtype;
       showRefreshToast("Refreshing\u2026");
-      refreshFromHandle(type).then(function () {
+      // Always use cacheOnly=true so the UI stays on the upload screen
+      // and all session cards remain visible after refresh
+      refreshFromHandle(type, true).then(function () {
         hideRefreshToast();
+        IDB.loadAll().then(function(en) { restoreUploadSection(en); });
       }).catch(function () {
         hideRefreshToast();
       });

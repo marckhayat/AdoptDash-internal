@@ -207,7 +207,7 @@ function renderDetails(data) {
   html += '<div class="filter-group"><label class="group-label">Booking Date</label>'          + makeDateSlider("det-bk",  dateBounds.bk)  + '</div>';
   html += '<div class="filter-group"><label class="group-label">Opt-in Date</label>'            + makeDateSlider("det-rs",  dateBounds.rs)  + '</div>';
   html += '<div class="filter-group"><label class="group-label">Incentive Expiry Date</label>'  + makeDateSlider("det-exp", dateBounds.exp) + '</div>';
-  html += '<div class="filter-group"><label class="group-label">Earn Date</label>'              + makeDateSlider("det-ea",  dateBounds.ea)  + '</div>';
+  html += '<div class="filter-group"><label class="group-label">Earn Date' + tip("Moving this slider will automatically check the Earned filter.") + '</label>'              + makeDateSlider("det-ea",  dateBounds.ea)  + '</div>';
 
   html += '<button class="btn btn-sm btn-outline-secondary w-100 mt-2" id="det-clear-btn"><i class="bi bi-x-circle me-1"></i>Clear filters</button>';
   html += '</div>'; // /det-filter-body
@@ -349,6 +349,11 @@ function renderDetails(data) {
         if (fromEl && toEl && parseInt(fromEl.value) > parseInt(toEl.value)) {
           if (side === "from") fromEl.value = toEl.value;
           else toEl.value = fromEl.value;
+        }
+        // Auto-check Earned when Earn Date slider is moved
+        if (prefix === "det-ea") {
+          var earnedCb = document.getElementById("filter-earned");
+          if (earnedCb) earnedCb.checked = true;
         }
         updateSliderDisplay(prefix);
         currentPage = 1;
