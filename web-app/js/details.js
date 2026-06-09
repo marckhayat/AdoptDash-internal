@@ -405,6 +405,7 @@ function renderDetails(data) {
   document.getElementById("det-clear-btn").addEventListener("click", function () {
     window._sliderUserSet = {};
     _sliderLastMoved = {};
+    ucMissedPreset = false;
     if (document.getElementById("filter-2tpartner")) document.getElementById("filter-2tpartner").value = "";
     document.getElementById("filter-crparty").value = "";
     el.querySelectorAll('input[type=checkbox]').forEach(function (cb) { cb.checked = false; });
