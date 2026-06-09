@@ -48,6 +48,8 @@ The only outbound network call the app makes is a lightweight version check agai
 
 > In short: GitHub hosts the app, not your data. Your Workspan data never leaves your machine.
 
+> **Note:** When accessing the app via GitHub Pages, the **Load via API** option is unavailable. The API feature requires a local proxy running on your machine, which is only possible when running the app locally. See [Getting Started](#getting-started) for download options.
+
 ---
 
 ## Getting Started
