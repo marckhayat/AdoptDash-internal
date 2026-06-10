@@ -16,7 +16,7 @@ var APP_FILE_META = null;
 var APP_FILTER_STATE = { details: null, lifecycle: null, cpiAdopt: null, customer: null };
 var APP_IS_DISTI = false;
 var APP_MULTI_SESSIONS = null; // { sessions: [...], fileMeta: {...} }
-var APP_VERSION = "v6.8.1";
+var APP_VERSION = "v6.8.2";
 // Use the browser's preferred language for date formatting (respects user's browser locale setting)
 var APP_LOCALE = navigator.language || undefined;
 // Holds a FileSystemFileHandle from showOpenFilePicker() to be persisted after load
