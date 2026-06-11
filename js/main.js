@@ -16,7 +16,7 @@ var APP_FILE_META = null;
 var APP_FILTER_STATE = { details: null, lifecycle: null, cpiAdopt: null, customer: null };
 var APP_IS_DISTI = false;
 var APP_MULTI_SESSIONS = null; // { sessions: [...], fileMeta: {...} }
-var APP_VERSION = "v6.8.2";
+var APP_VERSION = "v6.8.3";
 // Use the browser's preferred language for date formatting (respects user's browser locale setting)
 var APP_LOCALE = navigator.language || undefined;
 // Holds a FileSystemFileHandle from showOpenFilePicker() to be persisted after load
@@ -644,21 +644,6 @@ function restoreUploadSection(cachedEntries) {
     '<div class="card-header bg-warning bg-opacity-10 fw-semibold" style="font-size:0.9rem"><i class="bi bi-lock-fill me-2 text-warning"></i>Cisco-internal</div>' +
     '<div class="card-body p-4 text-center">' +
     '<p class="small mb-3"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="16" height="16" style="vertical-align:-2px;margin-right:4px"><path d="M50,0 A50,50 0 0,1 93.3,75 L50,50Z" fill="#EA4335"/><path d="M93.3,75 A50,50 0 0,1 6.7,75 L50,50Z" fill="#FBBC05"/><path d="M6.7,75 A50,50 0 0,1 50,0 L50,50Z" fill="#34A853"/><circle cx="50" cy="50" r="33" fill="white"/><circle cx="50" cy="50" r="20" fill="#4285F4"/></svg><strong>Chrome recommended for the best experience.</strong></p>' +
-    '<p class="text-muted small mb-3">Load a CPI data file from the shared OneDrive folder.</p>' +
-    '<div class="mb-3 text-start">'+
-    '<label class="form-label small fw-semibold mb-1"><i class="bi bi-person-badge-fill me-1"></i>Your Cisco username</label>' +
-    '<div class="input-group input-group-sm" style="max-width:420px">' +
-    '<input type="text" id="lci-username" class="form-control form-control-sm" placeholder="e.g. jsmith" style="font-family:monospace"/>' +
-    '</div>' +
-    '<div class="mt-2" id="lci-path-advanced">'+
-    '<label class="form-label small fw-semibold mb-1"><i class="bi bi-folder me-1"></i>Base folder <span class="text-muted fw-normal">(auto-filled from username, or pick manually)</span></label>' +
-    '<div class="d-flex gap-2 align-items-center">' +
-    '<input type="text" id="lci-basepath" class="form-control form-control-sm" style="font-family:monospace;font-size:0.78rem"/>' +
-    '<button id="lci-browse-folder-btn" class="btn btn-sm btn-outline-secondary flex-shrink-0" title="Browse for folder"><i class="bi bi-folder2-open"></i></button>' +
-    '</div>' +
-    '</div>' +
-    '<a href="#" class="small" id="lci-toggle-advanced">Advanced: set base folder</a>' +
-    '</div>' +
     '<div class="row g-2 mb-3 align-items-end">' +
     '<div class="col-auto"><label class="form-label small fw-semibold mb-1">Region</label>' +
     '<select id="lci-region" class="form-select form-select-sm">' +
@@ -672,10 +657,6 @@ function restoreUploadSection(cachedEntries) {
     '</div>' +
     '</div>' +
     '</div>' +
-    '<div id="lci-path-hint" class="alert alert-secondary py-2 px-3 text-start small mb-3 d-none">' +
-    '<span id="lci-path-text" style="font-family:monospace"></span>' +
-    '<button id="lci-copy-btn" class="btn btn-sm btn-outline-secondary ms-2 py-0" title="Copy path"><i class="bi bi-clipboard"></i></button>' +
-    '</div>' +
     '<div id="lci-error" class="alert alert-danger py-2 px-3 small mb-3 d-none"></div>' +
     '<div id="lci-session-picker" class="d-none"></div>' +
     '<div id="lci-last-file-hint" class="d-none mb-2 text-start small">' +
@@ -684,7 +665,7 @@ function restoreUploadSection(cachedEntries) {
     ' &nbsp;<a href="#" id="lci-pick-different" class="text-muted">Use different file</a>' +
     '</div>' +
     '<div class="d-flex align-items-center gap-3 flex-wrap">' +
-    '<p class="text-muted small mb-0">Navigate to the displayed path and select the file.</p>' +
+    '<p class="text-muted small mb-0">Locate the <span id="lci-file-hint-text" class="fw-semibold fst-italic"></span> file in your OneDrive.</p>' +
     '<button id="lci-load-btn" class="btn btn-warning px-4"><i class="bi bi-folder2-open me-2"></i>Load CPI File…</button>' +
     '<input type="file" id="lci-file-input" accept=".csv" class="d-none" />' +
     '</div>'+
@@ -904,6 +885,7 @@ function restoreUploadSection(cachedEntries) {
       // and all session cards remain visible after refresh
       refreshFromHandle(type, true).then(function () {
         hideRefreshToast();
+        if (APP_MULTI_SESSIONS && type.indexOf("cpi-") === 0) APP_MULTI_SESSIONS.loadedAt = new Date().toISOString();
         IDB.loadAll().then(function(en) { restoreUploadSection(en); });
       }).catch(function () {
         hideRefreshToast();
@@ -922,104 +904,20 @@ function restoreUploadSection(cachedEntries) {
     if (!confirm("This will delete all cached sessions and your saved username. Continue?")) return;
     IDB.clearAll().then(function () {
       IDB.clearAllHandles().catch(function() {});
-      localStorage.removeItem("lci-username");
-      localStorage.removeItem("lci-basepath");
       localStorage.removeItem("ws-report-id");
       localStorage.removeItem("ws-client-id");
       localStorage.removeItem("ws-client-secret");
+      APP_MULTI_SESSIONS = null;
       restoreUploadSection([]);
     });
   });
 
-  // ── CPI path hint ─────────────────────────────────────────────────────────
-  var isMac = navigator.platform.indexOf("Mac") !== -1 || navigator.userAgent.indexOf("Mac") !== -1;
-  var SEP = isMac ? "/" : "\\";
-
-  function buildBasePath(username) {
-    if (!username) return "";
-    return isMac
-      ? "/Users/" + username + "/Library/CloudStorage/OneDrive-Cisco/CXPO TEAM - Adoption Dashboard"
-      : "C:\\Users\\" + username + "\\OneDrive - Cisco\\CXPO TEAM - Adoption Dashboard";
-  }
-
-  // Restore saved username and base path
-  var savedUsername = localStorage.getItem("lci-username") || "";
-  var savedBase     = localStorage.getItem("lci-basepath") || buildBasePath(savedUsername);
-  document.getElementById("lci-username").value  = savedUsername;
-  document.getElementById("lci-basepath").value  = savedBase || "";
-  if (!savedUsername) document.getElementById("lci-username").classList.add("is-invalid");
-
-  // Toggle advanced path editor
-  document.getElementById("lci-toggle-advanced").addEventListener("click", function (e) {
-    e.preventDefault();
-    var el = document.getElementById("lci-path-advanced");
-    var isShown = el.style.display !== "none" && el.offsetParent !== null;
-    el.style.display = isShown ? "none" : "block";
-    this.textContent = isShown ? "Advanced: set base folder" : "Hide";
-  });
-  // Hide by default
-  document.getElementById("lci-path-advanced").style.display = "none";
-
-  // Folder picker button — stores directory handle for direct file access
-  document.getElementById("lci-browse-folder-btn").addEventListener("click", function () {
-    if (typeof window.showDirectoryPicker !== "function") {
-      alert("Folder picker is only supported in Chrome/Edge. Please type the path manually.");
-      return;
-    }
-    window.showDirectoryPicker({ mode: "read" }).then(function (dirHandle) {
-      IDB.saveHandle("lci-dir-handle", dirHandle).catch(function(){});
-      // Update the basepath field with the folder name as confirmation
-      var el = document.getElementById("lci-basepath");
-      el.value = dirHandle.name + " (folder selected)";
-      el.style.color = "green";
-      localStorage.removeItem("lci-basepath"); // don't override with stale string
-      updateLciHint();
-    }).catch(function (err) {
-      if (err.name !== "AbortError") alert("Could not open folder picker: " + err.message);
-    });
-  });
-
-  // Username input → auto-build base path
-  document.getElementById("lci-username").addEventListener("input", function () {
-    var u = this.value.trim();
-    this.classList.toggle("is-invalid", !u);
-    if (u) {
-      localStorage.setItem("lci-username", u);
-      var built = buildBasePath(u);
-      document.getElementById("lci-basepath").value = built;
-      localStorage.setItem("lci-basepath", built);
-    }
-    updateLciHint();
-  });
-
-  // Manual path override updates hint live and auto-saves
-  document.getElementById("lci-basepath").addEventListener("input", function () {
-    localStorage.setItem("lci-basepath", this.value.trim());
-    updateLciHint();
-  });
-
-  function lciPath() {
-    var u    = document.getElementById("lci-username").value.trim();
-    var base = (document.getElementById("lci-basepath").value.trim() || buildBasePath(u) || "").replace(/[\\/]+$/, "");
+  function updateLciHint() {
     var region = document.getElementById("lci-region").value;
     var week   = document.getElementById("lci-week").value;
     var regionFile = region === "DISTI" ? "DISTI" : region;
-    var folder = "LCI data " + region;
     var filename = week ? "CPI_data_" + regionFile + "_" + week + ".csv" : "CPI_data_" + regionFile + ".csv";
-    return base + SEP + folder + SEP + filename;
-  }
-
-  function updateLciHint() {
-    var path = lciPath();
-    document.getElementById("lci-path-text").title = path;
-    var MAX = 68;
-    var display = path;
-    if (path.length > MAX) {
-      var keep = Math.floor((MAX - 3) / 2);
-      display = path.slice(0, keep) + "…" + path.slice(path.length - keep);
-    }
-    document.getElementById("lci-path-text").textContent = display;
-    document.getElementById("lci-path-hint").classList.remove("d-none");
+    document.getElementById("lci-file-hint-text").textContent = filename;
   }
 
   ["lci-region","lci-week"].forEach(function (id) {
@@ -1029,15 +927,6 @@ function restoreUploadSection(cachedEntries) {
     });
   });
   updateLciHint();
-
-  document.getElementById("lci-copy-btn").addEventListener("click", function () {
-    var path = lciPath();
-    navigator.clipboard.writeText(path).then(function () {
-      var btn = document.getElementById("lci-copy-btn");
-      btn.innerHTML = '<i class="bi bi-clipboard-check"></i>';
-      setTimeout(function () { btn.innerHTML = '<i class="bi bi-clipboard"></i>'; }, 1500);
-    });
-  });
 
   // ── Chip / tag input for BE GEO IDs ──────────────────────────────────────
   var lciGeoIds = [];
@@ -1417,6 +1306,7 @@ function refreshAllPreviousSessions() {
       });
     });
   }, Promise.resolve()).then(function () {
+    if (APP_MULTI_SESSIONS) APP_MULTI_SESSIONS.loadedAt = new Date().toISOString();
     IDB.loadAll().then(function (en) { restoreUploadSection(en); });
   });
 }
