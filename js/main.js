@@ -16,7 +16,7 @@ var APP_FILE_META = null;
 var APP_FILTER_STATE = { details: null, lifecycle: null, cpiAdopt: null, customer: null };
 var APP_IS_DISTI = false;
 var APP_MULTI_SESSIONS = null; // { sessions: [...], fileMeta: {...} }
-var APP_VERSION = "v6.8.3";
+var APP_VERSION = "v6.8.4";
 // Use the browser's preferred language for date formatting (respects user's browser locale setting)
 var APP_LOCALE = navigator.language || undefined;
 // Holds a FileSystemFileHandle from showOpenFilePicker() to be persisted after load
@@ -461,13 +461,14 @@ function finishLoad(filename, rowCount, headerAutoDetected, idbType, loadedAt, f
     var _pendingHandle = PENDING_FILE_HANDLE;
     PENDING_FILE_HANDLE = null;
     IDB.save(idbType, APP_DATA, {
-      filename:      filename,
-      rowCount:      rowCount,
-      loadedAt:      new Date().toISOString(),
-      displayName:   displayName,
-      beGeoIds:      beGeoIds,
-      isDisti:       APP_IS_DISTI,
-      hasFileHandle: !!_pendingHandle
+      filename:         filename,
+      rowCount:         rowCount,
+      loadedAt:         new Date().toISOString(),
+      fileLastModified: APP_FILE_META && APP_FILE_META.lastModified ? APP_FILE_META.lastModified.toISOString() : null,
+      displayName:      displayName,
+      beGeoIds:         beGeoIds,
+      isDisti:          APP_IS_DISTI,
+      hasFileHandle:    !!_pendingHandle
     }).catch(function (e) { console.warn("IDB save failed:", e); });
     if (_pendingHandle) {
       IDB.saveHandle(idbType, _pendingHandle).catch(function(e) { console.warn("Handle save failed:", e); });
@@ -537,7 +538,7 @@ function restoreUploadSection(cachedEntries) {
     html += '</div>';
     html += '<div class="d-flex gap-1 flex-shrink-0">';
     html += '<button class="btn btn-sm btn-' + btnColor + ' idb-resume-btn py-0" data-idbtype="' + entry.type + '" title="Resume"><i class="bi bi-play-fill"></i></button>';
-    if (entry.meta.hasFileHandle) {
+    if (entry.meta.hasFileHandle || (isChrome && isCpi)) {
       html += '<button class="btn btn-sm btn-outline-primary idb-refresh-btn py-0" data-idbtype="' + entry.type + '" title="Refresh from file"><i class="bi bi-arrow-clockwise"></i></button>';
     }
     html += '<button class="btn btn-sm btn-outline-danger idb-clear-btn py-0" data-idbtype="' + entry.type + '" title="Delete"><i class="bi bi-trash"></i></button>';
@@ -846,8 +847,12 @@ function restoreUploadSection(cachedEntries) {
   sec.querySelectorAll(".multi-del-btn").forEach(function(btn) {
     btn.addEventListener("click", function() {
       var idx = parseInt(this.dataset.geoIdx, 10);
+      var sess = APP_MULTI_SESSIONS.sessions[idx];
+      var idbKey = "cpi-" + sess.id;
       APP_MULTI_SESSIONS.sessions.splice(idx, 1);
       if (APP_MULTI_SESSIONS.sessions.length === 0) APP_MULTI_SESSIONS = null;
+      IDB.remove(idbKey).catch(function() {});
+      IDB.removeHandle(idbKey).catch(function() {});
       IDB.loadAll().then(function(en) { restoreUploadSection(en); });
     });
   });
@@ -860,7 +865,7 @@ function restoreUploadSection(cachedEntries) {
       IDB.load(type).then(function (entry) {
         if (!entry || !entry.data) { IDB.loadAll().then(function(e){restoreUploadSection(e);}); alert("Cache not found."); return; }
         APP_DATA = entry.data;
-        APP_FILE_META = { name: entry.meta.filename, lastModified: null, cachedAt: entry.meta.loadedAt ? new Date(entry.meta.loadedAt) : null };
+        APP_FILE_META = { name: entry.meta.filename, lastModified: entry.meta.fileLastModified ? new Date(entry.meta.fileLastModified) : null, cachedAt: entry.meta.loadedAt ? new Date(entry.meta.loadedAt) : null };
         window.APP_IS_DISTI = !!entry.meta.isDisti;
         finishLoad(entry.meta.filename, entry.meta.rowCount, false, null, entry.meta.loadedAt, true);
       }).catch(function (e) { IDB.loadAll().then(function(en){restoreUploadSection(en);}); alert("Error loading cache: " + e); });
@@ -1167,9 +1172,11 @@ function processCpiFile(file, region, week, idsToLoad) {
           });
           var partnerName = "";
           if (rows.length > 0) {
-            partnerName = rawIsDisti
-              ? String(rows[0][rawDistiKey] || "").trim()
-              : String(rows[0]["Partner Name"] || "").trim();
+            var nameKey = rawIsDisti ? rawDistiKey : "Partner Name";
+            var nameFreq = {};
+            rows.forEach(function(r) { var n = String(r[nameKey] || "").trim(); if (n) nameFreq[n] = (nameFreq[n] || 0) + 1; });
+            var names = Object.keys(nameFreq);
+            partnerName = names.length > 0 ? names.reduce(function(a, b) { return nameFreq[a] >= nameFreq[b] ? a : b; }) : "";
           }
           return { id: id, rows: rows, partnerName: partnerName };
         });
@@ -1205,27 +1212,34 @@ function processCpiFile(file, region, week, idsToLoad) {
         if (notFound.length > 0) console.warn("No data for: " + notFound.map(function(s){return s.id;}).join(", "));
         var _multiHandle = PENDING_FILE_HANDLE;
         PENDING_FILE_HANDLE = null;
-        found.forEach(function(sess) {
+        var savePromises = found.map(function(sess) {
           var transformed = transformData(sess.rows);
           var idbKey = "cpi-" + sess.id;
           var beGeoIds2 = [sess.id];
-          IDB.save(idbKey, transformed, {
-            filename:      file.name + " · BE GEO ID " + sess.id,
-            rowCount:      transformed.length,
-            loadedAt:      new Date().toISOString(),
-            displayName:   sess.partnerName || sess.id,
-            beGeoIds:      beGeoIds2,
-            isDisti:       rawIsDisti,
-            hasFileHandle: !!_multiHandle
-          }).catch(function(e) { console.warn("IDB save failed for " + sess.id + ":", e); });
-          if (_multiHandle) {
-            IDB.saveHandle(idbKey, _multiHandle).catch(function(e) { console.warn("Handle save failed for " + sess.id + ":", e); });
-          }
           sess._transformed = transformed;
+          var saveP = IDB.save(idbKey, transformed, {
+            filename:         file.name + " · BE GEO ID " + sess.id,
+            rowCount:         transformed.length,
+            loadedAt:         new Date().toISOString(),
+            fileLastModified: file.lastModified ? new Date(file.lastModified).toISOString() : null,
+            displayName:      sess.partnerName || sess.id,
+            beGeoIds:         beGeoIds2,
+            isDisti:          rawIsDisti,
+            hasFileHandle:    !!_multiHandle
+          }).then(function() {
+            if (_multiHandle) {
+              IDB.saveHandle(idbKey, _multiHandle).catch(function(e) { console.warn("Handle save failed for " + sess.id + ":", e); });
+            }
+          }).catch(function(e) { console.warn("IDB save failed for " + sess.id + ":", e); });
+          return saveP;
         });
 
         APP_MULTI_SESSIONS = { sessions: found, fileMeta: { name: file.name, lastModified: file.lastModified ? new Date(file.lastModified) : null }, loadedAt: new Date().toISOString(), notFoundNote: notFound.length > 0 ? notFound.map(function(s){return s.id;}).join(", ") : "", hasHandle: !!_multiHandle };
-        IDB.loadAll().then(function(en) { restoreUploadSection(en); });
+        Promise.all(savePromises).then(function() {
+          IDB.loadAll().then(function(en) { restoreUploadSection(en); });
+        }).catch(function() {
+          IDB.loadAll().then(function(en) { restoreUploadSection(en); });
+        });
 
       } catch (err) {
         PENDING_FILE_HANDLE = null;
@@ -1273,6 +1287,10 @@ function refreshFromHandle(type, cacheOnly) {
         processPartnerFile(file);
       } else if (type.indexOf("cpi-") === 0) {
         var geoId = type.replace("cpi-", "");
+        // Update in-memory fileMeta with the refreshed file's lastModified date
+        if (APP_MULTI_SESSIONS && file.lastModified) {
+          APP_MULTI_SESSIONS.fileMeta.lastModified = new Date(file.lastModified);
+        }
         PENDING_FILE_HANDLE = handle;
         return refreshCpiFromHandle(file, geoId, cacheOnly);
       }
@@ -1405,16 +1423,22 @@ function refreshCpiFromHandle(file, geoId, cacheOnly) {
                 filename: file.name + " · BE GEO ID " + geoId,
                 rowCount: transformed.length,
                 loadedAt: new Date().toISOString(),
+                fileLastModified: file.lastModified ? new Date(file.lastModified).toISOString() : null,
                 isDisti: !!rawIsDisti,
                 displayName: displayName,
                 beGeoIds: beGeoIds,
                 hasFileHandle: !!_handle
-              }).catch(function(e) { console.warn("IDB save failed:", e); });
-              if (_handle) {
-                IDB.saveHandle("cpi-" + geoId, _handle).catch(function(e) { console.warn("Handle save failed:", e); });
-              }
-              PENDING_FILE_HANDLE = null;
-              resolve();
+              }).then(function() {
+                if (_handle) {
+                  IDB.saveHandle("cpi-" + geoId, _handle).catch(function(e) { console.warn("Handle save failed:", e); });
+                }
+                PENDING_FILE_HANDLE = null;
+                resolve();
+              }).catch(function(e) {
+                console.warn("IDB save failed:", e);
+                PENDING_FILE_HANDLE = null;
+                resolve();
+              });
             } else {
               window.APP_IS_DISTI = !!rawIsDisti;
               APP_DATA = transformData(rows);
