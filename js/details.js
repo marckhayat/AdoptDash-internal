@@ -79,10 +79,12 @@ function renderDetails(data) {
     var customers = new Set();
     var offersMap = new Set();
     var ucMap     = new Set();
+    var partners  = new Set();
     rows.forEach(function (r) {
       customers.add(r["CR Party ID"]);
       offersMap.add(r["CRPartyID-Offer"]);
       ucMap.add(String(r["CR Party ID"] || "") + "|" + String(r["Track"] || "") + "|" + String(r["Sub-Track"] || ""));
+      if (r["2T Partner Name"] && String(r["2T Partner Name"]).trim() !== "") partners.add(String(r["2T Partner Name"]).trim());
     });
 
     function dedupeMax(field) {
@@ -98,6 +100,7 @@ function renderDetails(data) {
     }
 
     return {
+      partners:  partners.size,
       customers: customers.size,
       useCases:  ucMap.size,
       missed:    dedupeMax("Missed Incentives"),
@@ -165,12 +168,13 @@ function renderDetails(data) {
   html += '<div class="filter-sidebar flex-shrink-0" id="det-filter-sidebar">';
   html += '<div class="d-flex align-items-center justify-content-between mb-2">';
   html += '<div class="fw-bold" style="font-size:0.8rem;color:var(--cisco-dark)"><i class="bi bi-funnel me-1"></i><span id="det-filter-label">Filters</span></div>';
-  html += '<span id="det-filter-toggle" class="text-muted" title="Collapse filters"><i class="bi bi-chevron-left"></i></span>';
+  html += '<button class="btn btn-sm btn-outline-secondary py-0 px-2 ms-auto" id="det-clear-btn" style="font-size:0.75rem"><i class="bi bi-x-circle me-1"></i>Clear</button>';
+  html += '<span id="det-filter-toggle" class="text-muted ms-2" title="Collapse filters"><i class="bi bi-chevron-left"></i></span>';
   html += '</div>';
   html += '<div id="det-filter-body">';
   var has2TPartner = data.some(function (r) { return r["2T Partner Name"] && String(r["2T Partner Name"]).trim() !== ""; });
   if (has2TPartner) {
-    html += '<div class="filter-group"><div class="position-relative"><input type="text" id="filter-2tpartner" class="form-control form-control-sm pe-4" placeholder="&#128269; 2T Partner Name..." /><button id="det-2tpartner-clear" type="button" class="btn btn-link p-0 position-absolute top-50 end-0 translate-middle-y me-2 d-none" style="font-size:0.8rem;color:#999;line-height:1" tabindex="-1"><i class="bi bi-x-lg"></i></button></div></div>';
+    html += '<div class="filter-group"><div class="position-relative"><input type="text" id="filter-2tpartner" class="form-control form-control-sm pe-4" placeholder="&#128269; 2T Partner..." /><button id="det-2tpartner-clear" type="button" class="btn btn-link p-0 position-absolute top-50 end-0 translate-middle-y me-2 d-none" style="font-size:0.8rem;color:#999;line-height:1" tabindex="-1"><i class="bi bi-x-lg"></i></button></div></div>';
   }
   html += '<div class="filter-group"><div class="position-relative"><input type="text" id="filter-crparty" class="form-control form-control-sm pe-4" placeholder="&#128269; Customer or WS-Deal ID..." /><button id="det-crparty-clear" type="button" class="btn btn-link p-0 position-absolute top-50 end-0 translate-middle-y me-2 d-none" style="font-size:0.8rem;color:#999;line-height:1" tabindex="-1"><i class="bi bi-x-lg"></i></button></div></div>';
 
@@ -185,8 +189,10 @@ function renderDetails(data) {
   html += '<div class="form-check form-check-sm mb-0"><input class="form-check-input" type="checkbox" id="filter-offer-optedin-y" value="Y"><label class="form-check-label" for="filter-offer-optedin-y">Y</label></div>';
   html += '<div class="form-check form-check-sm mb-0"><input class="form-check-input" type="checkbox" id="filter-offer-optedin-n" value="N"><label class="form-check-label" for="filter-offer-optedin-n">N</label></div>';
   html += '</div>';
-  html += makeCheckboxGroup("PVI" + tip("UCs included in the PVI Engagement score calculations."), "filter-pvi", ["Eligible", "Onboard", "Adopt"]);
   html += '</div>';
+  if (!has2TPartner) {
+    html += makeCheckboxGroup("PVI" + tip("UCs included in the PVI Engagement score calculations."), "filter-pvi", ["Eligible", "Onboard", "Adopt"]);
+  }
 
   html += makeCheckboxGroup("Stage", "filter-stage", stages, {
     "Eligible":     "Can earn incentives on this deal.",
@@ -209,7 +215,6 @@ function renderDetails(data) {
   html += '<div class="filter-group"><label class="group-label">Incentive Expiry Date</label>'  + makeDateSlider("det-exp", dateBounds.exp) + '</div>';
   html += '<div class="filter-group"><label class="group-label">Earn Date' + tip("Moving this slider will automatically check the Earned filter.") + '</label>'              + makeDateSlider("det-ea",  dateBounds.ea)  + '</div>';
 
-  html += '<button class="btn btn-sm btn-outline-secondary w-100 mt-2" id="det-clear-btn"><i class="bi bi-x-circle me-1"></i>Clear filters</button>';
   html += '</div>'; // /det-filter-body
   html += '</div>'; // /sidebar
 
@@ -232,6 +237,7 @@ function renderDetails(data) {
     filterToggle.classList.toggle("collapsed", isCollapsed);
     filterSidebar.style.minWidth = isCollapsed ? "0" : "";
     document.getElementById("det-filter-label").classList.toggle("d-none", isCollapsed);
+    document.getElementById("det-clear-btn").classList.toggle("d-none", isCollapsed);
     if (window.APP_FILTER_STATE && window.APP_FILTER_STATE.details) {
       window.APP_FILTER_STATE.details.filterCollapsed = isCollapsed;
     }
@@ -413,6 +419,8 @@ function renderDetails(data) {
     ucMissedPreset = false;
     if (document.getElementById("filter-2tpartner")) document.getElementById("filter-2tpartner").value = "";
     document.getElementById("filter-crparty").value = "";
+    var _clrBtns = ["det-2tpartner-clear","det-crparty-clear"];
+    _clrBtns.forEach(function(id) { var b = document.getElementById(id); if (b) b.classList.add("d-none"); });
     el.querySelectorAll('input[type=checkbox]').forEach(function (cb) { cb.checked = false; });
     document.getElementById("filter-portfolio").value = "";
     document.getElementById("filter-offer").value = "";
@@ -556,6 +564,7 @@ function renderDetails(data) {
       filterToggle.classList.add("collapsed");
       filterSidebar.style.minWidth = "0";
       document.getElementById("det-filter-label").classList.add("d-none");
+      document.getElementById("det-clear-btn").classList.add("d-none");
     }
   }
 
@@ -648,7 +657,8 @@ function renderDetails(data) {
     var csActive  = csFromEl && csToEl && !(parseInt(csFromEl.value) === parseInt(csFromEl.min) && parseInt(csToEl.value) === parseInt(csToEl.max));
 
     filteredData = data.filter(function (r) {
-      if (twoTVal    && String(r["2T Partner Name"] || "").toLowerCase().indexOf(twoTVal) === -1)   return false;
+      if (twoTVal    && String(r["2T Partner Name"] || "").toLowerCase().indexOf(twoTVal) === -1
+                     && String(r["2T Partner BE GEO ID - (Disti Only)"] || "").toLowerCase().indexOf(twoTVal) === -1) return false;
       if (crPartyVal && String(r["CR Party Name"] || "").toLowerCase().indexOf(crPartyVal) === -1
                      && String(r["Deal WS-ID"] || "").toLowerCase().indexOf(crPartyVal) === -1
                      && String(r["CR Party ID"] || "").toLowerCase().indexOf(crPartyVal) === -1
@@ -783,6 +793,7 @@ function renderDetails(data) {
   function renderSummary(rows) {
     var s = calcSummary(rows);
     var html = "";
+    if (has2TPartner) html += metricCard(s.partners, "2T Partners");
     html += metricCard(s.customers,          "Customers");
     html += metricCard(s.useCases,           "Use Cases");
     html += metricCard("$" + Math.round(s.missed).toLocaleString(),    "Total Missed");
@@ -918,6 +929,10 @@ function renderDetails(data) {
             var buId  = escHtml(String(r["CX Customer BU ID"] || ""));
             var subIds = [crId ? "CR: " + crId : "", buId ? "BU: " + buId : ""].filter(Boolean).join(" &middot; ");
             cell = crNameEsc + (subIds ? '<div style="font-size:0.72rem;color:#888;margin-top:1px">' + subIds + '</div>' : '');
+          } else if (c.field === "2T Partner Name") {
+            var ttNameEsc = escHtml(String(r["2T Partner Name"] || ""));
+            var ttGeoId   = escHtml(String(r["2T Partner BE GEO ID - (Disti Only)"] || ""));
+            cell = ttNameEsc + (ttGeoId ? '<div style="font-size:0.72rem;color:#888;margin-top:1px">ID: ' + ttGeoId + '</div>' : '');
           } else if (c.isWsId) {
             var wsid = val ? String(val) : "";
             cell = wsid ? '<a href="https://app.workspan.com/wsid/' + escHtml(wsid) + '" target="_blank" rel="noopener">' + escHtml(wsid) + '</a>' : '';

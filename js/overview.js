@@ -88,12 +88,10 @@ function renderOverview(data) {
   // File metadata
   var fileDateLabel = "";
   var fileDateCaption = "File Date";
-  if (window.APP_FILE_META && window.APP_FILE_META.cachedAt) {
-    fileDateLabel = window.APP_FILE_META.cachedAt.toLocaleDateString(window.APP_LOCALE, { year: "numeric", month: "short", day: "numeric" });
-    fileDateCaption = "Cached";
-  } else if (window.APP_FILE_META && window.APP_FILE_META.lastModified) {
+  if (window.APP_FILE_META && window.APP_FILE_META.lastModified) {
     fileDateLabel = window.APP_FILE_META.lastModified.toLocaleDateString(window.APP_LOCALE, { year: "numeric", month: "short", day: "numeric" });
-    fileDateCaption = "File Date";
+  } else if (window.APP_FILE_META && window.APP_FILE_META.cachedAt) {
+    fileDateLabel = window.APP_FILE_META.cachedAt.toLocaleDateString(window.APP_LOCALE, { year: "numeric", month: "short", day: "numeric" });
   }
   var fileName  = (window.APP_FILE_META && window.APP_FILE_META.name)  ? window.APP_FILE_META.name  : "";
   var rowsLabel = (window.APP_DATA) ? window.APP_DATA.length.toLocaleString() + " rows" : "";
