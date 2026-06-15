@@ -22,11 +22,7 @@ jobs:
           zip -r AdoptDash-${{ github.ref_name }}.zip . \
             --exclude "*.git*" \
             --exclude ".github/*" \
-            --exclude "proxy/*" \
-            --exclude "*.sh" \
-            --exclude "*.bat" \
-            --exclude "*.pptx" \
-            --exclude "*.md"
+            --exclude "*.pptx"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
