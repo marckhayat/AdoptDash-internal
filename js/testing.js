@@ -906,11 +906,10 @@ function renderTesting(data) {
         });
         var stageTags = stageSorted.map(function(s) { return stageBadgeHtml(s); }).join(" ");
         h += '<div>';
-        h += '<div class="d-flex justify-content-between small mb-1">';
-        h += '<span class="text-truncate me-2" title="' + escHtml(task.name) + '">' + escHtml(task.name) + '</span>';
+        h += '<div class="d-flex justify-content-between align-items-center small mb-1">';
+        h += '<span class="d-flex align-items-center gap-1 text-truncate me-2"><span title="' + escHtml(task.name) + '">' + escHtml(task.name) + '</span>' + stageTags + '</span>';
         h += '<span class="text-muted flex-shrink-0">' + task.count + ' deal' + (task.count !== 1 ? 's' : '') + ' (' + pct + '%)</span>';
         h += '</div>';
-        h += '<div class="d-flex align-items-center gap-1 mb-1">' + stageTags + '</div>';
         h += '<div class="progress" style="height:5px"><div class="progress-bar bg-warning" role="progressbar" style="width:' + pct + '%"></div></div>';
         h += '</div>';
       });
