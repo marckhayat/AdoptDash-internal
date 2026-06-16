@@ -449,7 +449,23 @@ function renderDetails(data) {
     if (dl.stage)         { dl.stage.forEach(function(s) { document.querySelectorAll('#filter-stage input[type=checkbox]').forEach(function(cb) { if (cb.value.toUpperCase() === s.toUpperCase()) cb.checked = true; }); }); }
     if (dl.ucMissed)      { ucMissedPreset = true; }
     if (dl.optIn)         { dl.optIn.forEach(function(s) { document.querySelectorAll('#filter-optin input[type=checkbox]').forEach(function(cb) { if (cb.value.toUpperCase() === s.toUpperCase()) cb.checked = true; }); }); }
+    if (dl.sortField) { sortField = dl.sortField; }
+    if (dl.sortDir)   { sortDir   = dl.sortDir;   }
     if (dl.offerOptedInN) { var _cbn = document.getElementById("filter-offer-optedin-n"); if (_cbn) _cbn.checked = true; }
+    if (dl.offerOptedInY) { var _cby = document.getElementById("filter-offer-optedin-y"); if (_cby) _cby.checked = true; }
+    if (dl.portfolio) {
+      var _pfEl = document.getElementById("filter-portfolio");
+      if (_pfEl) {
+        _pfEl.value = dl.portfolio;
+        var _ofSel = document.getElementById("filter-offer");
+        if (_ofSel) {
+          var _dlOffers = Array.from(new Set(data.filter(function(r){ return String(r["Deal CPI Portfolio"]||"") === dl.portfolio; }).map(function(r){ return String(r["Track"]||""); }).filter(Boolean))).sort();
+          _ofSel.innerHTML = '<option value="">All</option>';
+          _dlOffers.forEach(function(o){ _ofSel.innerHTML += '<option value="'+o.replace(/"/g,'&quot;')+'">'+o+'</option>'; });
+        }
+      }
+    }
+    if (dl.offer) { var _ofEl = document.getElementById("filter-offer"); if (_ofEl) _ofEl.value = dl.offer; refreshUcDropdown(); }
     if (dl.csFrom !== undefined || dl.csTo !== undefined) {
       var _csFrom = document.getElementById("det-cs-from");
       var _csTo   = document.getElementById("det-cs-to");
@@ -1039,6 +1055,11 @@ function renderDetails(data) {
         currentPage = 1;
         applySort();
         renderTable();
+        // Persist sort so it survives tab switching
+        if (window.APP_FILTER_STATE && window.APP_FILTER_STATE.details) {
+          window.APP_FILTER_STATE.details.sortField = sortField;
+          window.APP_FILTER_STATE.details.sortDir   = sortDir;
+        }
       });
     });
 

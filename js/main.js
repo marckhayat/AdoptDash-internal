@@ -13,10 +13,10 @@ window.addEventListener("unhandledrejection", function (e) {
 // Store file metadata globally so tabs can access it
 var APP_DATA = null;
 var APP_FILE_META = null;
-var APP_FILTER_STATE = { details: null, lifecycle: null, cpiAdopt: null, customer: null };
+var APP_FILTER_STATE = { details: null, lifecycle: null, cpiAdopt: null, customer: null, testing: null };
 var APP_IS_DISTI = false;
 var APP_MULTI_SESSIONS = null; // { sessions: [...], fileMeta: {...} }
-var APP_VERSION = "v6.8.5";
+var APP_VERSION = "v6.8.6";
 // Use the browser's preferred language for date formatting (respects user's browser locale setting)
 var APP_LOCALE = navigator.language || undefined;
 // Holds a FileSystemFileHandle from showOpenFilePicker() to be persisted after load
@@ -1494,6 +1494,7 @@ function renderActiveTab(target) {
     case "#tab-pvi":       renderPVI(APP_DATA);       break;
     case "#tab-lifecycle": renderLifecycle(APP_DATA); break;
     case "#tab-cpi-adopt": renderCPIAdopt(APP_DATA);  break;
+    case "#tab-testing":   renderTesting(APP_DATA);   break;
   }
 }
 
@@ -1710,9 +1711,9 @@ function resetApp() {
   // Clear all tab panes and hide tab content until data is loaded
   APP_DATA = null;
   window.APP_DATA = null;
-  APP_FILTER_STATE = { details: null, lifecycle: null, cpiAdopt: null };
+  APP_FILTER_STATE = { details: null, lifecycle: null, cpiAdopt: null, testing: null };
   document.getElementById("mainTabContent").classList.add("d-none");
-  ["tab-overview","tab-details","tab-pvi","tab-lifecycle","tab-cpi-adopt"].forEach(function (id) {
+  ["tab-overview","tab-details","tab-pvi","tab-lifecycle","tab-cpi-adopt","tab-testing"].forEach(function (id) {
     var pane = document.getElementById(id);
     if (pane) pane.innerHTML = "";
   });
