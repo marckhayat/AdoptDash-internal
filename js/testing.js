@@ -875,50 +875,38 @@ function renderTesting(data) {
     var stagesPresent = STAGE_ORDER.filter(function(s){ return stageGroups[s] && stageGroups[s].length > 0; });
     var h = '';
     h += '<div class="row g-3">';
-    h += '<div class="col-12 col-lg-6"><div class="card shadow-sm h-100"><div class="card-body">';
+    h += '<div class="col-12 col-lg-3"><div class="card shadow-sm h-100"><div class="card-body">';
     h += '<h6 class="card-title mb-3">Stage Breakdown</h6>';
     if (stagesPresent.length > 0) {
-      h += '<table class="table table-sm table-hover mb-0" style="table-layout:fixed"><colgroup><col style="width:22%"><col style="width:10%"><col style="width:13%"><col style="width:55%"></colgroup><thead><tr><th>Stage</th><th class="text-end">Deals</th><th class="text-end">Avg Days</th><th>Top Pending Task</th></tr></thead><tbody>';
+      h += '<table class="table table-sm table-hover mb-0" style="table-layout:fixed"><colgroup><col style="width:50%"><col style="width:20%"><col style="width:30%"></colgroup><thead><tr><th>Stage</th><th class="text-end">Deals</th><th class="text-end">Avg Days</th></tr></thead><tbody>';
       stagesPresent.forEach(function(stage) {
         var rows = stageGroups[stage];
         var sd = rows.map(function(r){ return r["Days in stage"]; }).filter(function(v){ return v !== null && v !== undefined && !isNaN(v); });
         var sa = sd.length ? Math.round(sd.reduce(function(s,v){return s+v;},0)/sd.length) : null;
-        var st = {};
-        rows.forEach(function(r) {
-          var tasks = r["Current stage pending tasks"]; if (!tasks) return;
-          tasks.split(";").forEach(function(t){ var tn = t.trim().replace(/ - \d+$/, "").trim(); if (tn) st[tn] = (st[tn]||0)+1; });
-        });
-        var topTask = Object.keys(st).sort(function(a,b){ return st[b]-st[a]; })[0] || "—";
         h += '<tr><td>' + stageBadgeHtml(stage) + '</td><td class="text-end">' + rows.length + '</td>';
-        h += '<td class="text-end">' + (sa !== null ? sa + 'd' : '—') + '</td>';
-        h += '<td class="small" style="word-break:break-word;white-space:normal" title="' + escHtml(topTask) + '">' + escHtml(topTask) + '</td></tr>';
+        h += '<td class="text-end">' + (sa !== null ? sa + 'd' : '—') + '</td></tr>';
       });
       h += '</tbody></table>';
     } else { h += '<p class="text-muted small">No stage data available.</p>'; }
     h += '</div></div></div>';
 
-    h += '<div class="col-12 col-lg-6"><div class="card shadow-sm h-100"><div class="card-body">';
+    h += '<div class="col-12 col-lg-9"><div class="card shadow-sm h-100"><div class="card-body">';
     h += '<h6 class="card-title mb-3">Top Pending Tasks</h6>';
     if (topTasks.length > 0) {
-      h += '<div class="d-flex flex-column gap-2" style="max-height:240px;overflow-y:auto">';
+      h += '<div class="d-flex flex-column gap-2">';
       topTasks.slice(0, 10).forEach(function(task) {
         var pct = Math.round(task.count / totalDeals * 100);
-        // sort stages in STAGE_ORDER order
         var stageSorted = task.stages.slice().sort(function(a, b) {
           return STAGE_ORDER.indexOf(a) - STAGE_ORDER.indexOf(b);
         });
         var stageTags = stageSorted.map(function(s) { return stageBadgeHtml(s); }).join(" ");
         h += '<div>';
-        h += '<div class="small mb-1">';
-        h += '<div class="d-flex align-items-center gap-1 flex-wrap mb-1">';
-        h += '<span style="word-break:break-word">' + escHtml(task.name) + '</span>';
-        h += stageTags;
+        h += '<div class="d-flex align-items-center small mb-1" style="min-width:0">';
+        h += '<span class="text-truncate me-1" style="min-width:0;flex-shrink:1" title="' + escHtml(task.name) + '">' + escHtml(task.name) + '</span>';
+        h += '<span class="d-flex align-items-center gap-1 flex-shrink-0 me-2">' + stageTags + '</span>';
+        h += '<span class="text-muted flex-shrink-0 ms-auto">' + task.count + ' deal' + (task.count !== 1 ? 's' : '') + ' (' + pct + '%)</span>';
         h += '</div>';
-        h += '<div class="d-flex justify-content-between align-items-center">';
-        h += '<div class="progress flex-grow-1 me-2" style="height:5px"><div class="progress-bar bg-warning" role="progressbar" style="width:' + pct + '%"></div></div>';
-        h += '<span class="text-muted flex-shrink-0">' + task.count + ' deal' + (task.count !== 1 ? 's' : '') + ' (' + pct + '%)</span>';
-        h += '</div>';
-        h += '</div>';
+        h += '<div class="progress" style="height:5px"><div class="progress-bar bg-warning" role="progressbar" style="width:' + pct + '%"></div></div>';
         h += '</div>';
       });
       h += '</div>';
