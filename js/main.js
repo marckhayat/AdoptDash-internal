@@ -1121,7 +1121,7 @@ function restoreUploadSection(cachedEntries) {
       var latest = release.tag_name;
       if (latest && latest !== APP_VERSION) {
         var container = document.getElementById("notif-toast-container");
-        if (container) {
+        if (container && !document.getElementById("notif-update")) {
           var html =
             '<div id="notif-update" class="toast show mb-2" style="border-left:4px solid #e65c00;background:#fff3e0" role="alert" data-bs-autohide="false">' +
               '<div class="toast-header" style="background:#e65c00;color:#fff">' +
@@ -1502,7 +1502,10 @@ function renderActiveTab(target) {
 function showDataNotifications(data) {
   var container = document.getElementById("notif-toast-container");
   if (!container || !data) return;
+  // Preserve the update-available toast (inserted by the version check) when refreshing data notifications
+  var updateToast = document.getElementById("notif-update");
   container.innerHTML = "";
+  if (updateToast) container.appendChild(updateToast);
   var dismissed = window._dismissedNotifs || {};
 
   var now    = new Date();
