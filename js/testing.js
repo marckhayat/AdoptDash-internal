@@ -759,15 +759,18 @@ function renderTesting(data) {
       });
     }
     if (arrivedAtStep >= 2) {
-      var ucs = _uchState.offer
-        ? Array.from(uchUCsByOffer[_uchState.offer] || []).sort()
-        : (_uchState.portfolio ? Array.from(uchUCsForPortfolio(_uchState.portfolio)).sort() : uchAllUCs);
-      uchBuildPills("uch-panel-uc", ucs, _uchState.uc, function(u) {
-        _uchState.uc = u;
-        uchUpdateBreadcrumb();
-        uchSaveState();
-        renderUCHealth();
-      });
+      (function buildUCPills() {
+        var _ucs = _uchState.offer
+          ? Array.from(uchUCsByOffer[_uchState.offer] || []).sort()
+          : (_uchState.portfolio ? Array.from(uchUCsForPortfolio(_uchState.portfolio)).sort() : uchAllUCs);
+        uchBuildPills("uch-panel-uc", _ucs, _uchState.uc, function(u) {
+          _uchState.uc = u;
+          buildUCPills();
+          uchUpdateBreadcrumb();
+          uchSaveState();
+          renderUCHealth();
+        });
+      })();
     }
     uchUpdateBreadcrumb();
     uchSlideToStep(arrivedAtStep);
