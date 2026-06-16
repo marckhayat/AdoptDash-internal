@@ -142,7 +142,7 @@ function renderTesting(data) {
     var totals      = {};
     var dealCounts  = {};
     var dimNames    = {};
-    var dealValueMap = {}; // dim → { key: value } for per-deal breakdown
+    var dealValueMap = {}; // dim → { key: {value, optedIn} }
     filtered.forEach(function(r) {
       var dim  = String(r[dimField] || "(Unknown)").trim();
       var name = String(r[nameField] || dim).trim();
@@ -152,12 +152,13 @@ function renderTesting(data) {
       if (key && seenKeys[dedupeKey]) return;
       if (key) seenKeys[dedupeKey] = true;
       var val = parseFloat(r["Potential Incentives"]) || 0;
+      var optedIn = norm(r["Adopt Rebate Opt-In Status"]) === "OPTED IN";
       totals[dim]     = (totals[dim]     || 0) + val;
       dealCounts[dim] = (dealCounts[dim] || 0) + 1;
       if (!dimNames[dim])    dimNames[dim]    = {};
       if (!dealValueMap[dim]) dealValueMap[dim] = {};
       dimNames[dim][name] = (dimNames[dim][name] || 0) + 1;
-      dealValueMap[dim][key] = (dealValueMap[dim][key] || 0) + val;
+      dealValueMap[dim][key] = { value: (dealValueMap[dim][key] ? dealValueMap[dim][key].value : 0) + val, optedIn: optedIn };
     });
 
     // Build primary label (most frequent name) and full name list per dim
@@ -173,11 +174,15 @@ function renderTesting(data) {
 
     // Sort descending
     var entries = Object.keys(totals).map(function(k){
-      // sort deal values descending (largest chunk at bottom of stacked bar)
-      var dvals = Object.values(dealValueMap[k] || {}).sort(function(a,b){ return b-a; });
-      return { id: k, label: primaryLabel(k), names: allNames(k), value: totals[k], deals: dealCounts[k] || 0, dealValues: dvals };
+      var dvals = Object.values(dealValueMap[k] || {}).sort(function(a,b){ return b.value - a.value; });
+      return { id: k, label: primaryLabel(k), names: allNames(k), value: totals[k], deals: dealCounts[k] || 0, dealValues: dvals,
+               hasOptedIn: dvals.some(function(d){ return d.optedIn; }) };
     });
-    entries.sort(function(a,b){ return b.value - a.value; });
+    entries.sort(function(a,b){
+      if (b.value !== a.value) return b.value - a.value;
+      if (mode === "eligible" && a.hasOptedIn !== b.hasOptedIn) return a.hasOptedIn ? -1 : 1;
+      return a.label.localeCompare(b.label);
+    });
 
     var grandTotal  = entries.reduce(function(s,e){ return s + e.value; }, 0);
     var grandDeals  = entries.reduce(function(s,e){ return s + e.deals; }, 0);
@@ -200,49 +205,124 @@ function renderTesting(data) {
 
     // Save filter state
     if (window.APP_FILTER_STATE) {
-      window.APP_FILTER_STATE.testing = { portfolio: portfolioFilter, offer: offerFilter, topN: String(topN), mode: mode, csFrom: csFromIdx, csTo: csToIdx };
+      window.APP_FILTER_STATE.testing = { portfolio: portfolioFilter, offer: offerFilter, topN: String(topN), mode: mode, csFrom: csFromIdx, csTo: csToIdx,
+        optedInHidden: !!(window.APP_FILTER_STATE.testing && window.APP_FILTER_STATE.testing.optedInHidden),
+        notOptedInHidden: !!(window.APP_FILTER_STATE.testing && window.APP_FILTER_STATE.testing.notOptedInHidden) };
     }
 
     // KPIs
     var kpiEl = document.getElementById("pareto-kpis");
-    // Build deep link preset based on current mode + slicers
-    var preset = { stage: ["Eligible"], sortField: "Potential Incentives", sortDir: "desc" };
-    if (mode === "optedin") preset.optIn = ["OPTED IN"];
-    if (portfolioFilter) preset.portfolio = portfolioFilter;
-    if (offerFilter)     preset.offer     = offerFilter;
-    if (csActive) { preset.csFrom = csFromIdx; preset.csTo = csToIdx; }
-    var presetJson = JSON.stringify(preset).replace(/"/g, "&quot;");
+
+    function buildPreset(optedInHidden, notOptedInHidden) {
+      var p = { stage: ["Eligible"], sortField: "Potential Incentives", sortDir: "desc" };
+      if (mode === "eligible") {
+        p.maxIncentive = true;
+        if (notOptedInHidden && !optedInHidden)  p.optIn = ["OPTED IN"];
+        if (optedInHidden    && !notOptedInHidden) p.optIn = ["PENDING"];
+      } else {
+        p.optIn = ["OPTED IN"];
+      }
+      if (portfolioFilter) p.portfolio = portfolioFilter;
+      if (offerFilter)     p.offer     = offerFilter;
+      if (csActive) { p.csFrom = csFromIdx; p.csTo = csToIdx; }
+      return p;
+    }
+
+    function updateDeepLink(optedInHidden, notOptedInHidden) {
+      _deepLinkPreset = buildPreset(optedInHidden, notOptedInHidden);
+    }
+
+    var _deepLinkPreset = buildPreset(false, false);
 
     kpiEl.innerHTML =
       '<div class="d-flex justify-content-between align-items-baseline"><span class="text-muted small">Total Potential</span><span class="fw-bold">' + fmtCurrency(grandTotal) + '</span></div>' +
       '<div class="d-flex justify-content-between align-items-baseline"><span class="text-muted small">' + dimLabel + 's in top ' + topN + '</span><span class="fw-bold">' + top.length + ' <span class="text-muted fw-normal" style="font-size:0.75rem">(' + topDeals + ' WS deals)</span></span></div>' +
       '<div class="d-flex justify-content-between align-items-baseline"><span class="text-muted small">' + dimLabel + 's driving 80%</span><span class="fw-bold text-warning">' + pct80Count + ' <span class="text-muted fw-normal" style="font-size:0.75rem">(' + deals80 + ' WS deals)</span></span></div>' +
       '<div class="d-flex justify-content-between align-items-baseline"><span class="text-muted small">Their share</span><span class="fw-bold text-danger">' + (grandTotal > 0 ? ((top.slice(0,pct80Count).reduce(function(s,e){return s+e.value;},0)/grandTotal*100).toFixed(1)) : "0.0") + '%</span></div>' +
-      '<div class="mt-auto pt-2 border-top"><a href="#" class="small" onclick=\'event.preventDefault();window.navigateToDetails(' + presetJson + ')\'><i class="bi bi-box-arrow-up-right me-1"></i>Open in Details tab</a></div>';
+      '<div class="mt-auto pt-2 border-top"><a href="#" id="pareto-deeplink" class="small"><i class="bi bi-box-arrow-up-right me-1"></i>Open in Details tab</a></div>';
+
+    document.getElementById("pareto-deeplink").addEventListener("click", function(e) {
+      e.preventDefault();
+      window.navigateToDetails(_deepLinkPreset);
+    });
 
     // Chart — stacked bars (one dataset per deal rank)
     if (_paretoChart) { _paretoChart.destroy(); _paretoChart = null; }
     var ctx = document.getElementById("pareto-chart").getContext("2d");
 
-    var maxDeals = top.reduce(function(m,e){ return Math.max(m, e.dealValues.length); }, 0);
+    var hasOptedIn = mode === "eligible" && top.some(function(e){ return e.dealValues.some(function(d){ return d.optedIn; }); });
 
     var barDatasets = [];
-    for (var di = 0; di < maxDeals; di++) {
-      (function(dealIdx) {
-        barDatasets.push({
-          type: "bar",
-          label: dealIdx === 0 ? "Potential Incentives" : "_d" + dealIdx,
-          order: 2,
-          stack: "deals",
-          data: top.map(function(e){ return e.dealValues[dealIdx] || 0; }),
-          backgroundColor: top.map(function(e, i){
-            return (cutoff80 === -1 || i <= cutoff80) ? "rgba(255,193,7,0.75)" : "rgba(108,117,125,0.45)";
-          }),
-          borderColor: "rgba(255,255,255,1)",
-          borderWidth: { top: 2, right: 0, bottom: 0, left: 0 },
-          yAxisID: "y"
-        });
-      })(di);
+
+    if (mode === "eligible") {
+      // Split into two separate stacks: opted-in and not-opted-in
+      var maxOptedIn    = top.reduce(function(m,e){ return Math.max(m, e.dealValues.filter(function(d){ return  d.optedIn; }).length); }, 0);
+      var maxNotOptedIn = top.reduce(function(m,e){ return Math.max(m, e.dealValues.filter(function(d){ return !d.optedIn; }).length); }, 0);
+
+      // Not opted-in layers (yellow)
+      for (var di = 0; di < maxNotOptedIn; di++) {
+        (function(idx) {
+          barDatasets.push({
+            type: "bar", order: 2, stack: "deals",
+            label: idx === 0 ? "Not opted-in" : "_no" + idx,
+            _group: "notopted",
+            data: top.map(function(e){
+              var dv = e.dealValues.filter(function(d){ return !d.optedIn; });
+              return dv[idx] ? dv[idx].value : 0;
+            }),
+            backgroundColor: top.map(function(e, i){
+              var dv = e.dealValues.filter(function(d){ return !d.optedIn; });
+              if (!dv[idx]) return "rgba(0,0,0,0)";
+              return (cutoff80 === -1 || i <= cutoff80) ? "rgba(255,193,7,0.75)" : "rgba(108,117,125,0.45)";
+            }),
+            borderColor: "rgba(255,255,255,1)",
+            borderWidth: { top: 2, right: 0, bottom: 0, left: 0 },
+            yAxisID: "y"
+          });
+        })(di);
+      }
+      // Opted-in layers (green)
+      for (var di2 = 0; di2 < maxOptedIn; di2++) {
+        (function(idx) {
+          barDatasets.push({
+            type: "bar", order: 2, stack: "deals",
+            label: idx === 0 ? "Opted-in" : "_oi" + idx,
+            _group: "optedin",
+            data: top.map(function(e){
+              var dv = e.dealValues.filter(function(d){ return d.optedIn; });
+              return dv[idx] ? dv[idx].value : 0;
+            }),
+            backgroundColor: top.map(function(e, i){
+              var dv = e.dealValues.filter(function(d){ return d.optedIn; });
+              if (!dv[idx]) return "rgba(0,0,0,0)";
+              return (cutoff80 === -1 || i <= cutoff80) ? "rgba(25,135,84,0.80)" : "rgba(25,135,84,0.40)";
+            }),
+            borderColor: "rgba(255,255,255,1)",
+            borderWidth: { top: 2, right: 0, bottom: 0, left: 0 },
+            yAxisID: "y"
+          });
+        })(di2);
+      }
+    } else {
+      // Opted-in mode: all deals green
+      var maxDeals = top.reduce(function(m,e){ return Math.max(m, e.dealValues.length); }, 0);
+      for (var di3 = 0; di3 < maxDeals; di3++) {
+        (function(idx) {
+          barDatasets.push({
+            type: "bar", order: 2, stack: "deals",
+            label: idx === 0 ? "Opted-in" : "_d" + idx,
+            _group: "optedin",
+            data: top.map(function(e){ return e.dealValues[idx] ? e.dealValues[idx].value : 0; }),
+            backgroundColor: top.map(function(e, i){
+              if (!e.dealValues[idx]) return "rgba(0,0,0,0)";
+              return (cutoff80 === -1 || i <= cutoff80) ? "rgba(25,135,84,0.80)" : "rgba(25,135,84,0.40)";
+            }),
+            borderColor: "rgba(255,255,255,1)",
+            borderWidth: { top: 2, right: 0, bottom: 0, left: 0 },
+            yAxisID: "y"
+          });
+        })(di3);
+      }
     }
 
     _paretoChart = new Chart(ctx, {
@@ -267,17 +347,68 @@ function renderTesting(data) {
         maintainAspectRatio: false,
         interaction: { mode: "index", intersect: false },
         plugins: {
+          title: {
+            display: true,
+            text: "Potential Incentives",
+            align: "start",
+            font: { size: 12, weight: "600" },
+            padding: { bottom: 6 }
+          },
           legend: {
             position: "top",
+            align: "center",
             labels: {
               font: { size: 11 },
-              filter: function(item) { return !item.text.startsWith("_d"); }
+              generateLabels: function(chart) {
+                var labels = [];
+                function groupHidden(group) {
+                  return chart.data.datasets.every(function(ds, i){
+                    return ds._group !== group || chart.getDatasetMeta(i).hidden;
+                  });
+                }
+                if (mode === "eligible") {
+                  labels.push({ text: "Opted-in",     fillStyle: "rgba(25,135,84,0.80)", strokeStyle: "rgba(255,255,255,1)", lineWidth: 1, hidden: groupHidden("optedin") });
+                  labels.push({ text: "Not opted-in", fillStyle: "rgba(255,193,7,0.75)", strokeStyle: "rgba(255,255,255,1)", lineWidth: 1, hidden: groupHidden("notopted") });
+                } else {
+                  labels.push({ text: "Opted-in",     fillStyle: "rgba(25,135,84,0.80)", strokeStyle: "rgba(255,255,255,1)", lineWidth: 1, hidden: groupHidden("optedin") });
+                }
+                // Line entry
+                chart.data.datasets.forEach(function(ds, i) {
+                  if (ds.yAxisID === "y2") {
+                    var meta = chart.getDatasetMeta(i);
+                    labels.push({ text: ds.label, fillStyle: ds.borderColor, strokeStyle: ds.borderColor, lineWidth: 2, hidden: meta.hidden, lineDash: [], datasetIndex: i, pointStyle: "line" });
+                  }
+                });
+                return labels;
+              }
+            },
+            onClick: function(e, legendItem, legend) {
+              var chart = legend.chart;
+              if (legendItem.text === "Cumulative %") {
+                Chart.defaults.plugins.legend.onClick.call(this, e, legendItem, legend);
+                return;
+              }
+              var group = legendItem.text === "Opted-in" ? "optedin" : "notopted";
+              var anyVisible = chart.data.datasets.some(function(ds, i){
+                return ds._group === group && !chart.getDatasetMeta(i).hidden;
+              });
+              chart.data.datasets.forEach(function(ds, i){
+                if (ds._group === group) chart.getDatasetMeta(i).hidden = anyVisible;
+              });
+              chart.update();
+              // Update deep link and persist legend state
+              var optedInHidden    = chart.data.datasets.every(function(ds,i){ return ds._group !== "optedin"  || chart.getDatasetMeta(i).hidden; });
+              var notOptedInHidden = chart.data.datasets.every(function(ds,i){ return ds._group !== "notopted" || chart.getDatasetMeta(i).hidden; });
+              updateDeepLink(optedInHidden, notOptedInHidden);
+              if (window.APP_FILTER_STATE && window.APP_FILTER_STATE.testing) {
+                window.APP_FILTER_STATE.testing.optedInHidden    = optedInHidden;
+                window.APP_FILTER_STATE.testing.notOptedInHidden = notOptedInHidden;
+              }
             }
           },
           tooltip: {
             filter: function(item) {
-              // For bars only show the first dataset (avoids one line per stack layer)
-              return item.dataset.yAxisID === "y2" || item.dataset.label === "Potential Incentives";
+              return item.dataset.yAxisID === "y2" || item.dataset.label === "Opted-in" || item.dataset.label === "Not opted-in";
             },
             callbacks: {
               label: function(ctx) {
@@ -313,7 +444,6 @@ function renderTesting(data) {
           y: {
             stacked: true,
             position: "left",
-            title: { display: true, text: "Potential Incentives ($)", font: { size: 11 } },
             ticks: {
               font: { size: 10 },
               callback: function(v) { return "$" + (v >= 1e6 ? (v/1e6).toFixed(1)+"M" : v >= 1e3 ? (v/1e3).toFixed(0)+"K" : v); }
@@ -330,6 +460,19 @@ function renderTesting(data) {
         }
       }
     });
+
+    // Restore legend hidden state
+    var _fs = window.APP_FILTER_STATE && window.APP_FILTER_STATE.testing;
+    if (_fs && mode === "eligible") {
+      if (_fs.optedInHidden || _fs.notOptedInHidden) {
+        _paretoChart.data.datasets.forEach(function(ds, i) {
+          if (_fs.optedInHidden    && ds._group === "optedin")  _paretoChart.getDatasetMeta(i).hidden = true;
+          if (_fs.notOptedInHidden && ds._group === "notopted") _paretoChart.getDatasetMeta(i).hidden = true;
+        });
+        _paretoChart.update();
+        updateDeepLink(_fs.optedInHidden, _fs.notOptedInHidden);
+      }
+    }
   }
 
   // ── Stage slider ───────────────────────────────────────────────────────────

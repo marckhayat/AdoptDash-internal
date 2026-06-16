@@ -112,7 +112,8 @@ function renderOverview(data) {
   html += '<div id="ovw-table-area"></div>';
   html += '<p class="text-muted small fst-italic mt-2" style="font-size:0.78rem">' +
     '<i class="bi bi-info-circle me-1"></i>' +
-    'Values in columns Total UC Eligible through Missed Incentives (progressed) cannot be summed because earning is available to one use case per offer per customer.' +
+    'Values in columns Total UC Eligible through Missed Incentives (progressed) cannot be summed because earning is available to one use case per offer per customer. ' +
+    'Review <a href="https://www.cisco.com/site/us/en/partners/cisco-partner-program/benefits/incentives/lifecycle/resources.html" target="_blank" rel="noopener">CPI resources</a>.' +
     '</p>';
 
   el.innerHTML = html;

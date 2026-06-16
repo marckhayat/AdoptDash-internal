@@ -69,7 +69,7 @@ function renderPVI(data) {
 
   // ── Build HTML
   var html = '<div class="disclaimer-card mb-3">';
-  html += '<i class="bi bi-info-circle me-1"></i>Partners should rely on <strong>PXP (Partner Experience Platform)</strong> for official PVI scores. ';
+  html += '<i class="bi bi-info-circle me-1"></i>Partners should rely on <strong><a href="https://cisco-pxp.my.site.com/pxp/s/" target="_blank" rel="noopener">PXP (Partner Experience Platform)</a></strong> for official PVI scores. ';
   html += 'The below is an indication of the Engagement score based on current CPI performance. Score may differ slightly from PXP due to the timing of data capture.';
   html += '</div>';
 

@@ -185,6 +185,7 @@ function renderDetails(data) {
   html += '<div class="form-check form-check-sm"><input class="form-check-input" type="checkbox" id="filter-earned"><label class="form-check-label" for="filter-earned">Earned' + tip("Deals where incentives have been earned.") + '</label></div>';
   html += '<div class="form-check form-check-sm"><input class="form-check-input" type="checkbox" id="filter-ea"><label class="form-check-label" for="filter-ea">EA' + tip("EA deals.") + '</label></div>';
   html += '<div class="form-check form-check-sm"><input class="form-check-input" type="checkbox" id="filter-aap"><label class="form-check-label" for="filter-aap">AAP' + tip("Completed the Adoption Accountability Plan.") + '</label></div>';
+  html += '<div class="form-check form-check-sm"><input class="form-check-input" type="checkbox" id="filter-max-incentive"><label class="form-check-label" for="filter-max-incentive">Max Incentive' + tip("One UC per offer per customer: the opted-in UC if available, otherwise the highest remaining potential incentive.") + '</label></div>';
   html += '<div class="d-flex gap-2 align-items-center mt-1 mb-0" style="font-size:0.78rem"><span class="text-muted">Offer opted-in:' + tip("Any UC opted-in within this offer.") + '</span>';
   html += '<div class="form-check form-check-sm mb-0"><input class="form-check-input" type="checkbox" id="filter-offer-optedin-y" value="Y"><label class="form-check-label" for="filter-offer-optedin-y">Y</label></div>';
   html += '<div class="form-check form-check-sm mb-0"><input class="form-check-input" type="checkbox" id="filter-offer-optedin-n" value="N"><label class="form-check-label" for="filter-offer-optedin-n">N</label></div>';
@@ -451,6 +452,7 @@ function renderDetails(data) {
     if (dl.optIn)         { dl.optIn.forEach(function(s) { document.querySelectorAll('#filter-optin input[type=checkbox]').forEach(function(cb) { if (cb.value.toUpperCase() === s.toUpperCase()) cb.checked = true; }); }); }
     if (dl.sortField) { sortField = dl.sortField; }
     if (dl.sortDir)   { sortDir   = dl.sortDir;   }
+    if (dl.maxIncentive) { var _cbMax = document.getElementById("filter-max-incentive"); if (_cbMax) _cbMax.checked = true; }
     if (dl.offerOptedInN) { var _cbn = document.getElementById("filter-offer-optedin-n"); if (_cbn) _cbn.checked = true; }
     if (dl.offerOptedInY) { var _cby = document.getElementById("filter-offer-optedin-y"); if (_cby) _cby.checked = true; }
     if (dl.portfolio) {
@@ -559,7 +561,7 @@ function renderDetails(data) {
     var _boolMap = { offerOptedInY:"filter-offer-optedin-y", offerOptedInN:"filter-offer-optedin-n",
       pviEligible:"filter-pvi-Eligible", pviOnboard:"filter-pvi-Onboard", pviAdopt:"filter-pvi-Adopt",
       newEligible:"filter-new-eligible", expiresSoon:"filter-expires-soon",
-      earned:"filter-earned", ea:"filter-ea", aap:"filter-aap" };
+      earned:"filter-earned", ea:"filter-ea", aap:"filter-aap", maxIncentive:"filter-max-incentive" };
     Object.keys(_boolMap).forEach(function(key) {
       var cbEl = document.getElementById(_boolMap[key]);
       if (cbEl && st[key]) cbEl.checked = true;
@@ -610,6 +612,7 @@ function renderDetails(data) {
         earned:        !!(document.getElementById("filter-earned")          || {}).checked,
         ea:            !!(document.getElementById("filter-ea")              || {}).checked,
         aap:           !!(document.getElementById("filter-aap")             || {}).checked,
+        maxIncentive:  !!(document.getElementById("filter-max-incentive")  || {}).checked,
         bkFrom:        window._sliderUserSet["det-bk"]  ? (document.getElementById("det-bk-from")  || {value:null}).value : null,
         bkTo:          window._sliderUserSet["det-bk"]  ? (document.getElementById("det-bk-to")    || {value:null}).value : null,
         rsFrom:        window._sliderUserSet["det-rs"]  ? (document.getElementById("det-rs-from")  || {value:null}).value : null,
@@ -641,7 +644,8 @@ function renderDetails(data) {
     var expiresSoon      = document.getElementById("filter-expires-soon").checked;
     var earnedChecked    = document.getElementById("filter-earned").checked;
     var eaChecked        = document.getElementById("filter-ea").checked;
-    var aapChecked       = document.getElementById("filter-aap").checked;
+    var aapChecked        = document.getElementById("filter-aap").checked;
+    var maxIncentiveChecked = !!(document.getElementById("filter-max-incentive") || {}).checked;
     var bkFrom  = document.getElementById("det-bk-from");
     var bkTo    = document.getElementById("det-bk-to");
     var rsFrom  = document.getElementById("det-rs-from");
@@ -702,7 +706,8 @@ function renderDetails(data) {
       }
       if (earnedChecked    && r["Earned?"] !== true)                                                        return false;
       if (eaChecked        && String(r["EA Flag"] || "") !== "Yes")                                         return false;
-      if (aapChecked       && String(r["AAP Flag"] || "") !== "Yes")                                        return false;
+      if (aapChecked          && String(r["AAP Flag"] || "") !== "Yes")                      return false;
+      if (maxIncentiveChecked && norm(r["Maximum Incentive Deal Flag"]) !== "YES")          return false;
 
       if (bkFromDate || bkToDate) {
         var d = toDate(r["Booking Date"]);
@@ -785,24 +790,33 @@ function renderDetails(data) {
     var dateFields    = { "Deal Incentive Expiry Date": true, "Booking Date": true, "Adopt Rebate Start Date": true };
     filteredData.sort(function (a, b) {
       var av = a[sortField], bv = b[sortField];
+      var primary;
       if (sortField === "Current stage") {
         var ai = currentStageOrder.indexOf(av || ""), bi = currentStageOrder.indexOf(bv || "");
         if (ai === -1) ai = currentStageOrder.length;
         if (bi === -1) bi = currentStageOrder.length;
-        return sortDir === "asc" ? ai - bi : bi - ai;
+        primary = sortDir === "asc" ? ai - bi : bi - ai;
       } else if (numericFields[sortField]) {
         av = av || 0; bv = bv || 0;
-        return sortDir === "asc" ? av - bv : bv - av;
+        primary = sortDir === "asc" ? av - bv : bv - av;
       } else if (dateFields[sortField]) {
         var ad = toDate(av), bd = toDate(bv);
-        if (!ad && !bd) return 0;
-        if (!ad) return sortDir === "asc" ? 1 : -1;
-        if (!bd) return sortDir === "asc" ? -1 : 1;
-        return sortDir === "asc" ? ad - bd : bd - ad;
+        if (!ad && !bd) primary = 0;
+        else if (!ad) primary = sortDir === "asc" ? 1 : -1;
+        else if (!bd) primary = sortDir === "asc" ? -1 : 1;
+        else primary = sortDir === "asc" ? ad - bd : bd - ad;
       } else {
         av = String(av || "").toLowerCase(); bv = String(bv || "").toLowerCase();
-        return sortDir === "asc" ? av.localeCompare(bv) : bv.localeCompare(av);
+        primary = sortDir === "asc" ? av.localeCompare(bv) : bv.localeCompare(av);
       }
+      if (primary !== 0) return primary;
+      // Alphabetical tiebreaker (only when primary sort is not already by name)
+      if (sortField !== "CR Party Name") {
+        var an = String(a["CR Party Name"] || "").toLowerCase();
+        var bn = String(b["CR Party Name"] || "").toLowerCase();
+        return an.localeCompare(bn);
+      }
+      return 0;
     });
   }
 
@@ -1182,7 +1196,8 @@ function renderDetails(data) {
         if (document.getElementById("filter-expires-soon") && document.getElementById("filter-expires-soon").checked) activeFilters.push("Expires Soon (<1M)");
         if (document.getElementById("filter-earned")       && document.getElementById("filter-earned").checked)       activeFilters.push("Earned");
         if (document.getElementById("filter-ea")           && document.getElementById("filter-ea").checked)           activeFilters.push("EA");
-        if (document.getElementById("filter-aap")          && document.getElementById("filter-aap").checked)          activeFilters.push("AAP");
+        if (document.getElementById("filter-aap")           && document.getElementById("filter-aap").checked)           activeFilters.push("AAP");
+        if (document.getElementById("filter-max-incentive") && document.getElementById("filter-max-incentive").checked) activeFilters.push("Max Incentive");
 
         // Build sheet rows array
         var sheetData = [];
