@@ -468,6 +468,7 @@ function renderDetails(data) {
       }
     }
     if (dl.offer) { var _ofEl = document.getElementById("filter-offer"); if (_ofEl) _ofEl.value = dl.offer; refreshUcDropdown(); }
+    if (dl.uc)    { var _ucEl = document.getElementById("filter-uc");    if (_ucEl) _ucEl.value = dl.uc; }
     if (dl.csFrom !== undefined || dl.csTo !== undefined) {
       var _csFrom = document.getElementById("det-cs-from");
       var _csTo   = document.getElementById("det-cs-to");

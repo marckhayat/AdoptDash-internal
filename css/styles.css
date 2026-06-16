@@ -332,6 +332,57 @@
   background: var(--cisco-blue2); cursor: pointer;
   border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.3);
 }
+
+/* ── UC Health cascade selector ───────────────────────────── */
+.uch-selector {
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1.25rem;
+  overflow: hidden;
+}
+.uch-breadcrumb {
+  font-size: 0.8rem;
+  color: #6c757d;
+  margin-bottom: 0.6rem;
+  min-height: 1.2rem;
+}
+.uch-breadcrumb .uch-bc-step {
+  cursor: pointer;
+  color: var(--cisco-blue2);
+  text-decoration: underline dotted;
+}
+.uch-breadcrumb .uch-bc-step:hover { color: var(--cisco-blue); }
+.uch-breadcrumb .uch-bc-sep { margin: 0 0.3rem; color: #adb5bd; }
+.uch-breadcrumb .uch-bc-current { color: #495057; font-weight: 600; }
+
+.uch-slide-track {
+  display: flex;
+  transition: transform 0.28s cubic-bezier(.4,0,.2,1);
+  will-change: transform;
+}
+.uch-slide-panel {
+  min-width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  padding: 0.25rem 0;
+}
+.uch-pill {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.82rem;
+  cursor: pointer;
+  border: 1px solid #ced4da;
+  background: #fff;
+  color: #212529;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  user-select: none;
+}
+.uch-pill:hover { background: var(--cisco-blue); border-color: var(--cisco-blue); color: #fff; }
+.uch-pill.selected { background: var(--cisco-blue2); border-color: var(--cisco-blue2); color: #fff; font-weight: 600; }
 .dual-range-wrap input[type=range]::-moz-range-thumb {
   pointer-events: all; width: 14px; height: 14px; border-radius: 50%;
   background: var(--cisco-blue2); cursor: pointer; border: 2px solid #fff;
