@@ -111,6 +111,7 @@ function renderTesting(data) {
   var _newTag = new Date() < new Date('2026-06-29') ? '<span class="position-absolute text-danger fw-bold" style="top:1px;right:2px;font-size:0.5rem;line-height:1">NEW</span>' : '';
   html += '<li class="nav-item position-relative"><button class="nav-link" id="tab-btn-pareto"><i class="bi bi-bar-chart-steps me-1"></i>Customer Analysis</button>' + _newTag + '</li>';
   html += '<li class="nav-item position-relative"><button class="nav-link" id="tab-btn-uch"><i class="bi bi-heart-pulse me-1"></i>UC Health</button>' + _newTag + '</li>';
+  html += '<li class="nav-item"><button class="nav-link" id="tab-btn-lifecycle"><i class="bi bi-bar-chart me-1"></i>Lifecycle</button></li>';
   html += '</ul>';
 
   // ── CPI Adopt sub-view ────────────────────────────────────────────────────
@@ -205,6 +206,11 @@ function renderTesting(data) {
 
   html += '<div id="uch-stats"></div>';
   html += '</div>'; // close testing-view-uch
+
+  // ── Lifecycle sub-view ────────────────────────────────────────────────────
+  html += '<div id="testing-view-lifecycle" style="display:none">';
+  html += '<div id="tab-lifecycle"></div>';
+  html += '</div>';
 
   html += '</div>'; // close outer div.p-3
   el.innerHTML = html;
@@ -784,6 +790,12 @@ function renderTesting(data) {
           : (_uchState.portfolio ? Array.from(uchUCsForPortfolio(_uchState.portfolio)).sort() : uchAllUCs);
         uchBuildPills("uch-panel-uc", _ucs, _uchState.uc, function(u) {
           _uchState.uc = u;
+          // Reset stage slider when switching UC
+          var _sf = document.getElementById("uch-cs-from");
+          var _st = document.getElementById("uch-cs-to");
+          if (_sf) _sf.value = 0;
+          if (_st) _st.value = stageMaxIdx;
+          updateUCHStageSliderDisplay();
           buildUCPills();
           uchUpdateBreadcrumb();
           uchSaveState();
@@ -938,10 +950,11 @@ function renderTesting(data) {
 
   // View switcher
   function showSubView(view) {
-    document.getElementById("testing-view-cpi").style.display    = view === "cpi"    ? "" : "none";
-    document.getElementById("testing-view-pareto").style.display = view === "pareto" ? "" : "none";
-    document.getElementById("testing-view-uch").style.display    = view === "uch"    ? "" : "none";
-    ["tab-btn-cpi","tab-btn-pareto","tab-btn-uch"].forEach(function(id) {
+    document.getElementById("testing-view-cpi").style.display        = view === "cpi"       ? "" : "none";
+    document.getElementById("testing-view-pareto").style.display     = view === "pareto"    ? "" : "none";
+    document.getElementById("testing-view-uch").style.display        = view === "uch"       ? "" : "none";
+    document.getElementById("testing-view-lifecycle").style.display  = view === "lifecycle" ? "" : "none";
+    ["tab-btn-cpi","tab-btn-pareto","tab-btn-uch","tab-btn-lifecycle"].forEach(function(id) {
       var btn = document.getElementById(id);
       if (btn) btn.classList.toggle("active", id === "tab-btn-" + view);
     });
@@ -1013,6 +1026,10 @@ function renderTesting(data) {
     renderPareto();
   });
   document.getElementById("tab-btn-uch").addEventListener("click", function() { showSubView("uch"); });
+  document.getElementById("tab-btn-lifecycle").addEventListener("click", function() {
+    showSubView("lifecycle");
+    renderLifecycle(data);
+  });
 
   // Restore active sub-view (or default to CPI Adopt)
   var savedView = _saved && _saved.view;
@@ -1024,6 +1041,9 @@ function renderTesting(data) {
     renderPareto();
   } else if (savedView === "uch") {
     showSubView("uch");
+  } else if (savedView === "lifecycle") {
+    showSubView("lifecycle");
+    renderLifecycle(data);
   } else {
     showSubView("cpi");
     renderCPIAdopt(data);
