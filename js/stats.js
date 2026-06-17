@@ -683,8 +683,12 @@ function renderTesting(data) {
   function uchSaveState() {
     if (window.APP_FILTER_STATE) {
       var cur = window.APP_FILTER_STATE.testing || {};
+      var uchCsFrom = document.getElementById("uch-cs-from");
+      var uchCsTo   = document.getElementById("uch-cs-to");
       window.APP_FILTER_STATE.testing = Object.assign({}, cur, {
-        view: "uch", uchPortfolio: _uchState.portfolio, uchOffer: _uchState.offer, uchUC: _uchState.uc
+        view: "uch", uchPortfolio: _uchState.portfolio, uchOffer: _uchState.offer, uchUC: _uchState.uc,
+        uchCsFrom: uchCsFrom ? parseInt(uchCsFrom.value) : 0,
+        uchCsTo:   uchCsTo   ? parseInt(uchCsTo.value)   : stageMaxIdx
       });
     }
   }
@@ -969,6 +973,10 @@ function renderTesting(data) {
       _uchState.offer     = _saved.uchOffer     || "";
       _uchState.uc        = _saved.uchUC        || "";
     }
+    // Restore UCH stage slider
+    if (_saved.uchCsFrom !== undefined) { var _ucf = document.getElementById("uch-cs-from"); if (_ucf) _ucf.value = _saved.uchCsFrom; }
+    if (_saved.uchCsTo   !== undefined) { var _uct = document.getElementById("uch-cs-to");   if (_uct) _uct.value = _saved.uchCsTo;   }
+    updateUCHStageSliderDisplay();
   }
 
   // Bootstrap portfolio pills (always) — then restore slide position if needed
