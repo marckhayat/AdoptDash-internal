@@ -284,6 +284,8 @@ function renderTesting(data) {
       return a.label.localeCompare(b.label);
     });
 
+    var uniqueCustomers = new Set(filtered.map(function(r){ return r["CR Party ID"]; })).size;
+
     var grandTotal  = entries.reduce(function(s,e){ return s + e.value; }, 0);
     var grandDeals  = entries.reduce(function(s,e){ return s + e.deals; }, 0);
     var top         = entries.slice(0, topN);
@@ -339,6 +341,7 @@ function renderTesting(data) {
       '<div class="d-flex justify-content-between align-items-baseline"><span class="text-muted small">' + dimLabel + 's in top ' + topN + '</span><span class="fw-bold">' + top.length + ' <span class="text-muted fw-normal" style="font-size:0.75rem">(' + topDeals + ' WS deals)</span></span></div>' +
       '<div class="d-flex justify-content-between align-items-baseline"><span class="text-muted small">' + dimLabel + 's driving 80%</span><span class="fw-bold text-warning">' + pct80Count + ' <span class="text-muted fw-normal" style="font-size:0.75rem">(' + deals80 + ' WS deals)</span></span></div>' +
       '<div class="d-flex justify-content-between align-items-baseline"><span class="text-muted small">Their share</span><span class="fw-bold text-danger">' + (grandTotal > 0 ? ((top.slice(0,pct80Count).reduce(function(s,e){return s+e.value;},0)/grandTotal*100).toFixed(1)) : "0.0") + '%</span></div>' +
+      '<div class="d-flex justify-content-between align-items-baseline"><span class="text-muted small">Total Customers</span><span class="fw-bold">' + uniqueCustomers + '</span></div>' +
       '<div class="mt-auto pt-2 border-top"><a href="#" id="pareto-deeplink" class="small"><i class="bi bi-box-arrow-up-right me-1"></i>Open in Details tab</a></div>';
 
     document.getElementById("pareto-deeplink").addEventListener("click", function(e) {
