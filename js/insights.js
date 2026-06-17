@@ -1,4 +1,4 @@
-// stats.js — Stats tab: CPI Adopt, Customer Analysis, UC Health
+// insights.js — Insights tab: CPI Adopt, Customer Analysis, UC Health, Lifecycle
 var _paretoChart = null;
 
 function renderTesting(data) {
@@ -1050,4 +1050,4 @@ function renderTesting(data) {
   }
 }
 
-window.renderStats = renderTesting;
+window.renderInsights = renderTesting;

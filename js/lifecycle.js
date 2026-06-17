@@ -75,7 +75,11 @@ function renderLifecycle(data) {
   html += '</div>';
   html += '</div>';
 
-  html += '<div class="chart-container" style="max-height:480px"><canvas id="lc-chart"></canvas></div>';
+  html += '<div style="display:inline-block;width:100%;position:relative">';
+  html += '<div class="chart-container" style="max-height:480px;padding-bottom:28px"><canvas id="lc-chart"></canvas>';
+  html += '<div style="position:absolute;bottom:0;left:0;right:0;text-align:center"><a href="#" id="lc-deeplink" class="small"><i class="bi bi-box-arrow-up-right me-1"></i>Open in Details tab</a></div>';
+  html += '</div>';
+  html += '</div>';
 
   el.innerHTML = html;
 
@@ -139,8 +143,24 @@ function renderLifecycle(data) {
     if (window.APP_FILTER_STATE) {
       window.APP_FILTER_STATE.lifecycle = { portfolio: portfolioFilter, offer: offerFilter, chartMode: chartMode };
     }
-    var now    = new Date();
-    var cutoff = new Date(now.getFullYear(), now.getMonth() - 17, 1);
+
+    // Update deep link
+    var dlEl = document.getElementById("lc-deeplink");
+    if (dlEl) {
+      dlEl.onclick = function(e) {
+        e.preventDefault();
+        var cutoff = window.get18MonthAgoStart ? window.get18MonthAgoStart() : new Date(new Date().getFullYear(), new Date().getMonth() - 17, 1);
+        var preset = {
+          stage: ["Eligible"],
+          maxIncentive: true,
+          bkFrom: Math.floor(cutoff.getTime() / 86400000)
+        };
+        if (portfolioFilter) preset.portfolio = portfolioFilter;
+        if (offerFilter)     preset.offer     = offerFilter;
+        if (window.navigateToDetails) window.navigateToDetails(preset);
+      };
+    }
+    var cutoff = window.get18MonthAgoStart ? window.get18MonthAgoStart() : new Date(new Date().getFullYear(), new Date().getMonth() - 17, 1);
 
     var subset = data.filter(function (r) {
       if (norm(r["Maximum Incentive Deal Flag"]) !== "YES") return false;
