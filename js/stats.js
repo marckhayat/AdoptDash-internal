@@ -108,8 +108,9 @@ function renderTesting(data) {
   // View switcher
   html += '<ul class="nav nav-pills mb-4" id="testing-view-tabs">';
   html += '<li class="nav-item"><button class="nav-link active" id="tab-btn-cpi"><i class="bi bi-graph-up-arrow me-1"></i>CPI Adopt</button></li>';
-  html += '<li class="nav-item position-relative"><button class="nav-link" id="tab-btn-pareto"><i class="bi bi-bar-chart-steps me-1"></i>Customer Analysis</button><span class="position-absolute text-danger fw-bold" style="top:1px;right:2px;font-size:0.5rem;line-height:1">NEW</span></li>';
-  html += '<li class="nav-item position-relative"><button class="nav-link" id="tab-btn-uch"><i class="bi bi-heart-pulse me-1"></i>UC Health</button><span class="position-absolute text-danger fw-bold" style="top:1px;right:2px;font-size:0.5rem;line-height:1">NEW</span></li>';
+  var _newTag = new Date() < new Date('2026-06-29') ? '<span class="position-absolute text-danger fw-bold" style="top:1px;right:2px;font-size:0.5rem;line-height:1">NEW</span>' : '';
+  html += '<li class="nav-item position-relative"><button class="nav-link" id="tab-btn-pareto"><i class="bi bi-bar-chart-steps me-1"></i>Customer Analysis</button>' + _newTag + '</li>';
+  html += '<li class="nav-item position-relative"><button class="nav-link" id="tab-btn-uch"><i class="bi bi-heart-pulse me-1"></i>UC Health</button>' + _newTag + '</li>';
   html += '</ul>';
 
   // ── CPI Adopt sub-view ────────────────────────────────────────────────────
@@ -307,9 +308,10 @@ function renderTesting(data) {
 
     // Save filter state
     if (window.APP_FILTER_STATE) {
-      window.APP_FILTER_STATE.testing = { portfolio: portfolioFilter, offer: offerFilter, topN: String(topN), mode: mode, csFrom: csFromIdx, csTo: csToIdx,
-        optedInHidden: !!(window.APP_FILTER_STATE.testing && window.APP_FILTER_STATE.testing.optedInHidden),
-        notOptedInHidden: !!(window.APP_FILTER_STATE.testing && window.APP_FILTER_STATE.testing.notOptedInHidden) };
+      var _cur = window.APP_FILTER_STATE.testing || {};
+      window.APP_FILTER_STATE.testing = { view: _cur.view || "pareto", portfolio: portfolioFilter, offer: offerFilter, topN: String(topN), mode: mode, csFrom: csFromIdx, csTo: csToIdx,
+        optedInHidden: !!_cur.optedInHidden,
+        notOptedInHidden: !!_cur.notOptedInHidden };
     }
 
     // KPIs
@@ -670,6 +672,10 @@ function renderTesting(data) {
 
   // ── Restore saved filter state ─────────────────────────────────────────────
   var _saved = window.APP_FILTER_STATE && window.APP_FILTER_STATE.testing;
+  // Ensure testing state object exists so view persists across renderPareto calls
+  if (window.APP_FILTER_STATE && !window.APP_FILTER_STATE.testing) {
+    window.APP_FILTER_STATE.testing = {};
+  }
 
   // ── UC Health: state + cascade selector ───────────────────────────────────
   var _uchState = { portfolio: "", offer: "", uc: "" };
@@ -926,6 +932,18 @@ function renderTesting(data) {
     statsEl.innerHTML = h;
   }
 
+  // View switcher
+  function showSubView(view) {
+    document.getElementById("testing-view-cpi").style.display    = view === "cpi"    ? "" : "none";
+    document.getElementById("testing-view-pareto").style.display = view === "pareto" ? "" : "none";
+    document.getElementById("testing-view-uch").style.display    = view === "uch"    ? "" : "none";
+    ["tab-btn-cpi","tab-btn-pareto","tab-btn-uch"].forEach(function(id) {
+      var btn = document.getElementById(id);
+      if (btn) btn.classList.toggle("active", id === "tab-btn-" + view);
+    });
+    if (window.APP_FILTER_STATE && window.APP_FILTER_STATE.testing) window.APP_FILTER_STATE.testing.view = view;
+  }
+
   // Initial render (deferred — Pareto view is hidden by default, render on tab click)
   // renderPareto() called lazily when Pareto sub-tab is activated
 
@@ -944,24 +962,12 @@ function renderTesting(data) {
     if (_saved.mode)   document.getElementById("pareto-mode").value   = _saved.mode;
     if (_saved.csFrom !== undefined) { var _csf = document.getElementById("pareto-cs-from"); if (_csf) _csf.value = _saved.csFrom; }
     if (_saved.csTo   !== undefined) { var _cst = document.getElementById("pareto-cs-to");   if (_cst) _cst.value = _saved.csTo;   }
-    if (_saved.portfolio || _saved.offer || _saved.topN || _saved.mode || _saved.csFrom !== undefined) {
-      updateStageSliderDisplay();
-      renderPareto();
-    }
 
     // Restore UCH state
     if (_saved.uchPortfolio || _saved.uchOffer || _saved.uchUC) {
       _uchState.portfolio = _saved.uchPortfolio || "";
       _uchState.offer     = _saved.uchOffer     || "";
       _uchState.uc        = _saved.uchUC        || "";
-    }
-
-    // Restore active view (UCH slider bootstrapped below after pills are built)
-    if (_saved.view === "uch") {
-      showSubView("uch");
-    } else if (_saved.view === "pareto") {
-      showSubView("pareto");
-      renderPareto();
     }
   }
 
@@ -990,18 +996,6 @@ function renderTesting(data) {
   document.getElementById("pareto-offer").addEventListener("change", renderPareto);
   document.getElementById("pareto-topn").addEventListener("change", renderPareto);
 
-  // View switcher events
-  function showSubView(view) {
-    document.getElementById("testing-view-cpi").style.display    = view === "cpi"    ? "" : "none";
-    document.getElementById("testing-view-pareto").style.display = view === "pareto" ? "" : "none";
-    document.getElementById("testing-view-uch").style.display    = view === "uch"    ? "" : "none";
-    ["tab-btn-cpi","tab-btn-pareto","tab-btn-uch"].forEach(function(id) {
-      var btn = document.getElementById(id);
-      if (btn) btn.classList.toggle("active", id === "tab-btn-" + view);
-    });
-    if (window.APP_FILTER_STATE && window.APP_FILTER_STATE.testing) window.APP_FILTER_STATE.testing.view = view;
-  }
-
   document.getElementById("tab-btn-cpi").addEventListener("click", function() {
     showSubView("cpi");
     renderCPIAdopt(data);
@@ -1012,8 +1006,20 @@ function renderTesting(data) {
   });
   document.getElementById("tab-btn-uch").addEventListener("click", function() { showSubView("uch"); });
 
-  // Default: show CPI Adopt on first load
-  renderCPIAdopt(data);
+  // Restore active sub-view (or default to CPI Adopt)
+  var savedView = _saved && _saved.view;
+  if (savedView === "pareto") {
+    showSubView("pareto");
+    if (_saved.portfolio || _saved.offer || _saved.topN || _saved.mode || _saved.csFrom !== undefined) {
+      updateStageSliderDisplay();
+    }
+    renderPareto();
+  } else if (savedView === "uch") {
+    showSubView("uch");
+  } else {
+    showSubView("cpi");
+    renderCPIAdopt(data);
+  }
 }
 
 window.renderStats = renderTesting;
