@@ -62,6 +62,7 @@ function renderDetails(data) {
   var currentStageOrder = ["Purchase","Onboard","Implement","Use","Engage","Adopt","Completed"];
   var showCompletionDates = false;
   var showDealDetails = false;
+  var showStageIncentives = false;
   var ucMissedPreset = false;
 
   // Restore sort state from saved session (filter DOM restored later, after DOM is built)
@@ -72,6 +73,7 @@ function renderDetails(data) {
     if (_detSaved.sortDir)   sortDir   = _detSaved.sortDir;
     if (_detSaved.showCompletionDates) showCompletionDates = true;
     if (_detSaved.showDealDetails)     showDealDetails     = true;
+    if (_detSaved.showStageIncentives) showStageIncentives = true;
   }
 
   // ── Summary dedup measures
@@ -595,6 +597,7 @@ function renderDetails(data) {
         sortDir:       sortDir,
         showCompletionDates: showCompletionDates,
         showDealDetails:     showDealDetails,
+        showStageIncentives: showStageIncentives,
         ucMissedPreset: ucMissedPreset,
         crParty:       (document.getElementById("filter-crparty")    || {value:""}).value,
         twoTPartner:   (document.getElementById("filter-2tpartner")  || {value:""}).value,
@@ -863,20 +866,26 @@ function renderDetails(data) {
         { label: "Use<br>Completion",        field: "Stage Completion Date(Use)",     isDate: true, isEarnDate: true },
         { label: "Engage<br>Completion",     field: "Stage Completion Date(Engage)",  isDate: true, isEarnDate: true },
         { label: "Adopt<br>Completion",      field: "Stage Completion Date(Adopt)",   isDate: true, isEarnDate: true },
-        { label: "Stages Completed<br>Before Opt-in", field: "_missedStages" },
+        { label: "Stages Completed<br>Before Opt-in", field: "_missedStages", isEarnDate: true },
       ] : []),
       { label: "Days in Stage",              field: "Days in stage" },
       { label: "Stage Progress",             field: "Current Stage Progress" },
       { label: "Pending Tasks",              field: "Current stage pending tasks",  style: "max-width:80px" },
       { label: "Booking Date",               field: "Booking Date",                 isDate: true, isBookingDate: true },
       ...(showDealDetails ? [
-        { label: "Deal ID",                  field: "Deal ID" },
-        { label: "Net Booking",              field: "Booking Amount - Net to Cisco", isCurrency: true },
+        { label: "Deal ID",                  field: "Deal ID",                                       isDealDetailCol: true },
+        { label: "Net Booking",              field: "Booking Amount - Net to Cisco", isCurrency: true, isDealDetailCol: true },
       ] : []),
       { label: "Opt-in Date",                field: "Adopt Rebate Start Date",      isDate: true },
       { label: "Expiry Date",                field: "Deal Incentive Expiry Date",   isDate: true, isExpiry: true },
       { label: "Missed Incentives",          field: "Missed Incentives",            isCurrency: true },
-      { label: "Potential Incentives",       field: "Potential Incentives",         isCurrency: true },
+      { label: "Potential<br>Incentives",       field: "Potential Incentives",         isCurrency: true, isPotentialIncentives: true },
+      ...(showStageIncentives ? [
+        { label: "Remaining<br>Onboard",  isRemainingIncentive: true, stageFlag: "Stage Completion Flag(onboard)", stageAmt: "Estimated Incentive Amount(Onboard)" },
+        { label: "Remaining<br>Use",      isRemainingIncentive: true, stageFlag: "Stage Completion Flag(Use)",     stageAmt: "Estimated Incentive Amount(Use)"     },
+        { label: "Remaining<br>Engage",   isRemainingIncentive: true, stageFlag: "Stage Completion Flag(Engage)",  stageAmt: "Estimated Incentive Amount(Engage)"  },
+        { label: "Remaining<br>Adopt",    isRemainingIncentive: true, stageFlag: "Stage Completion Flag(Adopt)",   stageAmt: "Estimated Incentive Amount(Adopt)"   },
+      ] : []),
       { label: "Estimated<br>Earned Incentives", field: "Estimated Earned Incentives", isCurrency: true, style: "min-width:90px;max-width:110px" },
       { label: "Deal WS-ID",                 field: "Deal WS-ID",                   style: "min-width:140px", isWsId: true },
       { label: "Status",                     field: "_status",                      isStatus: true }
@@ -897,11 +906,25 @@ function renderDetails(data) {
     };
     var thead = "<thead><tr>" + cols.map(function (c) {
       var styleAttr = c.style ? 'style="' + c.style + (sortableCols[c.field] ? ";cursor:pointer;user-select:none" : "") + '"' : '';
+      if (c.isRemainingIncentive) {
+        return '<th class="text-end" style="white-space:nowrap;font-size:0.8rem;border-bottom:4px solid #7ec8e3">' + c.label + '</th>';
+      }
+      if (c.isEarnDate) {
+        return '<th style="white-space:nowrap;font-size:0.8rem;border-bottom:4px solid #7ec8e3">' + c.label + '</th>';
+      }
+      if (c.isDealDetailCol) {
+        var ddStyleAttr = c.style ? 'style="' + c.style + ';border-bottom:4px solid #7ec8e3"' : 'style="border-bottom:4px solid #7ec8e3"';
+        if (sortableCols[c.field]) {
+          var ddIcon = sortField === c.field ? (sortDir === "asc" ? " ▲" : " ▼") : " ⇅";
+          return '<th style="cursor:pointer;user-select:none;border-bottom:4px solid #7ec8e3" data-sortfield="' + c.field + '">' + c.label + '<span style="font-size:0.7rem;opacity:0.7">' + ddIcon + '</span></th>';
+        }
+        return '<th ' + ddStyleAttr + '>' + c.label + '</th>';
+      }
       if (c.isCurrentStage) {
         var sortIcon = sortField === c.field ? (sortDir === "asc" ? " ▲" : " ▼") : " ⇅";
         var toggleIcon = showCompletionDates ? "bi-dash-circle" : "bi-plus-circle";
         var toggleTitle = showCompletionDates ? "Hide completion dates" : "Show completion dates";
-        return '<th style="cursor:pointer;user-select:none;white-space:nowrap" data-sortfield="' + c.field + '">' +
+        return '<th style="cursor:pointer;user-select:none;white-space:nowrap' + (showCompletionDates ? ';border-bottom:4px solid #7ec8e3' : '') + '" data-sortfield="' + c.field + '">' +
           c.label + '<span style="font-size:0.7rem;opacity:0.7">' + sortIcon + '</span>' +
           ' <i class="bi ' + toggleIcon + '" id="det-completion-toggle" title="' + toggleTitle + '" style="font-size:0.8rem;opacity:0.7;cursor:pointer;vertical-align:middle" onclick="event.stopPropagation()"></i></th>';
       }
@@ -909,9 +932,17 @@ function renderDetails(data) {
         var bdSortIcon    = sortField === c.field ? (sortDir === "asc" ? " ▲" : " ▼") : " ⇅";
         var bdToggleIcon  = showDealDetails ? "bi-dash-circle" : "bi-plus-circle";
         var bdToggleTitle = showDealDetails ? "Hide Deal ID & Net Booking" : "Show Deal ID & Net Booking";
-        return '<th style="white-space:nowrap;cursor:pointer;user-select:none" data-sortfield="' + c.field + '">' +
+        return '<th style="white-space:nowrap;cursor:pointer;user-select:none' + (showDealDetails ? ';border-bottom:4px solid #7ec8e3' : '') + '" data-sortfield="' + c.field + '">' +
           c.label + '<span style="font-size:0.7rem;opacity:0.7">' + bdSortIcon + '</span>' +
           ' <i class="bi ' + bdToggleIcon + '" id="det-dealdetails-toggle" title="' + bdToggleTitle + '" style="font-size:0.8rem;opacity:0.7;cursor:pointer;vertical-align:middle" onclick="event.stopPropagation()"></i></th>';
+      }
+      if (c.isPotentialIncentives) {
+        var piSortIcon    = sortField === c.field ? (sortDir === "asc" ? " ▲" : " ▼") : " ⇅";
+        var piToggleIcon  = showStageIncentives ? "bi-dash-circle" : "bi-plus-circle";
+        var piToggleTitle = showStageIncentives ? "Hide stage incentive breakdown" : "Show stage incentive breakdown";
+        return '<th style="cursor:pointer;user-select:none' + (showStageIncentives ? ';border-bottom:4px solid #7ec8e3' : '') + '" data-sortfield="' + c.field + '">' +
+          c.label + '<span style="font-size:0.7rem;opacity:0.7">' + piSortIcon + '</span>' +
+          ' <i class="bi ' + piToggleIcon + '" id="det-stageincentives-toggle" title="' + piToggleTitle + '" style="font-size:0.8rem;opacity:0.7;cursor:pointer;vertical-align:middle" onclick="event.stopPropagation()"></i></th>';
       }
       if (sortableCols[c.field]) {
         var icon = sortField === c.field ? (sortDir === "asc" ? " ▲" : " ▼") : " ⇅";
@@ -937,6 +968,13 @@ function renderDetails(data) {
           var cell = "";
           if (c.isCurrency) {
             cell = fmtCurrency(val);
+          } else if (c.isRemainingIncentive) {
+            var _norm = function(x) { return x === null || x === undefined ? "" : String(x).replace(/\u00A0/g," ").trim().toUpperCase(); };
+            var isEligible = _norm(r["Stage"]) === "ELIGIBLE";
+            var isCompleted = _norm(r[c.stageFlag]) === "YES";
+            cell = (isEligible && !isCompleted) ? fmtCurrency(parseFloat(r[c.stageAmt]) || 0) : "-";
+            tbody += '<td>' + cell + '</td>';
+            return;
           } else if (c.isExpiry) {
             var dObj = toDate(val);
             var cellStyle = "";
@@ -1043,6 +1081,15 @@ function renderDetails(data) {
     if (dealToggleEl) {
       dealToggleEl.addEventListener("click", function () {
         showDealDetails = !showDealDetails;
+        applyFiltersAndRender();
+      });
+    }
+
+    // Stage incentives toggle
+    var stageIncentivesToggleEl = document.getElementById("det-stageincentives-toggle");
+    if (stageIncentivesToggleEl) {
+      stageIncentivesToggleEl.addEventListener("click", function () {
+        showStageIncentives = !showStageIncentives;
         applyFiltersAndRender();
       });
     }
@@ -1224,23 +1271,27 @@ function renderDetails(data) {
           { label:"Offer",                   field:"Track" },
           { label:"Use Case",                field:"Sub-Track" },
           { label:"Current Stage",           field:"Current stage" },
-          { label:"Days in Stage",           field:"Days in stage" },
-          { label:"Stage Progress",          field:"Current Stage Progress" },
-          { label:"Pending Tasks",           field:"Current stage pending tasks" },
-          { label:"Deal WS-ID",              field:"Deal WS-ID" },
-          { label:"Deal ID",                 field:"Deal ID" },
-          { label:"Net Booking",             field:"Booking Amount - Net to Cisco", isCurrency:true },
-          { label:"Booking Date",            field:"Booking Date",                isDate:true },
-          { label:"Opt-in Date",             field:"Adopt Rebate Start Date",     isDate:true },
-          { label:"Expiry Date",             field:"Deal Incentive Expiry Date",  isDate:true },
           { label:"Onboard Completion",      field:"Stage Completion Date(onboard)", isDate:true },
           { label:"Use Completion",          field:"Stage Completion Date(Use)",     isDate:true },
           { label:"Engage Completion",       field:"Stage Completion Date(Engage)",  isDate:true },
           { label:"Adopt Completion",        field:"Stage Completion Date(Adopt)",   isDate:true },
           { label:"Stages Completed Before Opt-in", field:"_missedStages" },
+          { label:"Days in Stage",           field:"Days in stage" },
+          { label:"Stage Progress",          field:"Current Stage Progress" },
+          { label:"Pending Tasks",           field:"Current stage pending tasks" },
+          { label:"Booking Date",            field:"Booking Date",                isDate:true },
+          { label:"Deal ID",                 field:"Deal ID" },
+          { label:"Net Booking",             field:"Booking Amount - Net to Cisco", isCurrency:true },
+          { label:"Opt-in Date",             field:"Adopt Rebate Start Date",     isDate:true },
+          { label:"Expiry Date",             field:"Deal Incentive Expiry Date",  isDate:true },
           { label:"Missed Incentives",       field:"Missed Incentives",           isCurrency:true },
           { label:"Potential Incentives",    field:"Potential Incentives",        isCurrency:true },
+          { label:"Remaining Onboard Incentive",  isRemainingIncentive:true, stageFlag:"Stage Completion Flag(onboard)", stageAmt:"Estimated Incentive Amount(Onboard)" },
+          { label:"Remaining Use Incentive",      isRemainingIncentive:true, stageFlag:"Stage Completion Flag(Use)",     stageAmt:"Estimated Incentive Amount(Use)"     },
+          { label:"Remaining Engage Incentive",   isRemainingIncentive:true, stageFlag:"Stage Completion Flag(Engage)",  stageAmt:"Estimated Incentive Amount(Engage)"  },
+          { label:"Remaining Adopt Incentive",    isRemainingIncentive:true, stageFlag:"Stage Completion Flag(Adopt)",   stageAmt:"Estimated Incentive Amount(Adopt)"   },
           { label:"Est. Earned Incentives",  field:"Estimated Earned Incentives", isCurrency:true },
+          { label:"Deal WS-ID",              field:"Deal WS-ID" },
           { label:"Opt-In Status",           field:"Adopt Rebate Opt-In Status" },
           { label:"Stage",                   field:"Stage" },
           { label:"Earned?",                 field:"Earned?" }
@@ -1254,6 +1305,12 @@ function renderDetails(data) {
           var row = colDefs.map(function(c) {
             var v = r[c.field];
             if (c.isCurrency) return (v === null || v === undefined || isNaN(v)) ? 0 : Math.round(v);
+            if (c.isRemainingIncentive) {
+              var _norm2 = function(x) { return x === null || x === undefined ? "" : String(x).replace(/\u00A0/g," ").trim().toUpperCase(); };
+              var _eligible = _norm2(r["Stage"]) === "ELIGIBLE";
+              var _completed = _norm2(r[c.stageFlag]) === "YES";
+              return (_eligible && !_completed) ? (Math.round(parseFloat(r[c.stageAmt]) || 0)) : 0;
+            }
             if (c.isDate) return fmtDate(v);
             if (c.field === "Earned?") return v === true ? "Yes" : "No";
             if (c.field === "_missedStages") {
@@ -1278,7 +1335,7 @@ function renderDetails(data) {
 
         // Column widths
         ws["!cols"] = colDefs.map(function(c) {
-          if (c.isCurrency) return { wch: 22 };
+          if (c.isCurrency || c.isRemainingIncentive) return { wch: 22 };
           if (c.field === "CR Party Name" || c.field === "2T Partner Name") return { wch: 35 };
           if (c.field === "Deal WS-ID" || c.field === "Track") return { wch: 22 };
           if (c.field === "_missedStages") return { wch: 30 };
