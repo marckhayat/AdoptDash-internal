@@ -1,4 +1,4 @@
-// testing.js — TESTING tab: Pareto analysis of Potential Incentives
+// stats.js — Stats tab: CPI Adopt, Customer Analysis, UC Health
 var _paretoChart = null;
 
 function renderTesting(data) {
@@ -107,12 +107,18 @@ function renderTesting(data) {
 
   // View switcher
   html += '<ul class="nav nav-pills mb-4" id="testing-view-tabs">';
-  html += '<li class="nav-item"><button class="nav-link active" id="tab-btn-pareto"><i class="bi bi-bar-chart-steps me-1"></i>Pareto Analysis</button></li>';
-  html += '<li class="nav-item"><button class="nav-link" id="tab-btn-uch"><i class="bi bi-heart-pulse me-1"></i>UC Health</button></li>';
+  html += '<li class="nav-item"><button class="nav-link active" id="tab-btn-cpi"><i class="bi bi-graph-up-arrow me-1"></i>CPI Adopt</button></li>';
+  html += '<li class="nav-item position-relative"><button class="nav-link" id="tab-btn-pareto"><i class="bi bi-bar-chart-steps me-1"></i>Customer Analysis</button><span class="position-absolute text-danger fw-bold" style="top:1px;right:2px;font-size:0.5rem;line-height:1">NEW</span></li>';
+  html += '<li class="nav-item position-relative"><button class="nav-link" id="tab-btn-uch"><i class="bi bi-heart-pulse me-1"></i>UC Health</button><span class="position-absolute text-danger fw-bold" style="top:1px;right:2px;font-size:0.5rem;line-height:1">NEW</span></li>';
   html += '</ul>';
 
-  html += '<div id="testing-view-pareto">';
-  html += '<h5 class="mb-3"><i class="bi bi-bar-chart-steps me-2"></i>Pareto – Potential Incentives by ' + dimLabel + '</h5>';
+  // ── CPI Adopt sub-view ────────────────────────────────────────────────────
+  html += '<div id="testing-view-cpi">';
+  html += '<div id="tab-cpi-adopt"></div>';
+  html += '</div>';
+
+  html += '<div id="testing-view-pareto" style="display:none">';
+  html += '<h5 class="mb-3"><i class="bi bi-bar-chart-steps me-2"></i>Customer Analysis – Potential Incentives by ' + dimLabel + '</h5>';
   html += '<p class="text-muted small mb-3">Ranks ' + dimLabel.toLowerCase() + 's by potential incentives. The line shows the cumulative share — the 80% threshold is highlighted.</p>';
 
   // Slicers
@@ -917,8 +923,8 @@ function renderTesting(data) {
     statsEl.innerHTML = h;
   }
 
-  // Initial render
-  renderPareto();
+  // Initial render (deferred — Pareto view is hidden by default, render on tab click)
+  // renderPareto() called lazily when Pareto sub-tab is activated
 
   // Restore slicer values after initial render (DOM now exists)
   if (_saved) {
@@ -949,10 +955,10 @@ function renderTesting(data) {
 
     // Restore active view (UCH slider bootstrapped below after pills are built)
     if (_saved.view === "uch") {
-      document.getElementById("testing-view-pareto").style.display = "none";
-      document.getElementById("testing-view-uch").style.display    = "";
-      document.getElementById("tab-btn-pareto").classList.remove("active");
-      document.getElementById("tab-btn-uch").classList.add("active");
+      showSubView("uch");
+    } else if (_saved.view === "pareto") {
+      showSubView("pareto");
+      renderPareto();
     }
   }
 
@@ -982,20 +988,29 @@ function renderTesting(data) {
   document.getElementById("pareto-topn").addEventListener("change", renderPareto);
 
   // View switcher events
+  function showSubView(view) {
+    document.getElementById("testing-view-cpi").style.display    = view === "cpi"    ? "" : "none";
+    document.getElementById("testing-view-pareto").style.display = view === "pareto" ? "" : "none";
+    document.getElementById("testing-view-uch").style.display    = view === "uch"    ? "" : "none";
+    ["tab-btn-cpi","tab-btn-pareto","tab-btn-uch"].forEach(function(id) {
+      var btn = document.getElementById(id);
+      if (btn) btn.classList.toggle("active", id === "tab-btn-" + view);
+    });
+    if (window.APP_FILTER_STATE && window.APP_FILTER_STATE.testing) window.APP_FILTER_STATE.testing.view = view;
+  }
+
+  document.getElementById("tab-btn-cpi").addEventListener("click", function() {
+    showSubView("cpi");
+    renderCPIAdopt(data);
+  });
   document.getElementById("tab-btn-pareto").addEventListener("click", function() {
-    document.getElementById("testing-view-pareto").style.display = "";
-    document.getElementById("testing-view-uch").style.display    = "none";
-    this.classList.add("active");
-    document.getElementById("tab-btn-uch").classList.remove("active");
-    if (window.APP_FILTER_STATE && window.APP_FILTER_STATE.testing) window.APP_FILTER_STATE.testing.view = "pareto";
+    showSubView("pareto");
+    renderPareto();
   });
-  document.getElementById("tab-btn-uch").addEventListener("click", function() {
-    document.getElementById("testing-view-pareto").style.display = "none";
-    document.getElementById("testing-view-uch").style.display    = "";
-    this.classList.add("active");
-    document.getElementById("tab-btn-pareto").classList.remove("active");
-    if (window.APP_FILTER_STATE && window.APP_FILTER_STATE.testing) window.APP_FILTER_STATE.testing.view = "uch";
-  });
+  document.getElementById("tab-btn-uch").addEventListener("click", function() { showSubView("uch"); });
+
+  // Default: show CPI Adopt on first load
+  renderCPIAdopt(data);
 }
 
-window.renderTesting = renderTesting;
+window.renderStats = renderTesting;

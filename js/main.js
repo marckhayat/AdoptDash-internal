@@ -1493,8 +1493,7 @@ function renderActiveTab(target) {
     case "#tab-details":   renderDetails(APP_DATA);   break;
     case "#tab-pvi":       renderPVI(APP_DATA);       break;
     case "#tab-lifecycle": renderLifecycle(APP_DATA); break;
-    case "#tab-cpi-adopt": renderCPIAdopt(APP_DATA);  break;
-    case "#tab-testing":   renderTesting(APP_DATA);   break;
+    case "#tab-testing":   renderStats(APP_DATA);   break;
   }
 }
 
@@ -1716,7 +1715,7 @@ function resetApp() {
   window.APP_DATA = null;
   APP_FILTER_STATE = { details: null, lifecycle: null, cpiAdopt: null, testing: null };
   document.getElementById("mainTabContent").classList.add("d-none");
-  ["tab-overview","tab-details","tab-pvi","tab-lifecycle","tab-cpi-adopt","tab-testing"].forEach(function (id) {
+  ["tab-overview","tab-details","tab-pvi","tab-lifecycle","tab-testing"].forEach(function (id) {
     var pane = document.getElementById(id);
     if (pane) pane.innerHTML = "";
   });
