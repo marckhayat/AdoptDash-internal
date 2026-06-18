@@ -193,6 +193,17 @@ function transformData(rawRows) {
     var engageProgress    = calcProgress(r["Task Details (Engage)"]);
     var adoptProgress     = calcProgress(r["Task Details (Adopt)"]);
 
+    // Overall Progress: sum Y and total across all stages
+    var _overallY = 0, _overallTotal = 0;
+    [purchaseProgress, onboardProgress, implementProgress, useProgress, engageProgress, adoptProgress].forEach(function(p) {
+      if (p && p !== "0/0") {
+        var parts = p.split("/");
+        _overallY     += parseInt(parts[0]) || 0;
+        _overallTotal += parseInt(parts[1]) || 0;
+      }
+    });
+    r["Overall Progress"] = _overallTotal > 0 ? _overallY + "/" + _overallTotal : null;
+
     var cs = r["Current stage"];
     if      (cs === "Purchase")  r["Current Stage Progress"] = purchaseProgress;
     else if (cs === "Onboard")   r["Current Stage Progress"] = onboardProgress;

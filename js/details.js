@@ -64,6 +64,7 @@ function renderDetails(data) {
   var showDealDetails = false;
   var showStageIncentives = false;
   var showDaysSinceOptIn = false;
+  var showOverallProgress = false;
   var ucMissedPreset = false;
 
   // Restore sort state from saved session (filter DOM restored later, after DOM is built)
@@ -76,6 +77,7 @@ function renderDetails(data) {
     if (_detSaved.showDealDetails)     showDealDetails     = true;
     if (_detSaved.showStageIncentives) showStageIncentives = true;
     if (_detSaved.showDaysSinceOptIn)  showDaysSinceOptIn  = true;
+    if (_detSaved.showOverallProgress) showOverallProgress = true;
   }
 
   // ── Summary dedup measures
@@ -601,6 +603,7 @@ function renderDetails(data) {
         showDealDetails:     showDealDetails,
         showStageIncentives: showStageIncentives,
         showDaysSinceOptIn:  showDaysSinceOptIn,
+        showOverallProgress: showOverallProgress,
         ucMissedPreset: ucMissedPreset,
         crParty:       (document.getElementById("filter-crparty")    || {value:""}).value,
         twoTPartner:   (document.getElementById("filter-2tpartner")  || {value:""}).value,
@@ -886,7 +889,10 @@ function renderDetails(data) {
       ...(showDaysSinceOptIn ? [
         { label: "Days Since<br>Opt-in",     field: "_daysSinceOptIn",              isDaysSinceOptInCol: true },
       ] : []),
-      { label: "Stage Progress",             field: "Current Stage Progress" },
+      { label: "Stage Progress",             field: "Current Stage Progress",       isStageProgress: true },
+      ...(showOverallProgress ? [
+        { label: "Overall<br>Progress",      field: "Overall Progress",             isOverallProgress: true },
+      ] : []),
       { label: "Pending Tasks",              field: "Current stage pending tasks",  style: "max-width:80px" },
       { label: "Booking Date",               field: "Booking Date",                 isDate: true, isBookingDate: true },
       ...(showDealDetails ? [
@@ -930,6 +936,16 @@ function renderDetails(data) {
       if (c.isDaysSinceOptInCol) {
         var dsoIcon = sortField === "_daysSinceOptIn" ? (sortDir === "asc" ? " ▲" : " ▼") : " ⇅";
         return '<th style="cursor:pointer;user-select:none;border-bottom:4px solid #7ec8e3" data-sortfield="_daysSinceOptIn">' + c.label + '<span style="font-size:0.7rem;opacity:0.7">' + dsoIcon + '</span></th>';
+      }
+      if (c.isOverallProgress) {
+        return '<th style="white-space:nowrap;font-size:0.8rem;border-bottom:4px solid #7ec8e3">' + c.label + '</th>';
+      }
+      if (c.isStageProgress) {
+        var spToggleIcon  = showOverallProgress ? "bi-dash-circle" : "bi-plus-circle";
+        var spToggleTitle = showOverallProgress ? "Hide overall progress" : "Show overall progress";
+        return '<th style="cursor:pointer;user-select:none' + (showOverallProgress ? ';border-bottom:4px solid #7ec8e3' : '') + '">' +
+          c.label +
+          ' <i class="bi ' + spToggleIcon + '" id="det-overallprogress-toggle" title="' + spToggleTitle + '" style="font-size:0.8rem;opacity:0.7;cursor:pointer;vertical-align:middle" onclick="event.stopPropagation()"></i></th>';
       }
       if (c.isDaysInStage) {
         var disSortIcon = sortField === c.field ? (sortDir === "asc" ? " ▲" : " ▼") : " ⇅";
@@ -1080,6 +1096,20 @@ function renderDetails(data) {
             } else {
               cell = "";
             }
+          } else if (c.field === "Overall Progress") {
+            var opParts = val ? String(val).split("/") : [];
+            var opX = parseInt(opParts[0]), opY = parseInt(opParts[1]);
+            if (!isNaN(opX) && !isNaN(opY) && opY > 0) {
+              var opPct = Math.round((opX / opY) * 100);
+              cell = '<div style="min-width:80px">' +
+                '<div class="progress" style="height:8px;margin-bottom:2px">' +
+                '<div class="progress-bar" style="width:' + opPct + '%;background:var(--cisco-blue)"></div>' +
+                '</div>' +
+                '<span style="font-size:0.75rem">' + opX + '/' + opY + '</span>' +
+                '</div>';
+            } else {
+              cell = "";
+            }
           } else if (c.field === "Sub-Track") {
             var PORTFOLIO_ABBR = { "NETWORKING": "NET", "SECURITY": "SEC", "CLOUD + AI INFRASTRUCTURE": "CAI", "COLLABORATION": "COL" };
             var pf2 = String(r["Deal CPI Portfolio"] || "").trim();
@@ -1133,6 +1163,15 @@ function renderDetails(data) {
     if (stageIncentivesToggleEl) {
       stageIncentivesToggleEl.addEventListener("click", function () {
         showStageIncentives = !showStageIncentives;
+        applyFiltersAndRender();
+      });
+    }
+
+    // Overall progress toggle
+    var overallProgressToggleEl = document.getElementById("det-overallprogress-toggle");
+    if (overallProgressToggleEl) {
+      overallProgressToggleEl.addEventListener("click", function () {
+        showOverallProgress = !showOverallProgress;
         applyFiltersAndRender();
       });
     }
@@ -1331,6 +1370,7 @@ function renderDetails(data) {
           { label:"Days in Stage",           field:"Days in stage" },
           { label:"Days Since Opt-in",       field:"_daysSinceOptIn", isDaysSinceOptInExport: true },
           { label:"Stage Progress",          field:"Current Stage Progress" },
+          { label:"Overall Progress",        field:"Overall Progress" },
           { label:"Pending Tasks",           field:"Current stage pending tasks" },
           { label:"Booking Date",            field:"Booking Date",                isDate:true },
           { label:"Deal ID",                 field:"Deal ID" },
