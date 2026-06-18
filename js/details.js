@@ -63,6 +63,7 @@ function renderDetails(data) {
   var showCompletionDates = false;
   var showDealDetails = false;
   var showStageIncentives = false;
+  var showDaysSinceOptIn = false;
   var ucMissedPreset = false;
 
   // Restore sort state from saved session (filter DOM restored later, after DOM is built)
@@ -74,6 +75,7 @@ function renderDetails(data) {
     if (_detSaved.showCompletionDates) showCompletionDates = true;
     if (_detSaved.showDealDetails)     showDealDetails     = true;
     if (_detSaved.showStageIncentives) showStageIncentives = true;
+    if (_detSaved.showDaysSinceOptIn)  showDaysSinceOptIn  = true;
   }
 
   // ── Summary dedup measures
@@ -598,6 +600,7 @@ function renderDetails(data) {
         showCompletionDates: showCompletionDates,
         showDealDetails:     showDealDetails,
         showStageIncentives: showStageIncentives,
+        showDaysSinceOptIn:  showDaysSinceOptIn,
         ucMissedPreset: ucMissedPreset,
         crParty:       (document.getElementById("filter-crparty")    || {value:""}).value,
         twoTPartner:   (document.getElementById("filter-2tpartner")  || {value:""}).value,
@@ -792,10 +795,21 @@ function renderDetails(data) {
   function applySort() {
     var numericFields = { "Potential Incentives": true, "Missed Incentives": true, "Estimated Earned Incentives": true, "Days in stage": true, "Booking Amount - Net to Cisco": true };
     var dateFields    = { "Deal Incentive Expiry Date": true, "Booking Date": true, "Adopt Rebate Start Date": true };
+    var sortToday     = new Date();
     filteredData.sort(function (a, b) {
       var av = a[sortField], bv = b[sortField];
       var primary;
-      if (sortField === "Current stage") {
+      if (sortField === "_daysSinceOptIn") {
+        var _norm4 = function(x) { return x === null || x === undefined ? "" : String(x).replace(/\u00A0/g," ").trim().toUpperCase(); };
+        var _dso = function(r) {
+          if ((_norm4(r["Stage"]) !== "ELIGIBLE" && _norm4(r["Stage"]) !== "EXPIRED") || !toDate(r["Adopt Rebate Start Date"])) return -1;
+          var _dis2 = parseInt(r["Days in stage"]) || 0;
+          var _dsoDays = Math.floor((sortToday - toDate(r["Adopt Rebate Start Date"])) / 86400000);
+          return _dis2 <= _dsoDays ? _dis2 : _dsoDays;
+        };
+        av = _dso(a); bv = _dso(b);
+        primary = sortDir === "asc" ? av - bv : bv - av;
+      } else if (sortField === "Current stage") {
         var ai = currentStageOrder.indexOf(av || ""), bi = currentStageOrder.indexOf(bv || "");
         if (ai === -1) ai = currentStageOrder.length;
         if (bi === -1) bi = currentStageOrder.length;
@@ -868,7 +882,10 @@ function renderDetails(data) {
         { label: "Adopt<br>Completion",      field: "Stage Completion Date(Adopt)",   isDate: true, isEarnDate: true },
         { label: "Stages Completed<br>Before Opt-in", field: "_missedStages", isEarnDate: true },
       ] : []),
-      { label: "Days in Stage",              field: "Days in stage" },
+      { label: "Days in<br>Stage",              field: "Days in stage",                isDaysInStage: true },
+      ...(showDaysSinceOptIn ? [
+        { label: "Days Since<br>Opt-in",     field: "_daysSinceOptIn",              isDaysSinceOptInCol: true },
+      ] : []),
       { label: "Stage Progress",             field: "Current Stage Progress" },
       { label: "Pending Tasks",              field: "Current stage pending tasks",  style: "max-width:80px" },
       { label: "Booking Date",               field: "Booking Date",                 isDate: true, isBookingDate: true },
@@ -898,6 +915,7 @@ function renderDetails(data) {
       "Missed Incentives": true,
       "Estimated Earned Incentives": true,
       "Booking Amount - Net to Cisco": true,
+      "_daysSinceOptIn": true,
       "Days in stage": true,
       "Current stage": true,
       "Booking Date": true,
@@ -908,6 +926,18 @@ function renderDetails(data) {
       var styleAttr = c.style ? 'style="' + c.style + (sortableCols[c.field] ? ";cursor:pointer;user-select:none" : "") + '"' : '';
       if (c.isRemainingIncentive) {
         return '<th class="text-end" style="white-space:nowrap;font-size:0.8rem;border-bottom:4px solid #7ec8e3">' + c.label + '</th>';
+      }
+      if (c.isDaysSinceOptInCol) {
+        var dsoIcon = sortField === "_daysSinceOptIn" ? (sortDir === "asc" ? " ▲" : " ▼") : " ⇅";
+        return '<th style="cursor:pointer;user-select:none;border-bottom:4px solid #7ec8e3" data-sortfield="_daysSinceOptIn">' + c.label + '<span style="font-size:0.7rem;opacity:0.7">' + dsoIcon + '</span></th>';
+      }
+      if (c.isDaysInStage) {
+        var disSortIcon = sortField === c.field ? (sortDir === "asc" ? " ▲" : " ▼") : " ⇅";
+        var disToggleIcon  = showDaysSinceOptIn ? "bi-dash-circle" : "bi-plus-circle";
+        var disToggleTitle = showDaysSinceOptIn ? "Hide days since opt-in" : "Show days since opt-in";
+        return '<th style="cursor:pointer;user-select:none' + (showDaysSinceOptIn ? ';border-bottom:4px solid #7ec8e3' : '') + '" data-sortfield="' + c.field + '">' +
+          c.label + '<span style="font-size:0.7rem;opacity:0.7">' + disSortIcon + '</span>' +
+          ' <i class="bi ' + disToggleIcon + '" id="det-daysoptIn-toggle" title="' + disToggleTitle + '" style="font-size:0.8rem;opacity:0.7;cursor:pointer;vertical-align:middle" onclick="event.stopPropagation()"></i></th>';
       }
       if (c.isEarnDate) {
         return '<th style="white-space:nowrap;font-size:0.8rem;border-bottom:4px solid #7ec8e3">' + c.label + '</th>';
@@ -1023,6 +1053,19 @@ function renderDetails(data) {
             var dayColor = days === null ? "" : days > 180 ? "color:#D13438" : days > 90 ? "color:#FF8C00" : "color:#107C10";
             tbody += '<td style="font-weight:600;' + dayColor + '">' + (days !== null ? days : "-") + '</td>';
             return;
+          } else if (c.field === "_daysSinceOptIn") {
+            var _norm3 = function(x) { return x === null || x === undefined ? "" : String(x).replace(/\u00A0/g," ").trim().toUpperCase(); };
+            var isOptInEligible = (_norm3(r["Stage"]) === "ELIGIBLE" || _norm3(r["Stage"]) === "EXPIRED") && toDate(r["Adopt Rebate Start Date"]);
+            if (isOptInEligible) {
+              var daysInStage = parseInt(r["Days in stage"]) || 0;
+              var daysSinceOptIn = Math.floor((today - toDate(r["Adopt Rebate Start Date"])) / 86400000);
+              var optDays = daysInStage <= daysSinceOptIn ? daysInStage : daysSinceOptIn;
+              var optColor = optDays > 180 ? "color:#D13438" : optDays > 90 ? "color:#FF8C00" : "color:#107C10";
+              tbody += '<td style="font-weight:600;' + optColor + '">' + optDays + '</td>';
+            } else {
+              tbody += '<td style="color:#aaa">-</td>';
+            }
+            return;
           } else if (c.field === "Current Stage Progress") {
             var parts = val ? String(val).split("/") : [];
             var x = parseInt(parts[0]), y = parseInt(parts[1]);
@@ -1090,6 +1133,15 @@ function renderDetails(data) {
     if (stageIncentivesToggleEl) {
       stageIncentivesToggleEl.addEventListener("click", function () {
         showStageIncentives = !showStageIncentives;
+        applyFiltersAndRender();
+      });
+    }
+
+    // Days since opt-in toggle
+    var daysOptInToggleEl = document.getElementById("det-daysoptIn-toggle");
+    if (daysOptInToggleEl) {
+      daysOptInToggleEl.addEventListener("click", function () {
+        showDaysSinceOptIn = !showDaysSinceOptIn;
         applyFiltersAndRender();
       });
     }
@@ -1277,6 +1329,7 @@ function renderDetails(data) {
           { label:"Adopt Completion",        field:"Stage Completion Date(Adopt)",   isDate:true },
           { label:"Stages Completed Before Opt-in", field:"_missedStages" },
           { label:"Days in Stage",           field:"Days in stage" },
+          { label:"Days Since Opt-in",       field:"_daysSinceOptIn", isDaysSinceOptInExport: true },
           { label:"Stage Progress",          field:"Current Stage Progress" },
           { label:"Pending Tasks",           field:"Current stage pending tasks" },
           { label:"Booking Date",            field:"Booking Date",                isDate:true },
@@ -1311,7 +1364,16 @@ function renderDetails(data) {
               var _completed = _norm2(r[c.stageFlag]) === "YES";
               return (_eligible && !_completed) ? (Math.round(parseFloat(r[c.stageAmt]) || 0)) : 0;
             }
-            if (c.isDate) return fmtDate(v);
+            if (c.isDaysSinceOptInExport) {
+              var _norm5 = function(x) { return x === null || x === undefined ? "" : String(x).replace(/\u00A0/g," ").trim().toUpperCase(); };
+              var _optDate = toDate(r["Adopt Rebate Start Date"]);
+              if ((_norm5(r["Stage"]) === "ELIGIBLE" || _norm5(r["Stage"]) === "EXPIRED") && _optDate) {
+                var _dis = parseInt(r["Days in stage"]) || 0;
+                var _dso = Math.floor((today - _optDate) / 86400000);
+                return _dis <= _dso ? _dis : _dso;
+              }
+              return "";
+            }
             if (c.field === "Earned?") return v === true ? "Yes" : "No";
             if (c.field === "_missedStages") {
               var optInDate = toDate(r["Adopt Rebate Start Date"]);
