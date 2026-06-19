@@ -1314,6 +1314,7 @@ function renderDetails(data) {
 
     setTimeout(function () {
       try {
+        var today = new Date();
         var XLS = (typeof XLSXStyle !== "undefined") ? XLSXStyle : XLSX;
         var s = calcSummary(rows);
 
