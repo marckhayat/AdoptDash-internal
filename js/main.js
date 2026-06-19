@@ -23,7 +23,7 @@ var APP_LOCALE = navigator.language || undefined;
 var PENDING_FILE_HANDLE = null;
 document.addEventListener("DOMContentLoaded", function () {
   var el = document.getElementById("app-version-label");
-  if (el) el.textContent = APP_VERSION;
+  if (el) el.textContent = APP_VERSION + " · Interactive";
 });
 
 // Workspan column names used to auto-detect the header row
@@ -494,7 +494,9 @@ function finishLoad(filename, rowCount, headerAutoDetected, idbType, loadedAt, f
   dateEl.textContent = "";
 
   var activeTab = document.querySelector(".nav-link.active[data-bs-target]");
-  renderActiveTab(activeTab ? activeTab.dataset.bsTarget : "#tab-overview");
+  ANNOTATIONS.load().then(function () {
+    renderActiveTab(activeTab ? activeTab.dataset.bsTarget : "#tab-overview");
+  });
   // Always reset first so no dismissed state bleeds from a previous session
   window._dismissedNotifs = {};
   window._currentSessionKey = idbType || null;
@@ -550,7 +552,7 @@ function restoreUploadSection(cachedEntries) {
     html += '</div>';
     html += '<div class="d-flex gap-1 flex-shrink-0">';
     html += '<button class="btn btn-sm btn-' + btnColor + ' idb-resume-btn py-0" data-idbtype="' + entry.type + '" title="Resume"><i class="bi bi-play-fill"></i></button>';
-    if (entry.meta.hasFileHandle || (isChrome && isCpi)) {
+    if (entry.meta.hasFileHandle || isChrome) {
       html += '<button class="btn btn-sm btn-outline-primary idb-refresh-btn py-0" data-idbtype="' + entry.type + '" title="Refresh from file"><i class="bi bi-arrow-clockwise"></i></button>';
     }
     html += '<button class="btn btn-sm btn-outline-danger idb-clear-btn py-0" data-idbtype="' + entry.type + '" title="Delete"><i class="bi bi-trash"></i></button>';
@@ -1487,12 +1489,22 @@ function refreshCpiFromHandle(file, geoId, cacheOnly) {
   });
 }
 
+// Returns APP_DATA filtered to exclude records flagged as excluded by the user
+function getActiveData() {
+  if (!APP_DATA) return APP_DATA;
+  var excludedIds = ANNOTATIONS.getExcludedWsIds();
+  if (excludedIds.length === 0) return APP_DATA;
+  var idSet = {};
+  excludedIds.forEach(function (id) { idSet[id] = true; });
+  return APP_DATA.filter(function (r) { return !idSet[String(r["Deal WS-ID"] || "")]; });
+}
+
 function renderActiveTab(target) {
   switch (target) {
-    case "#tab-overview":  renderOverview(APP_DATA);  break;
-    case "#tab-details":   renderDetails(APP_DATA);   break;
-    case "#tab-pvi":       renderPVI(APP_DATA);       break;
-    case "#tab-testing":   renderInsights(APP_DATA);   break;
+    case "#tab-overview":  renderOverview(getActiveData());  break;
+    case "#tab-details":   renderDetails(APP_DATA);          break;  // details always shows all rows (dimmed)
+    case "#tab-pvi":       renderPVI(getActiveData());       break;
+    case "#tab-testing":   renderInsights(getActiveData());  break;
   }
 }
 
@@ -1738,6 +1750,7 @@ window.APP_DATA        = APP_DATA;
 window.APP_FILTER_STATE = APP_FILTER_STATE;
 window.resetApp        = resetApp;
 window.renderActiveTab = renderActiveTab;
+window.getActiveData   = getActiveData;
 
 window._dismissedNotifs = {};
 window._currentSessionKey = null;
