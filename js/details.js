@@ -71,11 +71,23 @@ function renderDetails(data) {
   var annotationsCache = ANNOTATIONS.getAll();
   var activeTagFilters = [];  // tags that must ALL match a row's annotations
 
+  // Returns only tag names that appear on WS-IDs present in the current data
+  function currentTagNames() {
+    var wsIds = new Set(data.map(function(r) { return String(r["Deal WS-ID"] || ""); }).filter(Boolean));
+    var tags  = new Set();
+    Object.keys(annotationsCache).forEach(function(id) {
+      if (wsIds.has(id)) {
+        (annotationsCache[id].tags || []).forEach(function(t) { tags.add(t); });
+      }
+    });
+    return Array.from(tags).sort();
+  }
+
   // ── Annotation modal ──────────────────────────────────────────────────────
   function openAnnotationModal(wsId, crPartyName, crPartyId) {
     var existing        = annotationsCache[wsId] || { tags: [], comment: "", excluded: false };
     var currentExcluded = ANNOTATIONS.isExcluded(wsId);
-    var allTags         = ANNOTATIONS.allTagNames();
+    var allTags         = currentTagNames();
 
     // Find all WS-IDs for this customer
     var customerWsIds = crPartyId
@@ -113,6 +125,7 @@ function renderDetails(data) {
           '<i class="bi bi-slash-circle me-1"></i>Exclude all ' + customerWsIds.length + ' UCs for ' + escHtml(crPartyName || "") + '</label>' +
           '</div>'
         : '') +
+      '<p class="text-muted mb-0 mt-2" style="font-size:0.75rem"><i class="bi bi-info-circle me-1"></i>This only affects the view within this dashboard. It does not update Workspan and has no impact on the CPI program whatsoever.</p>' +
       '</div>';
 
     var modalHtml =
@@ -128,10 +141,17 @@ function renderDetails(data) {
       '<div style="font-size:0.8rem;color:#888;margin-bottom:6px">' + escHtml(crPartyName || "") + '</div>' +
       '<label class="form-label fw-semibold" style="font-size:0.82rem">Tags</label>' +
       '<div id="annot-tag-list" class="mb-2">' + tagChecks + '</div>' +
-      '<div class="d-flex gap-2 mb-3">' +
+      '<div class="d-flex gap-2 mb-2">' +
       '<input type="text" id="annot-new-tag" class="form-control form-control-sm" placeholder="+ new tag" style="max-width:160px">' +
       '<button class="btn btn-sm btn-outline-secondary" id="annot-add-tag-btn">Add</button>' +
       '</div>' +
+      (customerWsIds.length > 1
+        ? '<div class="form-check mb-3" style="font-size:0.8rem">' +
+          '<input class="form-check-input" type="checkbox" id="annot-tags-all-ucs">' +
+          '<label class="form-check-label text-muted" for="annot-tags-all-ucs">' +
+          '<i class="bi bi-tags me-1"></i>Apply these tags to all ' + customerWsIds.length + ' UCs for ' + escHtml(crPartyName || "") +
+          '</label></div>'
+        : '') +
       '<label class="form-label fw-semibold" style="font-size:0.82rem">Comment</label>' +
       '<textarea id="annot-comment" class="form-control form-control-sm" rows="4" style="resize:vertical">' + escHtml(existing.comment || "") + '</textarea>' +
       '</div>' +
@@ -187,16 +207,28 @@ function renderDetails(data) {
     document.getElementById("annot-save-btn").addEventListener("click", function () {
       var tags    = [];
       modalEl.querySelectorAll(".annot-tag-check:checked").forEach(function (cb) { tags.push(cb.value); });
-      var comment  = document.getElementById("annot-comment").value.trim();
-      var exclThis = exclThisEl.checked;
-      var exclAll  = exclAllEl ? exclAllEl.checked : false;
+      var comment        = document.getElementById("annot-comment").value.trim();
+      var exclThis       = exclThisEl.checked;
+      var exclAll        = exclAllEl ? exclAllEl.checked : false;
+      var tagsAllUcsEl   = document.getElementById("annot-tags-all-ucs");
+      var applyTagsToAll = tagsAllUcsEl ? tagsAllUcsEl.checked : false;
 
       var saves = [ANNOTATIONS.saveFull(wsId, tags, comment, exclThis)];
 
-      // Handle "exclude all / un-exclude all" for sibling WS-IDs
-      if (customerWsIds.length > 1 && (exclAll || allCustomerExcluded)) {
+      if (customerWsIds.length > 1) {
         var siblingIds = customerWsIds.filter(function(id) { return id !== wsId; });
-        saves.push(ANNOTATIONS.setExcludedForCustomer(siblingIds, exclAll));
+
+        if (applyTagsToAll) {
+          // Apply tags (and optionally exclusion) to all siblings, preserving each sibling's comment
+          siblingIds.forEach(function(id) {
+            var sib     = annotationsCache[id] || { tags: [], comment: "", excluded: false };
+            var sibExcl = (exclAll || allCustomerExcluded) ? exclAll : sib.excluded;
+            saves.push(ANNOTATIONS.saveFull(id, tags, sib.comment || "", sibExcl));
+          });
+        } else if (exclAll || allCustomerExcluded) {
+          // Only update exclusion for siblings, leave their tags untouched
+          saves.push(ANNOTATIONS.setExcludedForCustomer(siblingIds, exclAll));
+        }
       }
 
       Promise.all(saves).then(function () {
@@ -213,7 +245,7 @@ function renderDetails(data) {
   function rebuildTagFilterUI() {
     var container = document.getElementById("annot-tag-filter-list");
     if (!container) return;
-    var allTags = ANNOTATIONS.allTagNames();
+    var allTags = currentTagNames();
     container.innerHTML = allTags.map(function (t) {
       var safeid = "filter-annottag-" + t.replace(/[^a-z0-9]/gi, "-");
       var chk = activeTagFilters.indexOf(t) !== -1 ? " checked" : "";
@@ -350,6 +382,7 @@ function renderDetails(data) {
 
   // Quick-toggle filters
   html += '<div class="filter-group">';
+  html += '<div class="form-check form-check-sm"><input class="form-check-input" type="checkbox" id="filter-hide-excluded"><label class="form-check-label" for="filter-hide-excluded"><i class="bi bi-slash-circle me-1 text-danger" style="font-size:0.75rem"></i>Hide excluded</label></div>';
   html += '<div class="form-check form-check-sm"><input class="form-check-input" type="checkbox" id="filter-new-eligible"><label class="form-check-label" for="filter-new-eligible">New Eligible' + tip("UCs eligible for opt-in, booked within the past 30 days.") + '</label></div>';
   html += '<div class="form-check form-check-sm"><input class="form-check-input" type="checkbox" id="filter-expires-soon"><label class="form-check-label" for="filter-expires-soon">Expires Soon (&lt;1M)' + tip("Deals where the incentive expires in less than 1 month.") + '</label></div>';
   html += '<div class="form-check form-check-sm"><input class="form-check-input" type="checkbox" id="filter-earned"><label class="form-check-label" for="filter-earned">Earned' + tip("Deals where incentives have been earned.") + '</label></div>';
@@ -387,7 +420,6 @@ function renderDetails(data) {
   html += '<div class="filter-group"><label class="group-label">Earn Date' + tip("Moving this slider will automatically check the Earned filter.") + '</label>'              + makeDateSlider("det-ea",  dateBounds.ea)  + '</div>';
 
   html += '<div class="filter-group"><label class="group-label"><i class="bi bi-tags me-1"></i>Tags</label><div id="annot-tag-filter-list"></div></div>';
-  html += '<div class="filter-group"><div class="form-check form-check-sm"><input class="form-check-input" type="checkbox" id="filter-hide-excluded"><label class="form-check-label" for="filter-hide-excluded"><i class="bi bi-slash-circle me-1 text-danger" style="font-size:0.75rem"></i>Hide excluded</label></div></div>';
   html += '</div>'; // /det-filter-body
   html += '</div>'; // /sidebar
 
@@ -618,6 +650,7 @@ function renderDetails(data) {
   // Apply deep-link preset if navigated from another tab
   if (window._detDeepLink) {
     var dl = window._detDeepLink;
+    if (dl.hideExcluded) { var _cbHideExcl = document.getElementById("filter-hide-excluded"); if (_cbHideExcl) _cbHideExcl.checked = true; }
     if (dl.checkboxIds) { dl.checkboxIds.forEach(function(id) { var cb = document.getElementById(id); if (cb) cb.checked = true; }); }
     if (dl.stage)         { dl.stage.forEach(function(s) { document.querySelectorAll('#filter-stage input[type=checkbox]').forEach(function(cb) { if (cb.value.toUpperCase() === s.toUpperCase()) cb.checked = true; }); }); }
     if (dl.ucMissed)      { ucMissedPreset = true; }

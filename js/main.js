@@ -16,7 +16,8 @@ var APP_FILE_META = null;
 var APP_FILTER_STATE = { details: null, lifecycle: null, cpiAdopt: null, customer: null, testing: null };
 var APP_IS_DISTI = false;
 var APP_MULTI_SESSIONS = null; // { sessions: [...], fileMeta: {...} }
-var APP_VERSION = "v6.8.6";
+var APP_EXCL_ACTIVE = false;   // when true, excluded deals are removed from overview/pvi/insights calculations
+var APP_VERSION = "v6.8.7";
 // Use the browser's preferred language for date formatting (respects user's browser locale setting)
 var APP_LOCALE = navigator.language || undefined;
 // Holds a FileSystemFileHandle from showOpenFilePicker() to be persisted after load
@@ -1492,6 +1493,7 @@ function refreshCpiFromHandle(file, geoId, cacheOnly) {
 // Returns APP_DATA filtered to exclude records flagged as excluded by the user
 function getActiveData() {
   if (!APP_DATA) return APP_DATA;
+  if (!window.APP_EXCL_ACTIVE) return APP_DATA;
   var excludedIds = ANNOTATIONS.getExcludedWsIds();
   if (excludedIds.length === 0) return APP_DATA;
   var idSet = {};
@@ -1748,8 +1750,10 @@ function resetApp() {
 
 window.APP_DATA        = APP_DATA;
 window.APP_FILTER_STATE = APP_FILTER_STATE;
+window.APP_EXCL_ACTIVE  = APP_EXCL_ACTIVE;
 window.resetApp        = resetApp;
 window.renderActiveTab = renderActiveTab;
+window.renderOverview  = renderOverview;
 window.getActiveData   = getActiveData;
 
 window._dismissedNotifs = {};
@@ -1771,6 +1775,7 @@ window._dismissNotif = function(id) {
 window.navigateToDetails = function (preset) {
   window.APP_FILTER_STATE = window.APP_FILTER_STATE || {};
   window.APP_FILTER_STATE.details = null; // clear saved state so preset takes over
+  if (window.APP_EXCL_ACTIVE) preset = Object.assign({}, preset, { hideExcluded: true });
   window._detDeepLink = preset;
   var btn = document.querySelector('[data-bs-target="#tab-details"]');
   if (!btn) return;

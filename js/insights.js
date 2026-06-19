@@ -215,6 +215,49 @@ function renderTesting(data) {
   html += '</div>'; // close outer div.p-3
   el.innerHTML = html;
 
+  // Always returns data respecting current APP_EXCL_ACTIVE state
+  function getEffectiveData() {
+    var base = (window.APP_DATA && window.APP_DATA.length) ? window.APP_DATA : data;
+    return (window.APP_EXCL_ACTIVE && window.getActiveData) ? window.getActiveData() : base;
+  }
+
+  // ── Exclude toggle button (shared across all subtabs) ─────────────────────
+  var insightNavTabs = document.getElementById("testing-view-tabs");
+  if (insightNavTabs) {
+    var _insightAllWsIds = new Set((window.APP_DATA || data).map(function(r) { return String(r["Deal WS-ID"] || ""); }));
+    var _insightExclCount = ANNOTATIONS.getExcludedWsIds().filter(function(id) { return _insightAllWsIds.has(id); }).length;
+    if (_insightExclCount > 0) {
+      var insightExclBtn = document.createElement("button");
+      insightExclBtn.id = "insight-excl-toggle-btn";
+      insightExclBtn.className = "btn btn-sm ms-auto";
+      insightExclBtn.style.cssText = "font-size:0.82rem;align-self:center";
+      function _updateInsightExclBtn() {
+        var active = !!window.APP_EXCL_ACTIVE;
+        if (active) {
+          insightExclBtn.className = "btn btn-sm ms-auto btn-danger";
+          insightExclBtn.innerHTML = '<i class="bi bi-slash-circle-fill me-1"></i>' + _insightExclCount + ' UCs excluded — removed from calcs';
+          insightExclBtn.title = "Excluded UCs are NOT counted. Click to include them.";
+        } else {
+          insightExclBtn.className = "btn btn-sm ms-auto btn-outline-secondary";
+          insightExclBtn.innerHTML = '<i class="bi bi-slash-circle me-1"></i>' + _insightExclCount + ' UCs excluded — counted in calcs';
+          insightExclBtn.title = "Excluded UCs are still counted. Click to remove them.";
+        }
+      }
+      _updateInsightExclBtn();
+      insightExclBtn.addEventListener("click", function () {
+        window.APP_EXCL_ACTIVE = !window.APP_EXCL_ACTIVE;
+        _updateInsightExclBtn();
+        if (_activeSubView === "pareto")         renderPareto();
+        else if (_activeSubView === "uch")       renderUCHealth();
+        else if (_activeSubView === "lifecycle") renderLifecycle(getEffectiveData());
+        else if (_activeSubView === "cpi")       renderCPIAdopt(getEffectiveData());
+      });
+      // Wrap nav in a flex row so button aligns right
+      insightNavTabs.style.cssText = "display:flex;flex-wrap:wrap;align-items:center";
+      insightNavTabs.appendChild(insightExclBtn);
+    }
+  }
+
   // ── Render function ────────────────────────────────────────────────────────
   function renderPareto() {
     var portfolioFilter = document.getElementById("pareto-portfolio").value;
@@ -228,7 +271,7 @@ function renderTesting(data) {
     var csActive        = !(csFromIdx === 0 && csToIdx === stageMaxIdx);
 
     // Filter based on selected mode
-    var filtered = data.filter(function(r) {
+    var filtered = getEffectiveData().filter(function(r) {
       if (norm(r["Stage"]) !== "ELIGIBLE") return false;
       if (mode === "eligible") {
         if (norm(r["Maximum Incentive Deal Flag"]) !== "YES") return false;
@@ -830,7 +873,7 @@ function renderTesting(data) {
     if (uchCsWrap) uchCsWrap.style.display = "";
 
     var seenKeys = {};
-    var deals = data.filter(function(r) {
+    var deals = getEffectiveData().filter(function(r) {
       if (norm(r["Stage"]) !== "ELIGIBLE") return false;
       if (norm(r["Adopt Rebate Opt-In Status"]) !== "OPTED IN") return false;
       if (portfolio && r["Deal CPI Portfolio"] !== portfolio) return false;
@@ -948,8 +991,10 @@ function renderTesting(data) {
     statsEl.innerHTML = h;
   }
 
-  // View switcher
+  // View switcher — tracks which subtab is currently active
+  var _activeSubView = "cpi";
   function showSubView(view) {
+    _activeSubView = view;
     document.getElementById("testing-view-cpi").style.display        = view === "cpi"       ? "" : "none";
     document.getElementById("testing-view-pareto").style.display     = view === "pareto"    ? "" : "none";
     document.getElementById("testing-view-uch").style.display        = view === "uch"       ? "" : "none";
@@ -1019,7 +1064,7 @@ function renderTesting(data) {
 
   document.getElementById("tab-btn-cpi").addEventListener("click", function() {
     showSubView("cpi");
-    renderCPIAdopt(data);
+    renderCPIAdopt(getEffectiveData());
   });
   document.getElementById("tab-btn-pareto").addEventListener("click", function() {
     showSubView("pareto");
@@ -1028,7 +1073,7 @@ function renderTesting(data) {
   document.getElementById("tab-btn-uch").addEventListener("click", function() { showSubView("uch"); });
   document.getElementById("tab-btn-lifecycle").addEventListener("click", function() {
     showSubView("lifecycle");
-    renderLifecycle(data);
+    renderLifecycle(getEffectiveData());
   });
 
   // Restore active sub-view (or default to CPI Adopt)
@@ -1043,10 +1088,10 @@ function renderTesting(data) {
     showSubView("uch");
   } else if (savedView === "lifecycle") {
     showSubView("lifecycle");
-    renderLifecycle(data);
+    renderLifecycle(getEffectiveData());
   } else {
     showSubView("cpi");
-    renderCPIAdopt(data);
+    renderCPIAdopt(getEffectiveData());
   }
 }
 
