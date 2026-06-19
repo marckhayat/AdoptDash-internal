@@ -892,9 +892,26 @@ function restoreUploadSection(cachedEntries) {
   sec.querySelectorAll(".idb-clear-btn").forEach(function (btn) {
     btn.addEventListener("click", function () {
       var type = this.dataset.idbtype;
-      IDB.remove(type).then(function () {
-        IDB.removeHandle(type).catch(function() {});
-        IDB.loadAll().then(function (entries) { restoreUploadSection(entries); });
+      // Load session data first to collect WS-IDs, then delete annotations for them
+      IDB.load(type).then(function (entry) {
+        var wsIds = [];
+        if (entry && entry.data) {
+          entry.data.forEach(function (r) {
+            var id = String(r["Deal WS-ID"] || "");
+            if (id) wsIds.push(id);
+          });
+        }
+        return IDB.remove(type).then(function () {
+          IDB.removeHandle(type).catch(function() {});
+          if (wsIds.length) ANNOTATIONS.clearForWsIds(wsIds);
+          IDB.loadAll().then(function (entries) { restoreUploadSection(entries); });
+        });
+      }).catch(function () {
+        // Fallback: delete session even if load failed
+        IDB.remove(type).then(function () {
+          IDB.removeHandle(type).catch(function() {});
+          IDB.loadAll().then(function (entries) { restoreUploadSection(entries); });
+        });
       });
     });
   });
@@ -928,6 +945,7 @@ function restoreUploadSection(cachedEntries) {
     if (!confirm("This will delete all cached sessions and your saved username. Continue?")) return;
     IDB.clearAll().then(function () {
       IDB.clearAllHandles().catch(function() {});
+      ANNOTATIONS.clearAll();
       localStorage.removeItem("ws-report-id");
       localStorage.removeItem("ws-client-id");
       localStorage.removeItem("ws-client-secret");

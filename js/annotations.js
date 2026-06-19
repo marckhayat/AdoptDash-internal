@@ -193,6 +193,17 @@ var ANNOTATIONS = (function () {
     });
   }
 
+  function clearAll() {
+    _cache = {};
+    _loaded = false;
+    return IDB.clearAllAnnotations();
+  }
+
+  function clearForWsIds(wsIds) {
+    wsIds.forEach(function (id) { delete _cache[id]; });
+    return Promise.all(wsIds.map(function (id) { return IDB.removeAnnotation(id); }));
+  }
+
   // ── Get all unique user-created tag names ─────────────────────────────────
   function allTagNames() {
     var tags = new Set();
@@ -229,6 +240,8 @@ var ANNOTATIONS = (function () {
     isExcluded:             isExcluded,
     getExcludedWsIds:       getExcludedWsIds,
     remove:                 remove,
+    clearAll:               clearAll,
+    clearForWsIds:          clearForWsIds,
     exportCSV:              exportCSV,
     exportJSON:             exportCSV,  // alias
     importCSV:              importCSV,
