@@ -240,7 +240,11 @@ function handleCSV(file) {
         setTimeout(function() {
           try {
             APP_DATA = transformData(results.data);
-            finishLoad(file.name, APP_DATA.length, false, "ws-" + file.name);
+            var _wsGeoIds = [];
+            APP_DATA.forEach(function(r) { var v = String(r["BE GEO ID"] || "").trim(); if (v && _wsGeoIds.indexOf(v) === -1) _wsGeoIds.push(v); });
+            _wsGeoIds.sort();
+            var _wsIdbKey = _wsGeoIds.length > 0 ? "ws-geo-" + _wsGeoIds.join("_") : "ws-" + file.name;
+            finishLoad(file.name, APP_DATA.length, false, _wsIdbKey);
           } catch(err) {
             restoreUploadSection([]);
             console.error(err);
@@ -416,7 +420,11 @@ function parseCSVAndFinish(csvString, filename, headerAutoDetected) {
       setTimeout(function () {
         try {
           APP_DATA = transformData(results.data);
-          finishLoad(filename, APP_DATA.length, headerAutoDetected, "ws-" + filename);
+          var _wsGeoIds2 = [];
+          APP_DATA.forEach(function(r) { var v = String(r["BE GEO ID"] || "").trim(); if (v && _wsGeoIds2.indexOf(v) === -1) _wsGeoIds2.push(v); });
+          _wsGeoIds2.sort();
+          var _wsIdbKey2 = _wsGeoIds2.length > 0 ? "ws-geo-" + _wsGeoIds2.join("_") : "ws-" + filename;
+          finishLoad(filename, APP_DATA.length, headerAutoDetected, _wsIdbKey2);
         } catch (err) {
           restoreUploadSection();
           console.error(err);
@@ -694,7 +702,9 @@ function restoreUploadSection(cachedEntries) {
       if (APP_MULTI_SESSIONS && APP_MULTI_SESSIONS.sessions.length > 0) {
         multiCards = APP_MULTI_SESSIONS.sessions.map(function(sess, i) {
           var name = sess.partnerName ? '<div class="fw-semibold small">' + sess.partnerName + '</div>' : '';
-          var loadedAt = APP_MULTI_SESSIONS.loadedAt || null;
+          // Use per-session IDB loadedAt if available, fall back to shared loadedAt
+          var idbEntry = cachedEntries.find(function(e) { return e.type === "cpi-" + sess.id; });
+          var loadedAt = (idbEntry && idbEntry.meta && idbEntry.meta.loadedAt) ? idbEntry.meta.loadedAt : (APP_MULTI_SESSIONS.loadedAt || null);
           var dateStr = loadedAt ? (function(iso){ var d=new Date(iso); return isNaN(d)?'':(d.toLocaleDateString(APP_LOCALE)+' '+d.toLocaleTimeString(APP_LOCALE,{hour:'2-digit',minute:'2-digit'})); })(loadedAt) : '';
           var hasHandle = !!(APP_MULTI_SESSIONS && APP_MULTI_SESSIONS.hasHandle);
           return '<div class="col-6"><div class="card border-warning mb-0 p-2">' +
@@ -927,7 +937,16 @@ function restoreUploadSection(cachedEntries) {
         hideRefreshToast();
         // Clear dismissed notifications so fresh data shows all notifications
         try { localStorage.removeItem(_notifStorageKey(type)); } catch(e) {}
-        if (APP_MULTI_SESSIONS && type.indexOf("cpi-") === 0) APP_MULTI_SESSIONS.loadedAt = new Date().toISOString();
+        // If this refreshed session is currently active, reload data and refresh notifications
+        if (window._currentSessionKey === type) {
+          IDB.load(type).then(function(entry) {
+            if (entry && entry.data) {
+              APP_DATA = entry.data;
+              window._dismissedNotifs = {};
+              showDataNotifications(APP_DATA);
+            }
+          });
+        }
         IDB.loadAll().then(function(en) { restoreUploadSection(en); });
       }).catch(function () {
         hideRefreshToast();
