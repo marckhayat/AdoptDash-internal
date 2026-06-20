@@ -549,7 +549,8 @@ function restoreUploadSection(cachedEntries) {
     }
     var basename = (entry.meta.filename || '').split(/[\\/]/).pop().replace(/\s*·\s*BE GEO ID.*$/, '');
     var dateStr = fmtDate(entry.meta.loadedAt);
-    html += '<div class="text-muted text-truncate" style="font-size:0.72rem" title="' + entry.meta.filename + '">' + basename + (dateStr ? ' &middot; ' + dateStr : '') + '</div>';
+    html += '<div class="text-muted text-truncate" style="font-size:0.72rem" title="' + entry.meta.filename + '">' + basename + '</div>';
+    if (dateStr) html += '<div class="text-muted" style="font-size:0.72rem">' + dateStr + '</div>';
     html += '</div>';
     html += '<div class="d-flex gap-1 flex-shrink-0">';
     html += '<button class="btn btn-sm btn-' + btnColor + ' idb-resume-btn py-0" data-idbtype="' + entry.type + '" title="Resume"><i class="bi bi-play-fill"></i></button>';
