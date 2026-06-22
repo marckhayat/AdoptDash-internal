@@ -864,6 +864,8 @@ function renderTesting(data) {
     // Show donut as soon as any selection is made
     var mr = document.getElementById("uch-main-row");
     if (mr) mr.style.display = _uchState.portfolio ? "" : "none";
+    var cw2 = document.getElementById("uch-cs-wrap");
+    if (cw2) cw2.style.display = _uchState.portfolio ? "" : "none";
     renderUCHDonut();
   }
 
@@ -883,6 +885,12 @@ function renderTesting(data) {
     var canvas = document.getElementById("uch-donut-canvas");
     if (!canvas) return;
 
+    var uchCsFromEl = document.getElementById("uch-cs-from");
+    var uchCsToEl   = document.getElementById("uch-cs-to");
+    var csFromIdx   = uchCsFromEl ? parseInt(uchCsFromEl.value) : 0;
+    var csToIdx     = uchCsToEl   ? parseInt(uchCsToEl.value)   : stageMaxIdx;
+    var csActive    = !(csFromIdx === 0 && csToIdx === stageMaxIdx);
+
     var seenKeys = {};
     var filtered = getEffectiveData().filter(function(r) {
       if (norm(r["Stage"]) !== "ELIGIBLE") return false;
@@ -890,6 +898,10 @@ function renderTesting(data) {
       if (_uchState.portfolio && r["Deal CPI Portfolio"] !== _uchState.portfolio) return false;
       if (_uchState.offer     && r["Track"]              !== _uchState.offer)     return false;
       if (_uchState.uc        && r["Sub-Track"]          !== _uchState.uc)        return false;
+      if (csActive) {
+        var si = STAGE_ORDER.indexOf(String(r["Current stage"] || ""));
+        if (si === -1 || si < csFromIdx || si > csToIdx) return false;
+      }
       var key = String(r["CRPartyID-Offer"] || r["Deal WS-ID"] || "");
       if (key) { if (seenKeys[key]) return false; seenKeys[key] = true; }
       return true;
@@ -910,6 +922,35 @@ function renderTesting(data) {
 
     var titleEl = document.getElementById("uch-donut-title");
     if (titleEl) titleEl.textContent = "Stage Distribution (" + total + " deal" + (total !== 1 ? "s" : "") + ")";
+
+    // ── KPI strip ────────────────────────────────────────────────────────────
+    var kpiArea = document.getElementById("uch-kpi-area");
+    if (kpiArea) {
+      if (total === 0) {
+        kpiArea.innerHTML = '<span class="text-muted small">No opted-in eligible deals in this selection.</span>';
+      } else {
+        var daysVals   = filtered.map(function(r){ return r["Days in stage"]; }).filter(function(v){ return v !== null && v !== undefined && !isNaN(v); });
+        var avgDaysAll = daysVals.length ? Math.round(daysVals.reduce(function(s,v){return s+v;},0) / daysVals.length) : null;
+        var kh = '';
+        kh += '<div class="card shadow-sm"><div class="card-body p-3">';
+        kh += '<div class="text-muted small mb-1">Opted-in Deals</div><div class="fs-4 fw-bold text-success">' + total + '</div>';
+        kh += '</div></div>';
+        if (avgDaysAll !== null) {
+          kh += '<div class="card shadow-sm"><div class="card-body p-3">';
+          kh += '<div class="text-muted small mb-1">Avg Days in Stage</div><div class="fs-4 fw-bold">' + avgDaysAll + '</div>';
+          kh += '</div></div>';
+        }
+        var uchPreset = { stage: ["Eligible"], optIn: ["OPTED IN"], sortField: "Potential Incentives", sortDir: "desc" };
+        if (_uchState.portfolio) uchPreset.portfolio = _uchState.portfolio;
+        if (_uchState.offer)     uchPreset.offer     = _uchState.offer;
+        if (_uchState.uc)        uchPreset.uc        = _uchState.uc;
+        if (csActive)            { uchPreset.csFrom  = csFromIdx; uchPreset.csTo = csToIdx; }
+        kh += '<a href="#" id="uch-deeplink" class="small"><i class="bi bi-box-arrow-up-right me-1"></i>Open in Details tab</a>';
+        kpiArea.innerHTML = kh;
+        var dlLink = document.getElementById("uch-deeplink");
+        if (dlLink) dlLink.addEventListener("click", function(e) { e.preventDefault(); window.navigateToDetails(uchPreset); });
+      }
+    }
 
     if (_uchDonutChart) { _uchDonutChart.destroy(); _uchDonutChart = null; }
     if (total === 0) return;
@@ -974,15 +1015,11 @@ function renderTesting(data) {
     });
 
     if (deals.length === 0) {
-      var kpiArea0 = document.getElementById("uch-kpi-area");
-      if (kpiArea0) kpiArea0.innerHTML = '<span class="text-muted small">No deals in this stage range.</span>';
       statsEl.innerHTML = '';
       return;
     }
 
     var totalDeals = deals.length;
-    var daysVals   = deals.map(function(r){ return r["Days in stage"]; }).filter(function(v){ return v !== null && v !== undefined && !isNaN(v); });
-    var avgDaysAll = daysVals.length ? Math.round(daysVals.reduce(function(s,v){return s+v;},0) / daysVals.length) : null;
 
     var stageGroups = {};
     deals.forEach(function(r) {
@@ -1006,30 +1043,6 @@ function renderTesting(data) {
     });
     var topTasks = Object.keys(taskData).map(function(t){ return { name: t, count: taskData[t].count, stages: Object.keys(taskData[t].stages) }; });
     topTasks.sort(function(a,b){ return b.count - a.count; });
-
-    var uchPreset = { stage: ["Eligible"], optIn: ["OPTED IN"], sortField: "Potential Incentives", sortDir: "desc" };
-    if (portfolio) uchPreset.portfolio = portfolio;
-    if (offer)     uchPreset.offer     = offer;
-    if (uc)        uchPreset.uc        = uc;
-    if (csActive)  { uchPreset.csFrom  = csFromIdx; uchPreset.csTo = csToIdx; }
-
-    // KPI area + deeplink (rendered into persistent slot next to slider)
-    var kpiArea = document.getElementById("uch-kpi-area");
-    if (kpiArea) {
-      var kh = '';
-      kh += '<div class="card shadow-sm"><div class="card-body p-3">';
-      kh += '<div class="text-muted small mb-1">Opted-in Deals</div><div class="fs-4 fw-bold text-success">' + totalDeals + '</div>';
-      kh += '</div></div>';
-      if (avgDaysAll !== null) {
-        kh += '<div class="card shadow-sm"><div class="card-body p-3">';
-        kh += '<div class="text-muted small mb-1">Avg Days in Stage</div><div class="fs-4 fw-bold">' + avgDaysAll + '</div>';
-        kh += '</div></div>';
-      }
-      kh += '<a href="#" id="uch-deeplink" class="small"><i class="bi bi-box-arrow-up-right me-1"></i>Open in Details tab</a>';
-      kpiArea.innerHTML = kh;
-      var dlLink = document.getElementById("uch-deeplink");
-      if (dlLink) dlLink.addEventListener("click", function(e) { e.preventDefault(); window.navigateToDetails(uchPreset); });
-    }
 
     var stagesPresent = STAGE_ORDER.filter(function(s){ return stageGroups[s] && stageGroups[s].length > 0; });
     var h = '';
