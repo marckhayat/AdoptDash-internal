@@ -204,7 +204,7 @@ function renderTesting(data) {
   html += '</div>';
   html += '</div>';
 
-  html += '<div class="row g-3 mt-1" id="uch-main-row" style="display:none">';
+  html += '<div class="row g-3 mt-1" id="uch-main-row">';
   html += '<div class="col-12 col-lg-3"><div class="card shadow-sm h-100"><div class="card-body">';
   html += '<h6 class="card-title mb-3" id="uch-donut-title">Stage Distribution</h6>';
   html += '<canvas id="uch-donut-canvas"></canvas>';
@@ -864,7 +864,7 @@ function renderTesting(data) {
     }
     // Show donut as soon as any selection is made
     var mr = document.getElementById("uch-main-row");
-    if (mr) mr.style.display = _uchState.portfolio ? "" : "none";
+    if (mr) mr.style.display = "";
     var cw2 = document.getElementById("uch-cs-wrap");
     if (cw2) cw2.style.display = _uchState.portfolio ? "" : "none";
     renderUCHDonut();
@@ -1144,6 +1144,7 @@ function renderTesting(data) {
     uchRenderStep(1);
   });
   uchUpdateBreadcrumb();
+  renderUCHDonut();
   if (_uchState.portfolio) {
     var _restoreStep = _uchState.uc ? 2 : (_uchState.offer ? 2 : 1);
     uchRenderStep(_restoreStep);
