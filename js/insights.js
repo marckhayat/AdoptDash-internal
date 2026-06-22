@@ -857,6 +857,7 @@ function renderTesting(data) {
     }
     uchUpdateBreadcrumb();
     uchSlideToStep(arrivedAtStep);
+    uchSaveState();
     if (!_uchState.uc) {
       var se = document.getElementById("uch-stats"); if (se) se.innerHTML = "";
       var cw = document.getElementById("uch-cs-wrap"); if (cw) cw.style.display = "none";
