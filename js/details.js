@@ -1074,11 +1074,11 @@ function renderDetails(data) {
     var s = calcSummary(rows);
     var html = "";
     if (has2TPartner) html += metricCard(s.partners, "2T Partners");
-    html += metricCard(s.customers,          "Customers");
-    html += metricCard(s.useCases,           "Use Cases");
-    html += metricCard("$" + Math.round(s.missed).toLocaleString(),    "Total Missed");
-    html += metricCard("$" + Math.round(s.potential).toLocaleString(), "Total Potential");
-    html += metricCard("$" + Math.round(s.earned).toLocaleString(),    "Total Estimated Earned");
+    html += metricCard(s.customers,          "Customers",             "A customer refers to a unique CR Party ID.");
+    html += metricCard(s.useCases,           "Use Cases",             "Count of unique use cases per offer per CR Party ID.");
+    html += metricCard("$" + Math.round(s.missed).toLocaleString(),    "Total Missed",           "Total amount of missed incentives. The highest incentive per unique UC per offer per CR Party ID is counted.");
+    html += metricCard("$" + Math.round(s.potential).toLocaleString(), "Total Potential",        "Total amount of remaining incentives. The highest incentive per unique UC per offer per CR Party ID is counted.");
+    html += metricCard("$" + Math.round(s.earned).toLocaleString(),    "Total Estimated Earned", "Estimated amount of earned incentives according to program rules. Payment process goes through further steps validated by the CPI team.");
     html += '<div class="d-flex flex-column align-items-end ms-auto gap-1">' +
       '<button id="det-export-btn" class="btn btn-sm btn-outline-success" style="font-size:0.82rem;white-space:nowrap">' +
       '<i class="bi bi-file-earmark-excel me-1"></i>Export to Excel</button>' +
@@ -1109,8 +1109,9 @@ function renderDetails(data) {
     });
   }
 
-  function metricCard(value, label) {
-    return '<div class="metric-card flex-fill"><div class="metric-value">' + value + '</div><div class="metric-label">' + label + '</div></div>';
+  function metricCard(value, label, tooltip) {
+    var infoIcon = tooltip ? tip(tooltip) : '';
+    return '<div class="metric-card flex-fill"><div class="metric-value">' + value + '</div><div class="metric-label">' + label + infoIcon + '</div></div>';
   }
 
   function renderTable() {
