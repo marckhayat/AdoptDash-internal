@@ -854,6 +854,78 @@ function renderTesting(data) {
     }
   }
 
+  // ── UC Health: donut chart ───────────────────────────────────────────────
+  var _uchDonutChart = null;
+  var UCH_STAGE_COLORS = {
+    "Purchase":  "#e74c3c",
+    "Onboard":   "#e07070",
+    "Implement": "#e67e22",
+    "Use":       "#f0b429",
+    "Engage":    "#27ae60",
+    "Adopt":     "#2ecc71",
+    "Completed": "#1abc9c"
+  };
+
+  function renderUCHDonut() {
+    var canvas = document.getElementById("uch-donut-canvas");
+    if (!canvas) return;
+
+    var seenKeys = {};
+    var filtered = getEffectiveData().filter(function(r) {
+      if (norm(r["Stage"]) !== "ELIGIBLE") return false;
+      if (norm(r["Adopt Rebate Opt-In Status"]) !== "OPTED IN") return false;
+      if (_uchState.portfolio && r["Deal CPI Portfolio"] !== _uchState.portfolio) return false;
+      if (_uchState.offer     && r["Track"]              !== _uchState.offer)     return false;
+      if (_uchState.uc        && r["Sub-Track"]          !== _uchState.uc)        return false;
+      var key = String(r["CRPartyID-Offer"] || r["Deal WS-ID"] || "");
+      if (key) { if (seenKeys[key]) return false; seenKeys[key] = true; }
+      return true;
+    });
+
+    var stageCounts = {};
+    STAGE_ORDER.forEach(function(s) { stageCounts[s] = 0; });
+    filtered.forEach(function(r) {
+      var cs = r["Current stage"] || "Unknown";
+      if (stageCounts[cs] !== undefined) stageCounts[cs]++;
+      else stageCounts[cs] = (stageCounts[cs] || 0) + 1;
+    });
+
+    var labels = STAGE_ORDER.filter(function(s) { return stageCounts[s] > 0; });
+    var values = labels.map(function(s) { return stageCounts[s]; });
+    var colors = labels.map(function(s) { return UCH_STAGE_COLORS[s] || "#adb5bd"; });
+    var total  = filtered.length;
+
+    var titleEl = document.getElementById("uch-donut-title");
+    if (titleEl) titleEl.textContent = "Stage Distribution (" + total + " deal" + (total !== 1 ? "s" : "") + ")";
+
+    if (_uchDonutChart) { _uchDonutChart.destroy(); _uchDonutChart = null; }
+    if (total === 0) return;
+
+    _uchDonutChart = new Chart(canvas, {
+      type: "doughnut",
+      data: {
+        labels: labels,
+        datasets: [{ data: values, backgroundColor: colors, borderWidth: 2, borderColor: "#fff", hoverOffset: 6 }]
+      },
+      options: {
+        cutout: "62%",
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+          legend: { position: "bottom", labels: { boxWidth: 12, padding: 8, font: { size: 11 } } },
+          tooltip: {
+            callbacks: {
+              label: function(ctx) {
+                var pct = total > 0 ? Math.round(ctx.parsed / total * 100) : 0;
+                return ctx.label + ": " + ctx.parsed + " (" + pct + "%)";
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+
   function renderUCHealth() {
     var portfolio  = _uchState.portfolio;
     var offer      = _uchState.offer;
@@ -949,6 +1021,14 @@ function renderTesting(data) {
     var stagesPresent = STAGE_ORDER.filter(function(s){ return stageGroups[s] && stageGroups[s].length > 0; });
     var h = '';
     h += '<div class="row g-3">';
+
+    // Donut chart column
+    h += '<div class="col-12 col-lg-3"><div class="card shadow-sm h-100"><div class="card-body">';
+    h += '<h6 class="card-title mb-3" id="uch-donut-title">Stage Distribution</h6>';
+    h += '<canvas id="uch-donut-canvas"></canvas>';
+    h += '</div></div></div>';
+
+    // Stage breakdown table column
     h += '<div class="col-12 col-lg-3"><div class="card shadow-sm h-100"><div class="card-body">';
     h += '<h6 class="card-title mb-3">Stage Breakdown</h6>';
     if (stagesPresent.length > 0) {
@@ -964,7 +1044,7 @@ function renderTesting(data) {
     } else { h += '<p class="text-muted small">No stage data available.</p>'; }
     h += '</div></div></div>';
 
-    h += '<div class="col-12 col-lg-9"><div class="card shadow-sm h-100"><div class="card-body">';
+    h += '<div class="col-12 col-lg-6"><div class="card shadow-sm h-100"><div class="card-body">';
     h += '<h6 class="card-title mb-3">Top Pending Tasks</h6>';
     if (topTasks.length > 0) {
       h += '<div class="d-flex flex-column gap-2">';
@@ -989,6 +1069,7 @@ function renderTesting(data) {
     h += '</div>';
 
     statsEl.innerHTML = h;
+    renderUCHDonut();
   }
 
   // View switcher — tracks which subtab is currently active
