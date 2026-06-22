@@ -1,17 +1,46 @@
 // =============================================================================
 // idb.js — IndexedDB persistence for APP_DATA
 // =============================================================================
-// Stores up to two named dataset slots: "workspan" and "lci".
-// Each entry: { type, data (APP_DATA array), meta: { filename, rowCount, loadedAt, ... } }
+// Uses two object stores:
+//   "datasets"    — full session data: { type, data (APP_DATA array), meta }
+//   "fileHandles" — FileSystemFileHandle references: { type, handle }
+//
+// Session metadata for the session-list UI is stored in localStorage
+// (key: "AdoptDash_sessionMeta") so it is always fast and reliable,
+// with no IDB version bumps required.
 // =============================================================================
 
 var IDB = (function () {
   var DB_NAME      = "AdoptionDashboard";
-  var DB_VERSION   = 2;
+  var DB_VERSION   = 3;
   var STORE        = "datasets";
   var HANDLE_STORE = "fileHandles";
   var _db          = null;
 
+  // ── localStorage-backed session metadata ────────────────────────────────
+  var _META_LS_KEY = "AdoptDash_sessionMeta";
+
+  function _lsGetAll() {
+    try { return JSON.parse(localStorage.getItem(_META_LS_KEY) || "[]"); } catch (e) { return []; }
+  }
+  function _lsSet(all) {
+    try { localStorage.setItem(_META_LS_KEY, JSON.stringify(all)); } catch (e) { console.warn("Session meta save failed:", e); }
+  }
+  function _lsSaveMeta(type, meta) {
+    var all = _lsGetAll();
+    var found = false;
+    for (var i = 0; i < all.length; i++) { if (all[i].type === type) { all[i].meta = meta; found = true; break; } }
+    if (!found) all.push({ type: type, meta: meta });
+    _lsSet(all);
+  }
+  function _lsRemoveMeta(type) {
+    _lsSet(_lsGetAll().filter(function (e) { return e.type !== type; }));
+  }
+  function _lsClearMeta() {
+    try { localStorage.removeItem(_META_LS_KEY); } catch (e) {}
+  }
+
+  // ── IndexedDB helpers ────────────────────────────────────────────────────
   function open() {
     return new Promise(function (resolve, reject) {
       if (_db) { resolve(_db); return; }
@@ -31,11 +60,12 @@ var IDB = (function () {
   }
 
   function save(type, data, meta) {
+    _lsSaveMeta(type, meta); // always write metadata to localStorage first (synchronous)
     return open().then(function (db) {
       return new Promise(function (resolve, reject) {
-        var tx  = db.transaction(STORE, "readwrite");
+        var tx    = db.transaction(STORE, "readwrite");
         var store = tx.objectStore(STORE);
-        var req = store.put({ type: type, data: data, meta: meta });
+        var req   = store.put({ type: type, data: data, meta: meta });
         req.onsuccess = resolve;
         req.onerror   = function (e) { reject(e.target.error); };
       });
@@ -55,6 +85,7 @@ var IDB = (function () {
   }
 
   function remove(type) {
+    _lsRemoveMeta(type);
     return open().then(function (db) {
       return new Promise(function (resolve, reject) {
         var tx    = db.transaction(STORE, "readwrite");
@@ -78,6 +109,28 @@ var IDB = (function () {
     });
   }
 
+  // Returns session metadata for the session-list UI.
+  // Reads from localStorage (fast, synchronous). If empty, attempts a one-time
+  // migration from IDB so existing sessions survive the transition.
+  function loadAllMeta() {
+    var lsEntries = _lsGetAll();
+    if (lsEntries.length > 0) return Promise.resolve(lsEntries);
+    // localStorage empty — try one-time migration from IDB
+    return open().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        var tx    = db.transaction(STORE, "readonly");
+        var store = tx.objectStore(STORE);
+        var req   = store.getAll();
+        req.onsuccess = function (e) { resolve(e.target.result || []); };
+        req.onerror   = function (e) { reject(e.target.error); };
+      });
+    }).then(function (fullEntries) {
+      var metaOnly = fullEntries.map(function (e) { return { type: e.type, meta: e.meta }; });
+      if (metaOnly.length > 0) _lsSet(metaOnly);
+      return metaOnly;
+    }).catch(function () { return []; });
+  }
+
   // Request persistent storage so the browser won't auto-evict IndexedDB data
   function requestPersistence() {
     if (navigator.storage && navigator.storage.persist) {
@@ -88,6 +141,7 @@ var IDB = (function () {
   }
 
   function clearAll() {
+    _lsClearMeta();
     return open().then(function (db) {
       return new Promise(function (resolve, reject) {
         var tx    = db.transaction(STORE, "readwrite");
@@ -147,5 +201,5 @@ var IDB = (function () {
     });
   }
 
-  return { save: save, load: load, remove: remove, loadAll: loadAll, clearAll: clearAll, requestPersistence: requestPersistence, saveHandle: saveHandle, loadHandle: loadHandle, removeHandle: removeHandle, clearAllHandles: clearAllHandles };
+  return { save: save, load: load, remove: remove, loadAll: loadAll, loadAllMeta: loadAllMeta, clearAll: clearAll, requestPersistence: requestPersistence, saveHandle: saveHandle, loadHandle: loadHandle, removeHandle: removeHandle, clearAllHandles: clearAllHandles };
 })();

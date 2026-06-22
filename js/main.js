@@ -37,7 +37,7 @@ document.addEventListener("DOMContentLoaded", init);
 
 function init() {
   // Check IndexedDB for cached datasets and render resume cards if found
-  IDB.loadAll().then(function (entries) {
+  IDB.loadAllMeta().then(function (entries) {
     restoreUploadSection(entries);
   }).catch(function () {
     restoreUploadSection([]);
@@ -550,7 +550,7 @@ function restoreUploadSection(cachedEntries) {
     html += '</div>';
     html += '<div class="d-flex gap-1 flex-shrink-0">';
     html += '<button class="btn btn-sm btn-' + btnColor + ' idb-resume-btn py-0" data-idbtype="' + entry.type + '" title="Resume"><i class="bi bi-play-fill"></i></button>';
-    if (entry.meta.hasFileHandle || (isChrome && isCpi)) {
+    if (entry.meta.hasFileHandle || isChrome) {
       html += '<button class="btn btn-sm btn-outline-primary idb-refresh-btn py-0" data-idbtype="' + entry.type + '" title="Refresh from file"><i class="bi bi-arrow-clockwise"></i></button>';
     }
     html += '<button class="btn btn-sm btn-outline-danger idb-clear-btn py-0" data-idbtype="' + entry.type + '" title="Delete"><i class="bi bi-trash"></i></button>';
@@ -867,7 +867,7 @@ function restoreUploadSection(cachedEntries) {
       if (APP_MULTI_SESSIONS.sessions.length === 0) APP_MULTI_SESSIONS = null;
       IDB.remove(idbKey).catch(function() {});
       IDB.removeHandle(idbKey).catch(function() {});
-      IDB.loadAll().then(function(en) { restoreUploadSection(en); });
+      IDB.loadAllMeta().then(function(en) { restoreUploadSection(en); });
     });
   });
 
@@ -877,12 +877,12 @@ function restoreUploadSection(cachedEntries) {
       var type = this.dataset.idbtype;
       showLoader("Loading from cache…");
       IDB.load(type).then(function (entry) {
-        if (!entry || !entry.data) { IDB.loadAll().then(function(e){restoreUploadSection(e);}); alert("Cache not found."); return; }
+        if (!entry || !entry.data) { IDB.loadAllMeta().then(function(e){restoreUploadSection(e);}); alert("Cache not found."); return; }
         APP_DATA = entry.data;
         APP_FILE_META = { name: entry.meta.filename, lastModified: entry.meta.fileLastModified ? new Date(entry.meta.fileLastModified) : null, cachedAt: entry.meta.loadedAt ? new Date(entry.meta.loadedAt) : null };
         window.APP_IS_DISTI = !!entry.meta.isDisti;
         finishLoad(entry.meta.filename, entry.meta.rowCount, false, type, entry.meta.loadedAt, true);
-      }).catch(function (e) { IDB.loadAll().then(function(en){restoreUploadSection(en);}); alert("Error loading cache: " + e); });
+      }).catch(function (e) { IDB.loadAllMeta().then(function(en){restoreUploadSection(en);}); alert("Error loading cache: " + e); });
     });
   });
 
@@ -891,7 +891,7 @@ function restoreUploadSection(cachedEntries) {
       var type = this.dataset.idbtype;
       IDB.remove(type).then(function () {
         IDB.removeHandle(type).catch(function() {});
-        IDB.loadAll().then(function (entries) { restoreUploadSection(entries); });
+        IDB.loadAllMeta().then(function (entries) { restoreUploadSection(entries); });
       });
     });
   });
@@ -907,7 +907,7 @@ function restoreUploadSection(cachedEntries) {
         // Clear dismissed notifications so fresh data shows all notifications
         try { localStorage.removeItem(_notifStorageKey(type)); } catch(e) {}
         if (APP_MULTI_SESSIONS && type.indexOf("cpi-") === 0) APP_MULTI_SESSIONS.loadedAt = new Date().toISOString();
-        IDB.loadAll().then(function(en) { restoreUploadSection(en); });
+        IDB.loadAllMeta().then(function(en) { restoreUploadSection(en); });
       }).catch(function () {
         hideRefreshToast();
       });
@@ -929,7 +929,7 @@ function restoreUploadSection(cachedEntries) {
       localStorage.removeItem("ws-client-id");
       localStorage.removeItem("ws-client-secret");
       APP_MULTI_SESSIONS = null;
-      restoreUploadSection([]);
+      location.reload();
     });
   });
 
@@ -1202,7 +1202,7 @@ function processCpiFile(file, region, week, idsToLoad) {
 
         if (found.length === 0) {
           PENDING_FILE_HANDLE = null;
-          IDB.loadAll().then(function(en) {
+          IDB.loadAllMeta().then(function(en) {
             restoreUploadSection(en);
             var errEl2 = document.getElementById("lci-error");
             if (errEl2) {
@@ -1224,55 +1224,64 @@ function processCpiFile(file, region, week, idsToLoad) {
           return;
         }
 
-        // Multiple IDs → save all to IDB immediately
+        // Multiple IDs → transform each on its own tick then save all to IDB
         if (notFound.length > 0) console.warn("No data for: " + notFound.map(function(s){return s.id;}).join(", "));
         var _multiHandle = PENDING_FILE_HANDLE;
         PENDING_FILE_HANDLE = null;
-        var savePromises = found.map(function(sess) {
-          var transformed = transformData(sess.rows);
-          var idbKey = "cpi-" + sess.id;
-          var beGeoIds2 = [sess.id];
-          sess._transformed = transformed;
-          var saveP = IDB.save(idbKey, transformed, {
-            filename:         file.name + " · BE GEO ID " + sess.id,
-            rowCount:         transformed.length,
-            loadedAt:         new Date().toISOString(),
-            fileLastModified: file.lastModified ? new Date(file.lastModified).toISOString() : null,
-            displayName:      sess.partnerName || sess.id,
-            beGeoIds:         beGeoIds2,
-            isDisti:          rawIsDisti,
-            hasFileHandle:    !!_multiHandle
-          }).then(function() {
-            if (_multiHandle) {
-              IDB.saveHandle(idbKey, _multiHandle).catch(function(e) { console.warn("Handle save failed for " + sess.id + ":", e); });
+
+        // Process sessions sequentially with setTimeout to keep the UI responsive
+        function processNext(idx, done) {
+          if (idx >= found.length) { done(); return; }
+          var sess = found[idx];
+          updateLoaderMsg("Processing BE GEO ID " + sess.id + " (" + (idx + 1) + " of " + found.length + ")\u2026");
+          setTimeout(function() {
+            try {
+              var transformed = transformData(sess.rows);
+              var idbKey = "cpi-" + sess.id;
+              sess._transformed = transformed;
+              IDB.save(idbKey, transformed, {
+                filename:         file.name + " \u00b7 BE GEO ID " + sess.id,
+                rowCount:         transformed.length,
+                loadedAt:         new Date().toISOString(),
+                fileLastModified: file.lastModified ? new Date(file.lastModified).toISOString() : null,
+                displayName:      sess.partnerName || sess.id,
+                beGeoIds:         [sess.id],
+                isDisti:          rawIsDisti,
+                hasFileHandle:    !!_multiHandle
+              }).then(function() {
+                if (_multiHandle) {
+                  IDB.saveHandle(idbKey, _multiHandle).catch(function(e) { console.warn("Handle save failed for " + sess.id + ":", e); });
+                }
+              }).catch(function(e) { console.warn("IDB save failed for " + sess.id + ":", e); });
+              processNext(idx + 1, done);
+            } catch(err) {
+              console.error("Transform failed for " + sess.id + ":", err);
+              processNext(idx + 1, done);
             }
-          }).catch(function(e) { console.warn("IDB save failed for " + sess.id + ":", e); });
-          return saveP;
-        });
+          }, 0);
+        }
 
         APP_MULTI_SESSIONS = { sessions: found, fileMeta: { name: file.name, lastModified: file.lastModified ? new Date(file.lastModified) : null }, loadedAt: new Date().toISOString(), notFoundNote: notFound.length > 0 ? notFound.map(function(s){return s.id;}).join(", ") : "", hasHandle: !!_multiHandle };
-        Promise.all(savePromises).then(function() {
-          IDB.loadAll().then(function(en) { restoreUploadSection(en); });
-        }).catch(function() {
-          IDB.loadAll().then(function(en) { restoreUploadSection(en); });
+        processNext(0, function() {
+          IDB.loadAllMeta().then(function(en) { restoreUploadSection(en); });
         });
 
       } catch (err) {
         PENDING_FILE_HANDLE = null;
-        IDB.loadAll().then(function(en) { restoreUploadSection(en); });
+        IDB.loadAllMeta().then(function(en) { restoreUploadSection(en); });
         console.error(err);
         alert("Error processing CPI file: " + err.message);
       }
     },
     error: function (err) {
       PENDING_FILE_HANDLE = null;
-      IDB.loadAll().then(function(en) { restoreUploadSection(en); });
+      IDB.loadAllMeta().then(function(en) { restoreUploadSection(en); });
       alert("Error reading CSV: " + err.message);
     }
   });
   }).catch(function (err) {
     PENDING_FILE_HANDLE = null;
-    IDB.loadAll().then(function(en) { restoreUploadSection(en); });
+    IDB.loadAllMeta().then(function(en) { restoreUploadSection(en); });
     alert("Error reading CPI file: " + err.message);
   });
 }
@@ -1285,6 +1294,25 @@ function refreshFromHandle(type, cacheOnly) {
   }
   return IDB.loadHandle(type).then(function (handle) {
     if (!handle) {
+      // For partner sessions with no saved handle, use showOpenFilePicker to let the user re-select
+      if (type.indexOf("ws-") === 0 && typeof window.showOpenFilePicker === "function") {
+        return window.showOpenFilePicker({
+          types: [{ description: "Workspan Report", accept: { "application/octet-stream": [".xlsx", ".xls", ".csv"], "text/csv": [".csv"] } }],
+          multiple: false
+        }).then(function (handles) {
+          var newHandle = handles[0];
+          PENDING_FILE_HANDLE = newHandle;
+          return newHandle.getFile();
+        }).then(function (file) {
+          if (cacheOnly) {
+            return refreshWsCacheOnly(file, type, PENDING_FILE_HANDLE);
+          }
+          processPartnerFile(file);
+        }).catch(function (err) {
+          PENDING_FILE_HANDLE = null;
+          if (err.name !== "AbortError") throw err;
+        });
+      }
       alert("No file handle saved for this session. Re-upload the file to enable one-click refresh.");
       throw new Error("No file handle saved for this session.");
     }
@@ -1312,6 +1340,7 @@ function refreshFromHandle(type, cacheOnly) {
       }
     });
   }).catch(function (err) {
+    if (err && err.name === "AbortError") return;
     alert("Could not refresh from file: " + err.message);
     throw err;
   });
@@ -1343,7 +1372,7 @@ function refreshAllPreviousSessions() {
     });
   }, Promise.resolve()).then(function () {
     if (APP_MULTI_SESSIONS) APP_MULTI_SESSIONS.loadedAt = new Date().toISOString();
-    IDB.loadAll().then(function (en) { restoreUploadSection(en); });
+    IDB.loadAllMeta().then(function (en) { restoreUploadSection(en); });
   });
 }
 
@@ -1466,14 +1495,14 @@ function refreshCpiFromHandle(file, geoId, cacheOnly) {
             }
           } catch (err) {
             PENDING_FILE_HANDLE = null;
-            IDB.loadAll().then(function(en) { restoreUploadSection(en); });
+            IDB.loadAllMeta().then(function(en) { restoreUploadSection(en); });
             alert("Error refreshing CPI data: " + err.message);
             reject(err);
           }
         },
         error: function (err) {
           PENDING_FILE_HANDLE = null;
-          IDB.loadAll().then(function(en) { restoreUploadSection(en); });
+          IDB.loadAllMeta().then(function(en) { restoreUploadSection(en); });
           alert("Error reading file: " + err.message);
           reject(err);
         }
@@ -1481,7 +1510,7 @@ function refreshCpiFromHandle(file, geoId, cacheOnly) {
     });
   }).catch(function (err) {
     PENDING_FILE_HANDLE = null;
-    IDB.loadAll().then(function(en) { restoreUploadSection(en); });
+    IDB.loadAllMeta().then(function(en) { restoreUploadSection(en); });
     alert("Error reading file: " + err.message);
     throw err;
   });
@@ -1720,7 +1749,7 @@ function resetApp() {
   });
 
   // Reload cache entries so resume cards show after reset
-  IDB.loadAll().then(function (entries) {
+  IDB.loadAllMeta().then(function (entries) {
     restoreUploadSection(entries);
   }).catch(function () {
     restoreUploadSection([]);
