@@ -204,7 +204,14 @@ function renderTesting(data) {
   html += '</div>';
   html += '</div>';
 
-  html += '<div id="uch-stats"></div>';
+  html += '<div class="row g-3 mt-1" id="uch-main-row" style="display:none">';
+  html += '<div class="col-12 col-lg-3"><div class="card shadow-sm h-100"><div class="card-body">';
+  html += '<h6 class="card-title mb-3" id="uch-donut-title">Stage Distribution</h6>';
+  html += '<canvas id="uch-donut-canvas"></canvas>';
+  html += '</div></div></div>';
+  html += '<div class="col-12 col-lg-9"><div id="uch-stats"></div></div>';
+  html += '</div>';
+
   html += '</div>'; // close testing-view-uch
 
   // ── Lifecycle sub-view ────────────────────────────────────────────────────
@@ -805,6 +812,8 @@ function renderTesting(data) {
           uchSlideToStep(0);
           var se = document.getElementById("uch-stats"); if (se) se.innerHTML = "";
           var cw = document.getElementById("uch-cs-wrap"); if (cw) cw.style.display = "none";
+          var mr = document.getElementById("uch-main-row"); if (mr) mr.style.display = "none";
+          if (_uchDonutChart) { _uchDonutChart.destroy(); _uchDonutChart = null; }
         } else if (step === "0") {
           // Back to offer panel for this portfolio
           _uchState.offer = ""; _uchState.uc = "";
@@ -852,6 +861,10 @@ function renderTesting(data) {
       var se = document.getElementById("uch-stats"); if (se) se.innerHTML = "";
       var cw = document.getElementById("uch-cs-wrap"); if (cw) cw.style.display = "none";
     }
+    // Show donut as soon as any selection is made
+    var mr = document.getElementById("uch-main-row");
+    if (mr) mr.style.display = _uchState.portfolio ? "" : "none";
+    renderUCHDonut();
   }
 
   // ── UC Health: donut chart ───────────────────────────────────────────────
@@ -1022,14 +1035,7 @@ function renderTesting(data) {
     var h = '';
     h += '<div class="row g-3">';
 
-    // Donut chart column
-    h += '<div class="col-12 col-lg-3"><div class="card shadow-sm h-100"><div class="card-body">';
-    h += '<h6 class="card-title mb-3" id="uch-donut-title">Stage Distribution</h6>';
-    h += '<canvas id="uch-donut-canvas"></canvas>';
-    h += '</div></div></div>';
-
-    // Stage breakdown table column
-    h += '<div class="col-12 col-lg-3"><div class="card shadow-sm h-100"><div class="card-body">';
+    h += '<div class="col-12 col-lg-4"><div class="card shadow-sm h-100"><div class="card-body">';
     h += '<h6 class="card-title mb-3">Stage Breakdown</h6>';
     if (stagesPresent.length > 0) {
       h += '<table class="table table-sm table-hover mb-0" style="table-layout:fixed"><colgroup><col style="width:50%"><col style="width:20%"><col style="width:30%"></colgroup><thead><tr><th>Stage</th><th class="text-end">Deals</th><th class="text-end">Avg Days</th></tr></thead><tbody>';
@@ -1044,7 +1050,7 @@ function renderTesting(data) {
     } else { h += '<p class="text-muted small">No stage data available.</p>'; }
     h += '</div></div></div>';
 
-    h += '<div class="col-12 col-lg-6"><div class="card shadow-sm h-100"><div class="card-body">';
+    h += '<div class="col-12 col-lg-8"><div class="card shadow-sm h-100"><div class="card-body">';
     h += '<h6 class="card-title mb-3">Top Pending Tasks</h6>';
     if (topTasks.length > 0) {
       h += '<div class="d-flex flex-column gap-2">';
