@@ -812,8 +812,7 @@ function renderTesting(data) {
           uchSlideToStep(0);
           var se = document.getElementById("uch-stats"); if (se) se.innerHTML = "";
           var cw = document.getElementById("uch-cs-wrap"); if (cw) cw.style.display = "none";
-          var mr = document.getElementById("uch-main-row"); if (mr) mr.style.display = "none";
-          if (_uchDonutChart) { _uchDonutChart.destroy(); _uchDonutChart = null; }
+          renderUCHDonut();
         } else if (step === "0") {
           // Back to offer panel for this portfolio
           _uchState.offer = ""; _uchState.uc = "";
