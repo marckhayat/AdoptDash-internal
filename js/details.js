@@ -1082,9 +1082,9 @@ function renderDetails(data) {
     html += '<div class="d-flex flex-column align-items-end ms-auto gap-1">' +
       '<button id="det-export-btn" class="btn btn-sm btn-outline-success" style="font-size:0.82rem;white-space:nowrap">' +
       '<i class="bi bi-file-earmark-excel me-1"></i>Export to Excel</button>' +
-      '<button id="det-annot-export-btn" class="btn btn-sm btn-outline-secondary" style="font-size:0.75rem;white-space:nowrap" title="Export annotations &amp; tags to JSON">' +
+      '<button id="det-annot-export-btn" class="btn btn-sm btn-outline-secondary" style="font-size:0.75rem;white-space:nowrap" title="Export annotations &amp; tags to CSV">' +
       '<i class="bi bi-download me-1"></i>Export Notes</button>' +
-      '<label class="btn btn-sm btn-outline-secondary mb-0" style="font-size:0.75rem;white-space:nowrap;cursor:pointer" title="Import annotations &amp; tags from JSON">' +
+      '<label class="btn btn-sm btn-outline-secondary mb-0" style="font-size:0.75rem;white-space:nowrap;cursor:pointer" title="Import annotations &amp; tags from CSV">' +
       '<i class="bi bi-upload me-1"></i>Import Notes<input type="file" id="det-annot-import-input" accept=".csv" style="display:none"></label>' +
       '</div>';
     document.getElementById("det-summary").innerHTML = html;
