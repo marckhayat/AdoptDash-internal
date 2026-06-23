@@ -14,7 +14,7 @@
   <!-- ΓöÇΓöÇ Top Navigation ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ -->
   <nav class="navbar navbar-expand-lg navbar-dark cisco-nav px-3 py-2">
     <a class="navbar-brand fw-bold fs-5" href="#" onclick="resetApp();return false;">
-      <i class="bi bi-bar-chart-fill me-2"></i>Adoption Dashboard
+      <i class="bi bi-bar-chart-fill me-2"></i>Adoption Dashboard — Internal
     </a>
     <span class="navbar-text text-white-50 small ms-2">Cisco CX Partner Organization</span>
     <div id="status-bar" class="d-none ms-auto d-flex align-items-center gap-2">
@@ -59,11 +59,8 @@
     </ul>
   </div>
 
-  <!-- ΓöÇΓöÇ Notification toast container (top-right, fixed) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ -->
-  <div id="notif-toast-container" aria-live="polite" aria-atomic="false"></div>
-
-  <!-- ΓöÇΓöÇ Main Content ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ -->
-  <div class="container-fluid px-3 py-3">
+  <!-- ── Main Content ──
+  <div class="container-fluid px-4 py-3">
 
     <!-- Upload Section -->
     <div id="upload-section"></div>
@@ -103,27 +100,15 @@
   <script src="js/insights.js"></script>
   <script src="js/main.js"></script>
 <footer class="border-top mt-4 bg-light">
-  <!-- Help/feedback banner -->
-  <div class="text-center py-3 border-bottom">
-    <a href="https://cs.co/AdoptDash" target="_blank" rel="noopener" class="btn btn-sm btn-outline-primary px-3 me-2">
-      <i class="bi bi-play-circle me-1"></i>Tutorials &amp; Community
-    </a>
-    <a href="https://cs.co/PartnerCSS" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary px-3">
-      <i class="bi bi-chat-dots me-1"></i>Submit Feedback or Request Help
-    </a>
-  </div>
   <!-- Disclaimer + version -->
   <div class="d-flex align-items-center justify-content-between px-3 py-2 flex-wrap gap-2 cisco-nav">
     <div style="font-size:0.75rem">
       <p class="mb-0" style="color:#fff">
-        <span class="fw-semibold me-1">Disclaimer:</span>This tool is independently developed and is not an official Cisco product. Provided "as is" without warranty. Partners are responsible for verifying all data and results.
+        <span class="fw-semibold me-1">Disclaimer:</span>This tool is independently developed and is not an official Cisco product. Provided "as is" without warranty.
       </p>
     </div>
     <div class="d-flex align-items-center gap-2">
       <span id="app-version-label" style="font-size:0.78rem;white-space:nowrap;color:#9aa5b1"></span>
-      <a href="https://github.com/marckhayat/AdoptDash#readme" target="_blank" rel="noopener"
-         style="font-size:0.78rem;color:#9aa5b1;text-decoration:none;opacity:0.7"
-         onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.7'">Read Me</a>
     </div>
   </div>
 </footer>

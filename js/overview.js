@@ -6,6 +6,12 @@ function renderOverview(data) {
   var el = document.getElementById("tab-overview");
   if (!el) return;
 
+  // Preserve selected BE GEO ID across re-renders
+  var _prevGeo = (function() {
+    var prev = document.getElementById("ovw-begeoid-sel");
+    return prev ? prev.value : ((window.APP_FILTER_STATE && window.APP_FILTER_STATE.overview) ? window.APP_FILTER_STATE.overview.beGeoId || "" : "");
+  })();
+
   // ── Helpers
   function norm(x) {
     if (x === null || x === undefined) return "";
@@ -99,13 +105,21 @@ function renderOverview(data) {
   // Partner / BE GEO / file date / file info header — all in one bar
   html += '<div class="d-flex flex-wrap gap-4 align-items-center mb-3 px-1 py-2 border-bottom">';
   if (isDisti) {
-    html += '<div><span class="text-muted small">Distributor</span><br/><strong class="fs-6">' + escHtml(distiLabel) + '</strong></div>';
+    html += '<div><span class="text-muted small">Distributor</span><br/><strong class="fs-6" id="ovw-partner-label">' + escHtml(distiLabel) + '</strong></div>';
   } else {
-    html += '<div><span class="text-muted small">Partner</span><br/><strong class="fs-6">' + escHtml(partnerLabel) + '</strong></div>';
+    html += '<div><span class="text-muted small">Partner</span><br/><strong class="fs-6" id="ovw-partner-label">' + escHtml(partnerLabel) + '</strong></div>';
   }
-  html += '<div><span class="text-muted small">BE GEO ID</span><br/><strong class="fs-6">' + escHtml(beGeoLabel) + '</strong></div>';
   if (fileDateLabel) {
     html += '<div><span class="text-muted small">' + fileDateCaption + '</span><br/><strong class="fs-6">' + escHtml(fileDateLabel) + '</strong></div>';
+  }
+  // BE GEO ID dropdown
+  if (beGeoIds.length > 0) {
+    var geoOpts = '<option value="">All BE GEO IDs (' + beGeoIds.length + ')</option>';
+    beGeoIds.forEach(function(id) { geoOpts += '<option value="' + escHtml(id) + '">' + escHtml(id) + '</option>'; });
+    html += '<div class="d-flex align-items-center gap-2 ms-auto">' +
+      '<label class="text-muted small mb-0" for="ovw-begeoid-sel">BE GEO ID</label>' +
+      '<select id="ovw-begeoid-sel" class="form-select form-select-sm" style="width:auto;font-size:0.85rem">' + geoOpts + '</select>' +
+      '</div>';
   }
   html += '</div>';
 
@@ -154,31 +168,60 @@ function renderOverview(data) {
 
     var exportBtn = document.createElement("button");
     exportBtn.id = "ovw-export-btn";
-    exportBtn.className = "btn btn-sm btn-outline-success" + (exclCount > 0 ? "" : " ms-auto");
+    exportBtn.className = "btn btn-sm btn-outline-success";
     exportBtn.innerHTML = '<i class="bi bi-file-earmark-excel me-1"></i>Export to Excel';
     exportBtn.style.cssText = "font-size:0.82rem";
     exportBtn.addEventListener("click", exportOverviewToXlsx);
     headerBar.appendChild(exportBtn);
-
-    var notifBtn = document.createElement("button");
-    notifBtn.id = "ovw-show-notif-btn";
-    notifBtn.className = "btn btn-sm btn-outline-secondary";
-    notifBtn.innerHTML = '<i class="bi bi-bell me-1"></i>Show Notifications';
-    notifBtn.style.cssText = "font-size:0.82rem";
-    notifBtn.addEventListener("click", function() {
-      window._dismissedNotifs = {};
-      try { localStorage.removeItem(window._notifStorageKey && window._notifStorageKey(window._currentSessionKey)); } catch(e) {}
-      if (window.showDataNotifications) window.showDataNotifications(data);
-    });
-    headerBar.appendChild(notifBtn);
   }
 
   renderTable();
 
-  function getFiltered() { return data; }
+  // Wire BE GEO ID dropdown
+  var geoSel = document.getElementById("ovw-begeoid-sel");
+  if (geoSel) {
+    geoSel.addEventListener("change", function() {
+      window.APP_FILTER_STATE = window.APP_FILTER_STATE || {};
+      window.APP_FILTER_STATE.overview = { beGeoId: this.value };
+      renderTable();
+    });
+    // Restore previously-selected value and re-apply
+    if (_prevGeo) {
+      geoSel.value = _prevGeo;
+      renderTable();
+    }
+  }
+
+  // Drilldown helper — merges the currently-selected BE GEO ID into the preset
+  window.ovwDrilldown = function(preset) {
+    var geoEl = document.getElementById("ovw-begeoid-sel");
+    var geo = geoEl ? geoEl.value : "";
+    if (geo) preset = Object.assign({}, preset, { beGeoId: geo });
+    window.navigateToDetails(preset);
+  };
+
+  function getFiltered() {
+    var geoEl = document.getElementById("ovw-begeoid-sel");
+    var selectedGeo = geoEl ? geoEl.value : "";
+    if (!selectedGeo) return data;
+    return data.filter(function(r) { return String(r["BE GEO ID"] || "") === selectedGeo; });
+  }
 
   function renderTable() {
     var fd = getFiltered();
+
+    // Update partner name label based on filtered rows
+    var labelEl = document.getElementById("ovw-partner-label");
+    if (labelEl) {
+      var nameKey = isDisti ? "Disti name" : "Partner Name";
+      var names = [];
+      fd.forEach(function(r) { var n = String(r[nameKey] || "").trim(); if (n && names.indexOf(n) === -1) names.push(n); });
+      names.sort();
+      var label = names.length === 0 ? "—"
+                : names.length === 1 ? names[0]
+                : names.slice(0, 3).join(", ") + (names.length > 3 ? " +" + (names.length - 3) + " more" : "");
+      labelEl.textContent = label;
+    }
 
     // ── Build grouped structure: Portfolio → Offer → UC → Type
     var groups = {};
@@ -302,11 +345,11 @@ function renderOverview(data) {
 
     // Group header row
     var groupDefs = [
-      { label: "<a href='#' class='ovw-drilldown-link' onclick='event.preventDefault();window.navigateToDetails({stage:[\"Eligible\"],offerOptedInN:true,optIn:[\"PENDING\"]})' title='Open Details tab filtered to this group'>Not opted-in · Eligible</a>",                                                                                                                                                                  span: 2, cls: "cg1" },
-      { label: "<a href='#' class='ovw-drilldown-link' onclick='event.preventDefault();window.navigateToDetails({stage:[\"Eligible\"],offerOptedInN:true,csFrom:2,csTo:4})' title='Open Details tab filtered to this group'>Not opted-in · Eligible · <i class='bi bi-check-circle-fill'></i> Onboard &nbsp;<i class='bi bi-check-circle-fill'></i> Use</a>", span: 2, cls: "cg2" },
-      { label: "<a href='#' class='ovw-drilldown-link' onclick='event.preventDefault();window.navigateToDetails({stage:[\"Eligible\"],offerOptedInN:true,csFrom:5,csTo:5})' title='Open Details tab filtered to this group'>Not opted-in · Eligible · <i class='bi bi-check-circle-fill'></i> Engage</a>", span: 3, cls: "cg3" },
-      { label: "<a href='#' class='ovw-drilldown-link' onclick='event.preventDefault();window.navigateToDetails({ucMissed:true,offerOptedInN:true,optIn:[\"PENDING\"]})' title='Open Details tab filtered to this group'>Not opted-in · <i class='bi bi-check-circle-fill'></i> Adopt &nbsp;<span class='fw-normal opacity-75'>or</span>&nbsp; <i class='bi bi-clock'></i> Expired</a>",          span: 2, cls: "cg4" },
-      { label: "<a href='#' class='ovw-drilldown-link' onclick='event.preventDefault();window.navigateToDetails({stage:[\"Eligible\"],optIn:[\"OPTED IN\"]})' title='Open Details tab filtered to this group'><i class='bi bi-hand-thumbs-up-fill'></i> Opted-in</a>",                                                              span: 3, cls: "cg5" }
+      { label: "<a href='#' class='ovw-drilldown-link' onclick='event.preventDefault();window.ovwDrilldown({stage:[\"Eligible\"],offerOptedInN:true,optIn:[\"PENDING\"]})' title='Open Details tab filtered to this group'>Not opted-in · Eligible</a>",                                                                                                                                                                  span: 2, cls: "cg1" },
+      { label: "<a href='#' class='ovw-drilldown-link' onclick='event.preventDefault();window.ovwDrilldown({stage:[\"Eligible\"],offerOptedInN:true,csFrom:2,csTo:4})' title='Open Details tab filtered to this group'>Not opted-in · Eligible · <i class='bi bi-check-circle-fill'></i> Onboard &nbsp;<i class='bi bi-check-circle-fill'></i> Use</a>", span: 2, cls: "cg2" },
+      { label: "<a href='#' class='ovw-drilldown-link' onclick='event.preventDefault();window.ovwDrilldown({stage:[\"Eligible\"],offerOptedInN:true,csFrom:5,csTo:5})' title='Open Details tab filtered to this group'>Not opted-in · Eligible · <i class='bi bi-check-circle-fill'></i> Engage</a>", span: 3, cls: "cg3" },
+      { label: "<a href='#' class='ovw-drilldown-link' onclick='event.preventDefault();window.ovwDrilldown({ucMissed:true,offerOptedInN:true,optIn:[\"PENDING\"]})' title='Open Details tab filtered to this group'>Not opted-in · <i class='bi bi-check-circle-fill'></i> Adopt &nbsp;<span class='fw-normal opacity-75'>or</span>&nbsp; <i class='bi bi-clock'></i> Expired</a>",          span: 2, cls: "cg4" },
+      { label: "<a href='#' class='ovw-drilldown-link' onclick='event.preventDefault();window.ovwDrilldown({stage:[\"Eligible\"],optIn:[\"OPTED IN\"]})' title='Open Details tab filtered to this group'><i class='bi bi-hand-thumbs-up-fill'></i> Opted-in</a>",                                                              span: 3, cls: "cg5" }
     ];
     var groupRow = '<tr><th class="border-end" style="min-width:240px"></th>';
     groupDefs.forEach(function (g) {

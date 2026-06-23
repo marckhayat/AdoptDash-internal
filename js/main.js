@@ -17,7 +17,7 @@ var APP_FILTER_STATE = { details: null, lifecycle: null, cpiAdopt: null, custome
 var APP_IS_DISTI = false;
 var APP_MULTI_SESSIONS = null; // { sessions: [...], fileMeta: {...} }
 var APP_EXCL_ACTIVE = false;   // when true, excluded deals are removed from overview/pvi/insights calculations
-var APP_VERSION = "v6.8.7";
+var APP_VERSION = "v1.0.0";
 // Use the browser's preferred language for date formatting (respects user's browser locale setting)
 var APP_LOCALE = navigator.language || undefined;
 // Holds a FileSystemFileHandle from showOpenFilePicker() to be persisted after load
@@ -477,7 +477,9 @@ function finishLoad(filename, rowCount, headerAutoDetected, idbType, loadedAt, f
       displayName:      displayName,
       beGeoIds:         beGeoIds,
       isDisti:          APP_IS_DISTI,
-      hasFileHandle:    !!_pendingHandle
+      hasFileHandle:    !!_pendingHandle,
+      scopeType:        APP_FILE_META && APP_FILE_META._scopeType  ? APP_FILE_META._scopeType  : "region",
+      scopeLabel:       APP_FILE_META && APP_FILE_META._scopeLabel ? APP_FILE_META._scopeLabel : ""
     }).catch(function (e) { console.warn("IDB save failed:", e); });
     if (_pendingHandle) {
       IDB.saveHandle(idbType, _pendingHandle).catch(function(e) { console.warn("Handle save failed:", e); });
@@ -511,19 +513,7 @@ function finishLoad(filename, rowCount, headerAutoDetected, idbType, loadedAt, f
     renderActiveTab(_activeTarget);
   });
   // Always reset first so no dismissed state bleeds from a previous session
-  window._dismissedNotifs = {};
   window._currentSessionKey = idbType || null;
-  if (fromCache) {
-    // Restore dismissed state only when resuming from cache
-    try {
-      var stored = localStorage.getItem(_notifStorageKey(window._currentSessionKey));
-      if (stored) window._dismissedNotifs = JSON.parse(stored);
-    } catch(e) {}
-  } else {
-    // Fresh load or refresh — clear any stale dismissed state for this session
-    try { localStorage.removeItem(_notifStorageKey(window._currentSessionKey)); } catch(e) {}
-  }
-  showDataNotifications(APP_DATA);
 }
 
 function restoreUploadSection(cachedEntries) {
@@ -540,32 +530,25 @@ function restoreUploadSection(cachedEntries) {
   }
 
   function resumeCard(entry) {
-    var isCpi = entry.type.indexOf("cpi-") === 0;
-    var beGeoId = isCpi ? entry.type.replace("cpi-", "") : "";
-    var displayName = entry.meta.displayName || "";
-    var cardColor  = isCpi ? "warning" : "success";
-    var btnColor   = isCpi ? "warning" : "success";
-    var html = '<div class="col-6"><div class="card border-' + cardColor + ' mb-2 p-2">';
+    var key = entry.type; // e.g. "cpi-EMEA", "cpi-EMEA-th:Southern Europe", "cpi-EMEA-co:France"
+    var region = key.replace(/^cpi-/, "").replace(/-(th|co):.*$/, "");
+    var scopeType  = entry.meta.scopeType  || "region";
+    var scopeLabel = entry.meta.scopeLabel || "";
+    var scopeStr = scopeType === "theater" ? "Theater: " + scopeLabel
+                 : scopeType === "country" ? "Country: " + scopeLabel
+                 : "Whole Region";
+    var html = '<div class="col-6"><div class="card border-warning mb-2 p-2">';
     html += '<div class="d-flex justify-content-between align-items-start gap-2">';
     html += '<div style="min-width:0">';
-    if (isCpi) {
-      if (displayName) html += '<div class="fw-semibold small">' + displayName + '</div>';
-    } else {
-      html += '<div class="fw-semibold small">' + (displayName || entry.meta.filename) + '</div>';
-    }
-    if (isCpi) {
-      html += '<div class="text-muted" style="font-size:0.72rem">BE GEO ID ' + beGeoId + ' &middot; ' + (entry.meta.rowCount||0).toLocaleString() + ' rows</div>';
-    } else {
-      var geoStr = (entry.meta.beGeoIds && entry.meta.beGeoIds.length > 0) ? entry.meta.beGeoIds.slice(0,3).join(", ") + (entry.meta.beGeoIds.length > 3 ? " +" + (entry.meta.beGeoIds.length - 3) + " more" : "") : "";
-      html += '<div class="text-muted" style="font-size:0.72rem">' + (geoStr ? 'BE GEO ID ' + geoStr + ' &middot; ' : '') + (entry.meta.rowCount||0).toLocaleString() + ' rows</div>';
-    }
-    var basename = (entry.meta.filename || '').split(/[\\/]/).pop().replace(/\s*·\s*BE GEO ID.*$/, '');
+    html += '<div class="fw-semibold small">' + region + ' &mdash; ' + scopeStr + '</div>';
+    html += '<div class="text-muted" style="font-size:0.72rem">' + (entry.meta.rowCount||0).toLocaleString() + ' rows</div>';
+    var basename = (entry.meta.filename || '').split(/[\\/]/).pop();
     var dateStr = fmtDate(entry.meta.loadedAt);
     html += '<div class="text-muted text-truncate" style="font-size:0.72rem" title="' + entry.meta.filename + '">' + basename + '</div>';
     if (dateStr) html += '<div class="text-muted" style="font-size:0.72rem">' + dateStr + '</div>';
     html += '</div>';
     html += '<div class="d-flex gap-1 flex-shrink-0">';
-    html += '<button class="btn btn-sm btn-' + btnColor + ' idb-resume-btn py-0" data-idbtype="' + entry.type + '" title="Resume"><i class="bi bi-play-fill"></i></button>';
+    html += '<button class="btn btn-sm btn-warning idb-resume-btn py-0" data-idbtype="' + entry.type + '" title="Resume"><i class="bi bi-play-fill"></i></button>';
     if (entry.meta.hasFileHandle || isChrome) {
       html += '<button class="btn btn-sm btn-outline-primary idb-refresh-btn py-0" data-idbtype="' + entry.type + '" title="Refresh from file"><i class="bi bi-arrow-clockwise"></i></button>';
     }
@@ -574,13 +557,10 @@ function restoreUploadSection(cachedEntries) {
     return html;
   }
 
-  // Split cached entries — exclude any IDs already covered by APP_MULTI_SESSIONS
-  var multiGeoIds = APP_MULTI_SESSIONS ? APP_MULTI_SESSIONS.sessions.map(function(s) { return "cpi-" + s.id; }) : [];
-  var wsEntries = [];
+  // Collect cached CPI (region-level) entries
   var cpiEntries = [];
   cachedEntries.forEach(function (e) {
-    if (e.type.indexOf("ws-") === 0) wsEntries.push(e);
-    else if (e.type.indexOf("cpi-") === 0 && multiGeoIds.indexOf(e.type) === -1) cpiEntries.push(e);
+    if (e.type.indexOf("cpi-") === 0) cpiEntries.push(e);
   });
 
   // ── Compute week options: Latest, then previous weeks down to 2026W23 ─────
@@ -599,74 +579,13 @@ function restoreUploadSection(cachedEntries) {
     weekOptions += '<option value="' + wLabel + '">' + wLabel + '</option>';
   }
 
-  // ── Build two-column layout ────────────────────────────────────────────────
+  // ── Build single-column layout ────────────────────────────────────────────
   sec.innerHTML =
     '<div class="container-fluid py-4" style="max-width:1400px">' +
     '<div class="row g-4">' +
 
-    // ── LEFT: Partner column ──────────────────────────────────────────────────
-    '<div class="col-12 col-lg-6">' +
-
-    // Partner upload card
-    '<div class="card shadow-sm border-primary mb-3">' +
-    '<div class="card-header bg-primary bg-opacity-10 fw-semibold" style="font-size:0.9rem"><i class="bi bi-people-fill me-2 text-primary"></i>Partners</div>' +
-    '<div class="card-body p-4 text-center">' +
-    // Toggle tabs
-    '<ul class="nav nav-pills mb-3 justify-content-center" id="ws-load-tabs">' +
-    '<li class="nav-item"><button class="nav-link active py-1 px-3" id="ws-tab-file" style="font-size:0.85rem"><i class="bi bi-file-earmark-spreadsheet me-1"></i>Upload File</button></li>' +
-    '<li class="nav-item ms-1"><button class="nav-link py-1 px-3" id="ws-tab-api" style="font-size:0.85rem"><i class="bi bi-cloud-download me-1"></i>Load via API</button></li>' +
-    '</ul>' +
-    // File upload panel
-    '<div id="ws-panel-file" class="text-center">' +
-    '<i class="bi bi-cloud-upload cisco-icon-lg mb-3"></i>' +
-    '<p class="text-muted mb-3">Upload your Workspan report export<br/>' +
-    '<small><a href="https://app.workspan.com/reports/view/19849" target="_blank" rel="noopener"><strong>Report 19849</strong></a> for Partners &nbsp;|&nbsp; <a href="https://app.workspan.com/reports/view/21766" target="_blank" rel="noopener"><strong>Report 21766</strong></a> for Distributors</small>' +
-    '</p>' +
-    '<div class="alert alert-warning py-2 px-3 text-start small mb-4">' +
-    '<i class="bi bi-exclamation-triangle me-1"></i><strong>For large exports (&gt;20 MB), use CSV.</strong><br/>' +
-    'In Workspan: <em>Export → CSV</em>. CSV handles any number of rows.' +
-    '</div>' +
-    '<button id="ws-choose-btn" class="btn btn-cisco btn-lg mb-3 px-5"><i class="bi bi-file-earmark-spreadsheet me-2"></i>Choose File (.xlsx or .csv)</button>' +
-    '<input type="file" id="file-input" accept=".xlsx,.xls,.csv" class="d-none" />' +
-    '</div>' +
-    // API panel
-    '<div id="ws-panel-api" class="d-none text-start">' +
-    '<div class="alert alert-info py-2 px-3 small mb-3"><i class="bi bi-info-circle me-1"></i>' +
-    '<strong>Requires the local proxy to be running.</strong> Start it first using ' +
-    '<code>Start Proxy (Windows).bat</code> or <code>Start Proxy (Mac).sh</code> from the app folder.</div>' +
-    '<p class="text-muted small mb-3">Enter your WorkSpan API credentials to download the report directly. Credentials are used only in your browser and never stored.</p>' +
-    '<p class="text-muted small mb-3"><i class="bi bi-hourglass-split me-1"></i><strong>Note:</strong> Depending on report size, this may take a few minutes.</p>' +
-    '<div class="mb-2">' +
-    '<label class="form-label small fw-semibold mb-1">Report ID</label>' +
-    '<input type="number" id="ws-report-id" class="form-control form-control-sm" placeholder="e.g. 19849" />' +
-    '</div>' +
-    '<div class="mb-2">' +
-    '<label class="form-label small fw-semibold mb-1">Client ID</label>' +
-    '<input type="text" id="ws-client-id" class="form-control form-control-sm" placeholder="WS-ApplicationUser_…" style="font-family:monospace;font-size:0.8rem" />' +
-    '</div>' +
-    '<div class="mb-3">' +
-    '<label class="form-label small fw-semibold mb-1">Client Secret</label>' +
-    '<input type="password" id="ws-client-secret" class="form-control form-control-sm" placeholder="••••••••••••" style="font-family:monospace" />' +
-    '</div>' +
-    '<div id="ws-api-error" class="alert alert-danger py-2 px-3 small mb-2 d-none"></div>' +
-    '<div id="ws-api-status" class="text-muted small mb-2 d-none"><i class="bi bi-arrow-repeat me-1"></i><span id="ws-api-status-text"></span></div>' +
-    '<button id="ws-api-load-btn" class="btn btn-primary px-4"><i class="bi bi-cloud-download me-2"></i>Load Report</button>' +
-    '<p class="text-muted small mt-3 mb-0"><i class="bi bi-shield-lock me-1"></i>API calls are routed through the local proxy on your machine. No data leaves your computer.</p>' +
-    '</div>' +
-    '</div></div>' +
-
-    // Previous partner sessions
-    (wsEntries.length > 0 ?
-      '<div class="card shadow-sm border-success">' +
-      '<div class="card-header bg-success bg-opacity-10 fw-semibold" style="font-size:0.85rem"><i class="bi bi-lightning-charge-fill me-2 text-success"></i>Previous sessions</div>' +
-      '<div class="card-body p-2"><div class="row g-2">' + wsEntries.map(resumeCard).join("") + '</div></div>' +
-      '</div>'
-    : '') +
-
-    '</div>' + // /left col
-
-    // ── RIGHT: Cisco-internal column ──────────────────────────────────────────
-    '<div class="col-12 col-lg-6">' +
+    // ── Cisco-internal column ──────────────────────────────────────────────
+    '<div class="col-12">' +
 
     // Cisco CPI card
     '<div class="card shadow-sm border-warning mb-3">' +
@@ -680,11 +599,6 @@ function restoreUploadSection(cachedEntries) {
     '</select></div>'+
     '<div class="col-auto"><label class="form-label small fw-semibold mb-1">Week</label>' +
     '<select id="lci-week" class="form-select form-select-sm">' + weekOptions + '</select></div>' +
-    '<div class="col"><label class="form-label small fw-semibold mb-1">BE GEO ID(s) <span class="fw-normal text-muted" style="font-size:0.75rem">— Separate multiple IDs with comma or space.</span></label>' +
-    '<div id="lci-begeoid-wrap" class="form-control form-control-sm d-flex flex-wrap gap-1 align-items-center" style="height:auto;min-height:31px;cursor:text;padding:3px 8px">' +
-    '<input type="text" id="lci-begeoid" class="border-0 p-0 bg-transparent" style="outline:none;width:90px;min-width:60px;font-size:0.875rem" placeholder="e.g. 12345" />' +
-    '</div>' +
-    '</div>' +
     '</div>' +
     '<div id="lci-error" class="alert alert-danger py-2 px-3 small mb-3 d-none"></div>' +
     '<div id="lci-session-picker" class="d-none"></div>' +
@@ -700,40 +614,14 @@ function restoreUploadSection(cachedEntries) {
     '</div>'+
     '</div></div>' +
 
-    // Previous CPI sessions (cached + any pending multi-session results)
+    // Previous CPI sessions
     (function() {
-      var multiCards = "";
-      if (APP_MULTI_SESSIONS && APP_MULTI_SESSIONS.sessions.length > 0) {
-        multiCards = APP_MULTI_SESSIONS.sessions.map(function(sess, i) {
-          var name = sess.partnerName ? '<div class="fw-semibold small">' + sess.partnerName + '</div>' : '';
-          // Use per-session IDB loadedAt if available, fall back to shared loadedAt
-          var idbEntry = cachedEntries.find(function(e) { return e.type === "cpi-" + sess.id; });
-          var loadedAt = (idbEntry && idbEntry.meta && idbEntry.meta.loadedAt) ? idbEntry.meta.loadedAt : (APP_MULTI_SESSIONS.loadedAt || null);
-          var dateStr = loadedAt ? (function(iso){ var d=new Date(iso); return isNaN(d)?'':(d.toLocaleDateString(APP_LOCALE)+' '+d.toLocaleTimeString(APP_LOCALE,{hour:'2-digit',minute:'2-digit'})); })(loadedAt) : '';
-          var hasHandle = !!(APP_MULTI_SESSIONS && APP_MULTI_SESSIONS.hasHandle);
-          return '<div class="col-6"><div class="card border-warning mb-0 p-2">' +
-            '<div class="d-flex justify-content-between align-items-start gap-2">' +
-            '<div style="min-width:0">' +
-            name +
-            '<div class="text-muted" style="font-size:0.72rem">BE GEO ID ' + sess.id + ' &middot; ' + sess.rows.length.toLocaleString() + ' rows</div>' +
-            '<div class="text-muted text-truncate" style="font-size:0.72rem">' + APP_MULTI_SESSIONS.fileMeta.name + (dateStr ? ' &middot; ' + dateStr : '') + '</div>' +
-            '</div>' +
-            '<div class="d-flex gap-1 flex-shrink-0">' +
-            '<button class="btn btn-sm btn-warning py-0 multi-pick-btn flex-shrink-0" data-geo-idx="' + i + '" title="Load"><i class="bi bi-play-fill"></i></button>' +
-            (hasHandle ? '<button class="btn btn-sm btn-outline-primary py-0 idb-refresh-btn flex-shrink-0" data-idbtype="cpi-' + sess.id + '" title="Refresh from file"><i class="bi bi-arrow-clockwise"></i></button>' : '') +
-            '<button class="btn btn-sm btn-outline-danger py-0 multi-del-btn flex-shrink-0" data-geo-idx="' + i + '" title="Delete"><i class="bi bi-trash"></i></button>' +
-            '</div>' +
-            '</div></div></div>';
-        }).join("");
-      }
-      var hasAny = cpiEntries.length > 0 || multiCards;
-      if (!hasAny) return '';
+      if (cpiEntries.length === 0) return '';
       return '<div class="card shadow-sm border-warning">' +
         '<div class="card-header bg-warning bg-opacity-10 fw-semibold d-flex justify-content-between align-items-center gap-2" style="font-size:0.85rem"><span><i class="bi bi-lightning-charge-fill me-2 text-warning"></i>Previous sessions</span>' +
         (isChrome ? '<button id="cpi-refresh-all-btn" class="btn btn-sm btn-outline-primary py-0 flex-shrink-0" title="Refresh all previous sessions"><i class="bi bi-arrow-clockwise me-1"></i>Refresh all</button>' : '') +
         '</div>' +
         '<div class="card-body p-2" id="cpi-prev-sessions-body"><div class="row g-2">' +
-        multiCards +
         cpiEntries.map(resumeCard).join("") +
         '</div></div></div>';
     })()+
@@ -747,148 +635,6 @@ function restoreUploadSection(cachedEntries) {
     '</div>'+
     '</div>'; // /container
 
-  // ── Wire up file inputs ───────────────────────────────────────────────────
-  document.getElementById("ws-choose-btn").addEventListener("click", function () {
-    if (typeof window.showOpenFilePicker === "function") {
-      window.showOpenFilePicker({
-        types: [{ description: "Workspan Report", accept: { "application/octet-stream": [".xlsx", ".xls", ".csv"], "text/csv": [".csv"] } }],
-        multiple: false
-      }).then(function (handles) {
-        var handle = handles[0];
-        PENDING_FILE_HANDLE = handle;
-        return handle.getFile();
-      }).then(function (file) {
-        processPartnerFile(file);
-      }).catch(function (err) {
-        PENDING_FILE_HANDLE = null;
-        if (err.name !== "AbortError") {
-          console.warn("showOpenFilePicker failed, falling back:", err);
-          document.getElementById("file-input").click();
-        }
-      });
-    } else {
-      document.getElementById("file-input").click();
-    }
-  });
-
-  document.getElementById("file-input").addEventListener("change", handleFileUpload);
-
-  // ── API tab toggle ────────────────────────────────────────────────────────
-  // Hide the API tab when running from GitHub Pages (proxy not available)
-  if (window.location.hostname === "marckhayat.github.io") {
-    document.getElementById("ws-tab-api").style.display = "none";
-    document.getElementById("ws-tab-file").style.cursor = "default";
-    document.getElementById("ws-tab-file").style.pointerEvents = "none";
-  }
-
-  document.getElementById("ws-tab-file").addEventListener("click", function() {
-    this.classList.add("active");
-    document.getElementById("ws-tab-api").classList.remove("active");
-    document.getElementById("ws-panel-file").classList.remove("d-none");
-    document.getElementById("ws-panel-api").classList.add("d-none");
-  });
-  document.getElementById("ws-tab-api").addEventListener("click", function() {
-    this.classList.add("active");
-    document.getElementById("ws-tab-file").classList.remove("active");
-    document.getElementById("ws-panel-api").classList.remove("d-none");
-    document.getElementById("ws-panel-file").classList.add("d-none");
-  });
-
-  // ── API load button ───────────────────────────────────────────────────────
-  // Restore saved API credentials
-  var savedReportId = localStorage.getItem("ws-report-id") || "";
-  var savedClientId = localStorage.getItem("ws-client-id") || "";
-  var savedSecret   = localStorage.getItem("ws-client-secret") || "";
-  if (savedReportId) document.getElementById("ws-report-id").value = savedReportId;
-  if (savedClientId) document.getElementById("ws-client-id").value = savedClientId;
-  if (savedSecret)   document.getElementById("ws-client-secret").value = savedSecret;
-
-  document.getElementById("ws-report-id").addEventListener("input", function() {
-    localStorage.setItem("ws-report-id", this.value.trim());
-  });
-  document.getElementById("ws-client-id").addEventListener("input", function() {
-    localStorage.setItem("ws-client-id", this.value.trim());
-  });
-  document.getElementById("ws-client-secret").addEventListener("input", function() {
-    localStorage.setItem("ws-client-secret", this.value.trim());
-  });
-
-  document.getElementById("ws-api-load-btn").addEventListener("click", function() {
-    var reportId = document.getElementById("ws-report-id").value.trim();
-    var clientId = document.getElementById("ws-client-id").value.trim();
-    var secret   = document.getElementById("ws-client-secret").value.trim();
-    var errEl    = document.getElementById("ws-api-error");
-    var statusEl = document.getElementById("ws-api-status");
-    var statusTxt= document.getElementById("ws-api-status-text");
-    errEl.classList.add("d-none");
-    if (!reportId || !clientId || !secret) {
-      errEl.textContent = "Please fill in all three fields.";
-      errEl.classList.remove("d-none");
-      return;
-    }
-    document.getElementById("ws-api-load-btn").disabled = true;
-    statusEl.classList.remove("d-none");
-    statusTxt.textContent = "Connecting…";
-
-    wsLoadReport({
-      reportId: reportId,
-      clientId: clientId,
-      clientSecret: secret,
-      onStatus: function(msg) { statusTxt.textContent = msg; updateLoaderMsg && updateLoaderMsg(msg); }
-    }).then(function(rows) {
-      if (!rows || rows.length === 0) throw new Error("No data returned from API.");
-      showLoader("Processing " + rows.length.toLocaleString() + " rows…");
-      setTimeout(function() {
-        APP_DATA = transformData(rows);
-        APP_FILE_META = { name: "WorkSpan Report " + reportId, lastModified: new Date() };
-        finishLoad("WorkSpan Report " + reportId, APP_DATA.length, false, "ws-api-" + reportId);
-      }, 0);
-    }).catch(function(err) {
-      document.getElementById("ws-api-load-btn").disabled = false;
-      statusEl.classList.add("d-none");
-      var isProxyDown = err.message.indexOf("Failed to fetch") !== -1 || err.message.indexOf("ERR_CONNECTION_REFUSED") !== -1;
-      errEl.innerHTML = '<i class="bi bi-exclamation-triangle me-1"></i>' + err.message +
-        (isProxyDown ? '<br/><span class="text-muted">The local proxy is not running. ' +
-          'Please start it first using <strong>Start Proxy (Windows).bat</strong> or <strong>Start Proxy (Mac).sh</strong> ' +
-          'from the app folder.</span>' : '');
-      errEl.classList.remove("d-none");
-    });
-  });
-
-  // ── Multi-session pick buttons (pending GEO sessions not yet cached) ──────
-  sec.querySelectorAll(".multi-pick-btn").forEach(function(btn) {
-    btn.addEventListener("click", function() {
-      var idx = parseInt(this.dataset.geoIdx, 10);
-      var sess = APP_MULTI_SESSIONS.sessions[idx];
-      // Use pre-transformed data if available (saved on import), otherwise transform now
-      if (sess._transformed) {
-        APP_DATA = sess._transformed;
-        APP_FILE_META = APP_MULTI_SESSIONS.fileMeta;
-        finishLoad(APP_MULTI_SESSIONS.fileMeta.name + " · BE GEO ID " + sess.id, APP_DATA.length, false, "cpi-" + sess.id, null, true);
-      } else {
-        showLoader("Processing " + sess.rows.length + " rows for " + sess.id + "…");
-        setTimeout(function() {
-          APP_DATA = transformData(sess.rows);
-          APP_FILE_META = APP_MULTI_SESSIONS.fileMeta;
-          finishLoad(APP_MULTI_SESSIONS.fileMeta.name + " · BE GEO ID " + sess.id, APP_DATA.length, false, "cpi-" + sess.id, null, true);
-        }, 0);
-      }
-    });
-  });
-
-  sec.querySelectorAll(".multi-del-btn").forEach(function(btn) {
-    btn.addEventListener("click", function() {
-      var idx = parseInt(this.dataset.geoIdx, 10);
-      var sess = APP_MULTI_SESSIONS.sessions[idx];
-      var idbKey = "cpi-" + sess.id;
-      APP_MULTI_SESSIONS.sessions.splice(idx, 1);
-      if (APP_MULTI_SESSIONS.sessions.length === 0) APP_MULTI_SESSIONS = null;
-      IDB.remove(idbKey).catch(function() {});
-      IDB.removeHandle(idbKey).catch(function() {});
-      IDB.loadAllMeta().then(function(en) { restoreUploadSection(en); });
-    });
-  });
-
   // ── Resume / Clear cache buttons ─────────────────────────────────────────
   sec.querySelectorAll(".idb-resume-btn").forEach(function (btn) {
     btn.addEventListener("click", function () {
@@ -897,7 +643,7 @@ function restoreUploadSection(cachedEntries) {
       IDB.load(type).then(function (entry) {
         if (!entry || !entry.data) { IDB.loadAllMeta().then(function(e){restoreUploadSection(e);}); alert("Cache not found."); return; }
         APP_DATA = entry.data;
-        APP_FILE_META = { name: entry.meta.filename, lastModified: entry.meta.fileLastModified ? new Date(entry.meta.fileLastModified) : null, cachedAt: entry.meta.loadedAt ? new Date(entry.meta.loadedAt) : null };
+        APP_FILE_META = { name: entry.meta.filename, lastModified: entry.meta.fileLastModified ? new Date(entry.meta.fileLastModified) : null, cachedAt: entry.meta.loadedAt ? new Date(entry.meta.loadedAt) : null, _scopeType: entry.meta.scopeType || "region", _scopeLabel: entry.meta.scopeLabel || "" };
         window.APP_IS_DISTI = !!entry.meta.isDisti;
         finishLoad(entry.meta.filename, entry.meta.rowCount, false, type, entry.meta.loadedAt, true);
       }).catch(function (e) { IDB.loadAllMeta().then(function(en){restoreUploadSection(en);}); alert("Error loading cache: " + e); });
@@ -939,19 +685,11 @@ function restoreUploadSection(cachedEntries) {
       // and all session cards remain visible after refresh
       refreshFromHandle(type, true).then(function () {
         hideRefreshToast();
-        // Clear dismissed notifications so fresh data shows all notifications
-        try { localStorage.removeItem(_notifStorageKey(type)); } catch(e) {}
-        // If this refreshed session is currently active, reload data and refresh notifications
         if (window._currentSessionKey === type) {
           IDB.load(type).then(function(entry) {
-            if (entry && entry.data) {
-              APP_DATA = entry.data;
-              window._dismissedNotifs = {};
-              showDataNotifications(APP_DATA);
-            }
+            if (entry && entry.data) APP_DATA = entry.data;
           });
         }
-        if (APP_MULTI_SESSIONS && type.indexOf("cpi-") === 0) APP_MULTI_SESSIONS.loadedAt = new Date().toISOString();
         IDB.loadAllMeta().then(function(en) { restoreUploadSection(en); });
       }).catch(function () {
         hideRefreshToast();
@@ -967,14 +705,10 @@ function restoreUploadSection(cachedEntries) {
   }
 
   document.getElementById("clear-all-btn").addEventListener("click", function () {
-    if (!confirm("This will delete all cached sessions and your saved username. Continue?")) return;
+    if (!confirm("This will delete all cached sessions. Continue?")) return;
     IDB.clearAll().then(function () {
       IDB.clearAllHandles().catch(function() {});
       ANNOTATIONS.clearAll();
-      localStorage.removeItem("ws-report-id");
-      localStorage.removeItem("ws-client-id");
-      localStorage.removeItem("ws-client-secret");
-      APP_MULTI_SESSIONS = null;
       location.reload();
     });
   });
@@ -995,64 +729,6 @@ function restoreUploadSection(cachedEntries) {
   });
   updateLciHint();
 
-  // ── Chip / tag input for BE GEO IDs ──────────────────────────────────────
-  var lciGeoIds = [];
-  var beGeoInput = document.getElementById("lci-begeoid");
-  var beGeoWrap  = document.getElementById("lci-begeoid-wrap");
-
-  function renderChips() {
-    // Remove all existing chips (keep the input itself)
-    Array.from(beGeoWrap.querySelectorAll(".geo-chip")).forEach(function(c) { c.remove(); });
-    lciGeoIds.forEach(function(id) {
-      var chip = document.createElement("span");
-      chip.className = "geo-chip badge d-inline-flex align-items-center gap-1 me-1";
-      chip.style.cssText = "background:#ffc107;color:#212529;font-size:0.8rem;padding:3px 7px;border-radius:12px;font-weight:500";
-      chip.textContent = id;
-      var x = document.createElement("button");
-      x.type = "button";
-      x.style.cssText = "background:none;border:none;padding:0 0 0 3px;cursor:pointer;font-size:0.75rem;line-height:1;color:#555;";
-      x.innerHTML = "&#x2715;";
-      x.setAttribute("aria-label", "Remove " + id);
-      x.addEventListener("click", function(e) {
-        e.stopPropagation();
-        lciGeoIds = lciGeoIds.filter(function(v) { return v !== id; });
-        renderChips();
-        if (lciGeoIds.length === 0) beGeoInput.placeholder = "e.g. 12345";
-      });
-      chip.appendChild(x);
-      beGeoWrap.insertBefore(chip, beGeoInput);
-    });
-    beGeoInput.placeholder = lciGeoIds.length === 0 ? "e.g. 12345" : "";
-  }
-
-  function commitGeoInput() {
-    var raw = beGeoInput.value;
-    var parts = raw.split(/[\s,]+/).map(function(s) { return s.trim(); }).filter(Boolean);
-    var added = false;
-    parts.forEach(function(id) {
-      if (id && lciGeoIds.indexOf(id) === -1) { lciGeoIds.push(id); added = true; }
-    });
-    beGeoInput.value = "";
-    if (added) renderChips();
-  }
-
-  beGeoInput.addEventListener("keydown", function(e) {
-    if (e.key === "," || e.key === " " || e.key === "Enter") {
-      e.preventDefault();
-      commitGeoInput();
-    } else if (e.key === "Backspace" && this.value === "" && lciGeoIds.length > 0) {
-      lciGeoIds.pop();
-      renderChips();
-    }
-  });
-  beGeoInput.addEventListener("input", function() {
-    var v = this.value;
-    if (v.indexOf(",") !== -1 || (v.length > 1 && v.indexOf(" ") !== -1)) {
-      commitGeoInput();
-    }
-  });
-  beGeoWrap.addEventListener("click", function() { beGeoInput.focus(); });
-
   // ── Show last-used CPI file hint if a handle is stored ───────────────────
   IDB.loadHandle("lci-last-file").then(function (handle) {
     if (!handle) return;
@@ -1066,39 +742,20 @@ function restoreUploadSection(cachedEntries) {
 
   // ── Load button: try last-used handle first, then fall back to file picker ──
   document.getElementById("lci-load-btn").addEventListener("click", function () {
-    commitGeoInput();
-    var errEl = document.getElementById("lci-error");
-    errEl.classList.add("d-none");
-    if (lciGeoIds.length === 0) {
-      errEl.textContent = "Please enter at least one BE GEO ID before loading.";
-      errEl.classList.remove("d-none");
-      return;
-    }
-    APP_MULTI_SESSIONS = null;
-    renderMultiPicker();
+    document.getElementById("lci-error").classList.add("d-none");
     openCpiFile(false);
   });
 
   // ── "Use different file" link ─────────────────────────────────────────────
   document.getElementById("lci-pick-different").addEventListener("click", function (e) {
     e.preventDefault();
-    commitGeoInput();
-    var errEl = document.getElementById("lci-error");
-    errEl.classList.add("d-none");
-    if (lciGeoIds.length === 0) {
-      errEl.textContent = "Please enter at least one BE GEO ID before loading.";
-      errEl.classList.remove("d-none");
-      return;
-    }
-    APP_MULTI_SESSIONS = null;
-    renderMultiPicker();
+    document.getElementById("lci-error").classList.add("d-none");
     openCpiFile(true);
   });
 
   function openCpiFile(forcePicker) {
-    var region    = document.getElementById("lci-region").value;
-    var week      = document.getElementById("lci-week").value;
-    var idsToLoad = lciGeoIds.slice();
+    var region = document.getElementById("lci-region").value;
+    var week   = document.getElementById("lci-week").value;
 
     function openPicker() {
       if (typeof window.showOpenFilePicker === "function") {
@@ -1116,7 +773,7 @@ function restoreUploadSection(cachedEntries) {
           }).catch(function() {});
           return handle.getFile();
         }).then(function (file) {
-          processCpiFile(file, region, week, idsToLoad);
+          processCpiFile(file, region, week);
         }).catch(function (err) {
           PENDING_FILE_HANDLE = null;
           if (err.name !== "AbortError") {
@@ -1143,7 +800,7 @@ function restoreUploadSection(cachedEntries) {
         if (perm !== "granted") { openPicker(); return; }
         PENDING_FILE_HANDLE = handle;
         return handle.getFile().then(function (file) {
-          processCpiFile(file, region, week, idsToLoad);
+          processCpiFile(file, region, week);
         });
       }).catch(function () { openPicker(); });
     }).catch(function () { openPicker(); });
@@ -1154,37 +811,8 @@ function restoreUploadSection(cachedEntries) {
     var file = e.target.files[0];
     if (!file) return;
     PENDING_FILE_HANDLE = null;
-    processCpiFile(file, document.getElementById("lci-region").value, document.getElementById("lci-week").value, lciGeoIds.slice());
+    processCpiFile(file, document.getElementById("lci-region").value, document.getElementById("lci-week").value);
   });
-
-  renderMultiPicker(); // show persistent session bar if APP_MULTI_SESSIONS is set
-
-  // ── Update check (runs once per page load) ────────────────────────────────
-  fetch("https://api.github.com/repos/marckhayat/AdoptDash/releases/latest")
-    .then(function(r) { return r.ok ? r.json() : null; })
-    .then(function(release) {
-      if (!release || !release.tag_name) return;
-      var latest = release.tag_name;
-      if (latest && latest !== APP_VERSION) {
-        var container = document.getElementById("notif-toast-container");
-        if (container && !document.getElementById("notif-update")) {
-          var html =
-            '<div id="notif-update" class="toast show mb-2" style="border-left:4px solid #e65c00;background:#fff3e0" role="alert" data-bs-autohide="false">' +
-              '<div class="toast-header" style="background:#e65c00;color:#fff">' +
-                '<i class="bi bi-arrow-up-circle-fill me-2"></i>' +
-                '<strong class="me-auto">Update Available</strong>' +
-                '<button type="button" class="btn-close btn-close-white ms-2" onclick="this.closest(\'.toast\').remove()" aria-label="Close"></button>' +
-              '</div>' +
-              '<div class="toast-body small">' +
-                'Version <strong>' + latest + '</strong> is available. ' +
-                '<a href="https://github.com/marckhayat/AdoptDash/releases/latest" target="_blank" rel="noopener">View release notes</a>' +
-              '</div>' +
-            '</div>';
-          container.insertAdjacentHTML("afterbegin", html);
-        }
-      }
-    })
-    .catch(function() { /* network unavailable — silently ignore */ });
 }
 
 function renderMultiPicker() {
@@ -1192,8 +820,160 @@ function renderMultiPicker() {
   if (barEl) { barEl.classList.add("d-none"); barEl.innerHTML = ""; }
 }
 
-// ── CPI file processing (shared between file-input fallback and showOpenFilePicker path) ──
-function processCpiFile(file, region, week, idsToLoad) {
+// ── Drill-down scope picker — shown after file is parsed, before transform ────
+function showDrillDownPicker(rawRows, onConfirm) {
+  var sec = document.getElementById("upload-section");
+  sec.classList.remove("d-none");
+
+  // Build theater → countries map
+  var theaterMap = {}; // { theaterName: [country, ...] }
+  rawRows.forEach(function(r) {
+    var t = String(r["Theater"] || "").trim();
+    var c = String(r["Partner Country"] || "").trim();
+    if (!t) return;
+    if (!theaterMap[t]) theaterMap[t] = [];
+    if (c && theaterMap[t].indexOf(c) === -1) theaterMap[t].push(c);
+  });
+  var theaters = Object.keys(theaterMap).sort();
+  Object.keys(theaterMap).forEach(function(t) { theaterMap[t].sort(); });
+
+  function render() {
+    var theaterOpts = theaters.map(function(t) {
+      var n = theaterMap[t].length;
+      return '<option value="' + t + '">' + t + ' (' + n + ' countr' + (n === 1 ? 'y' : 'ies') + ')</option>';
+    }).join('');
+
+    sec.innerHTML =
+      '<div class="upload-card mx-auto my-5">' +
+      '<div class="card shadow-sm border-warning">' +
+      '<div class="card-header bg-warning bg-opacity-10 fw-semibold"><i class="bi bi-funnel me-2 text-warning"></i>Select Analysis Scope</div>' +
+      '<div class="card-body p-4">' +
+      '<p class="text-muted small mb-3">Choose the granularity for this session. You can reload the file at any time to change it.</p>' +
+
+      // Region
+      '<div class="form-check mb-2">' +
+        '<input class="form-check-input" type="radio" name="scope-level" id="scope-region" value="region" checked>' +
+        '<label class="form-check-label" for="scope-region"><strong>Whole Region</strong> <span class="text-muted small">— all ' + rawRows.length.toLocaleString() + ' rows</span></label>' +
+      '</div>' +
+
+      // Theater
+      (theaters.length > 0 ?
+        '<div class="form-check mb-2">' +
+          '<input class="form-check-input" type="radio" name="scope-level" id="scope-theater" value="theater">' +
+          '<label class="form-check-label" for="scope-theater"><strong>Theater</strong> <span class="text-muted small">— ' + theaters.length + ' available</span></label>' +
+        '</div>' +
+        '<div id="theater-dropdown-wrap" class="ms-4 mb-2 d-none" style="max-width:340px">' +
+          '<label class="form-label small fw-semibold mb-1">Theater:</label>' +
+          '<select id="scope-theater-sel" class="form-select form-select-sm">' + theaterOpts + '</select>' +
+        '</div>'
+      : '') +
+
+      // Country (grayed out by default, enabled when a theater is selected)
+      '<div class="form-check mb-2" id="scope-country-row">' +
+        '<input class="form-check-input" type="radio" name="scope-level" id="scope-country" value="country" disabled>' +
+        '<label class="form-check-label text-muted" for="scope-country" id="scope-country-label"><strong>Country</strong> <span class="small">— select a theater first</span></label>' +
+      '</div>' +
+      '<div id="country-dropdown-wrap" class="ms-4 mb-3 d-none" style="max-width:340px">' +
+        '<label class="form-label small fw-semibold mb-1">Country:</label>' +
+        '<select id="scope-country-sel" class="form-select form-select-sm"></select>' +
+      '</div>' +
+
+      '<div class="mt-3">' +
+        '<button id="scope-confirm-btn" class="btn btn-warning px-4"><i class="bi bi-play-fill me-2"></i>Continue</button>' +
+      '</div>' +
+      '</div></div></div>';
+
+    function getSelectedTheater() {
+      var sel = document.getElementById("scope-theater-sel");
+      return sel ? sel.value : null;
+    }
+
+    function refreshCountryDropdown(theater) {
+      var countries = theaterMap[theater] || [];
+      var countryOpts = countries.map(function(c) { return '<option value="' + c + '">' + c + '</option>'; }).join('');
+      var cSel = document.getElementById("scope-country-sel");
+      if (cSel) cSel.innerHTML = countryOpts;
+
+      var cRadio = document.getElementById("scope-country");
+      var cLabel = document.getElementById("scope-country-label");
+      var cRow   = document.getElementById("scope-country-row");
+      if (cRadio) cRadio.disabled = false;
+      if (cLabel) {
+        cLabel.classList.remove("text-muted");
+        cLabel.innerHTML = '<strong>Country</strong> <span class="small text-muted">— ' + countries.length + ' in ' + theater + '</span>';
+      }
+    }
+
+    // Wire theater radio
+    var theaterRadio = document.getElementById("scope-theater");
+    if (theaterRadio) {
+      theaterRadio.addEventListener("change", function() {
+        document.getElementById("theater-dropdown-wrap").classList.remove("d-none");
+        document.getElementById("country-dropdown-wrap").classList.add("d-none");
+        var theater = getSelectedTheater();
+        if (theater) refreshCountryDropdown(theater);
+      });
+    }
+
+    // Wire theater select change
+    var theaterSel = document.getElementById("scope-theater-sel");
+    if (theaterSel) {
+      theaterSel.addEventListener("change", function() {
+        var cRadio = document.getElementById("scope-country");
+        if (cRadio && cRadio.checked) {
+          // If country was already selected, switch back to theater
+          document.getElementById("scope-theater").checked = true;
+          document.getElementById("country-dropdown-wrap").classList.add("d-none");
+        }
+        refreshCountryDropdown(this.value);
+      });
+    }
+
+    // Wire country radio
+    var countryRadio = document.getElementById("scope-country");
+    if (countryRadio) {
+      countryRadio.addEventListener("change", function() {
+        if (!this.disabled) {
+          document.getElementById("theater-dropdown-wrap").classList.remove("d-none");
+          document.getElementById("country-dropdown-wrap").classList.remove("d-none");
+        }
+      });
+    }
+
+    // Wire region radio — hide both dropdowns
+    var regionRadio = document.getElementById("scope-region");
+    if (regionRadio) {
+      regionRadio.addEventListener("change", function() {
+        var tw = document.getElementById("theater-dropdown-wrap");
+        var cw = document.getElementById("country-dropdown-wrap");
+        if (tw) tw.classList.add("d-none");
+        if (cw) cw.classList.add("d-none");
+      });
+    }
+
+    document.getElementById("scope-confirm-btn").addEventListener("click", function() {
+      var level = document.querySelector('input[name="scope-level"]:checked').value;
+      var filteredRows = rawRows;
+      var scopeLabel = "";
+      if (level === "theater") {
+        var theater = getSelectedTheater();
+        filteredRows = rawRows.filter(function(r) { return String(r["Theater"] || "").trim() === theater; });
+        scopeLabel = theater;
+      } else if (level === "country") {
+        var country = document.getElementById("scope-country-sel").value;
+        filteredRows = rawRows.filter(function(r) { return String(r["Partner Country"] || "").trim() === country; });
+        scopeLabel = country;
+      }
+      showLoader("Processing " + filteredRows.length.toLocaleString() + " rows\u2026");
+      setTimeout(function() { onConfirm(filteredRows, level, scopeLabel); }, 0);
+    });
+  }
+
+  render();
+}
+
+// ── CPI file processing — loads all rows, sessions keyed by region ───────────
+function processCpiFile(file, region, week) {
   var regionFile = region === "DISTI" ? "DISTI" : region;
   var expected = week
     ? "CPI_data_" + regionFile + "_" + week + ".csv"
@@ -1212,119 +992,53 @@ function processCpiFile(file, region, week, idsToLoad) {
 
   showLoader("Reading CPI file…");
   readFileAsText(file).then(function (rawText) {
-    // CPI files are Cisco-internal and properly formatted — skip the Workspan quote fix
     Papa.parse(rawText, {
       header: true,
       skipEmptyLines: true,
       dynamicTyping: false,
       complete: function (results) {
-      try {
-        if (!results.data || results.data.length === 0) throw new Error("No data found in CSV.");
+        try {
+          if (!results.data || results.data.length === 0) throw new Error("No data found in CSV.");
 
-        var rawKeys = Object.keys(results.data[0] || {});
-        var rawDistiKey = rawKeys.find(function(k) { return k.trim().toLowerCase() === "disti name"; });
-        var rawIsDisti = rawDistiKey && results.data.some(function(r) {
-          return r[rawDistiKey] && String(r[rawDistiKey]).trim() !== "";
-        });
+          var rawKeys = Object.keys(results.data[0] || {});
+          var rawDistiKey = rawKeys.find(function(k) { return k.trim().toLowerCase() === "disti name"; });
+          var rawIsDisti = !!(rawDistiKey && results.data.some(function(r) {
+            return r[rawDistiKey] && String(r[rawDistiKey]).trim() !== "";
+          }));
 
-        updateLoaderMsg("Filtering " + idsToLoad.length + " BE GEO ID(s)…");
-        var sessions = idsToLoad.map(function(id) {
-          var rows = results.data.filter(function(r) {
-            return String(r["BE GEO ID"] || "").trim() === id;
-          });
-          var partnerName = "";
-          if (rows.length > 0) {
-            var nameKey = rawIsDisti ? rawDistiKey : "Partner Name";
-            var nameFreq = {};
-            rows.forEach(function(r) { var n = String(r[nameKey] || "").trim(); if (n) nameFreq[n] = (nameFreq[n] || 0) + 1; });
-            var names = Object.keys(nameFreq);
-            partnerName = names.length > 0 ? names.reduce(function(a, b) { return nameFreq[a] >= nameFreq[b] ? a : b; }) : "";
-          }
-          return { id: id, rows: rows, partnerName: partnerName };
-        });
-
-        var found = sessions.filter(function(s) { return s.rows.length > 0; });
-        var notFound = sessions.filter(function(s) { return s.rows.length === 0; });
-
-        if (found.length === 0) {
-          PENDING_FILE_HANDLE = null;
-          IDB.loadAllMeta().then(function(en) {
-            restoreUploadSection(en);
-            var errEl2 = document.getElementById("lci-error");
-            if (errEl2) {
-              errEl2.innerHTML = '<i class="bi bi-exclamation-triangle me-1"></i>No data found for ' +
-                (idsToLoad.length === 1 ? 'BE GEO ID <strong>' + idsToLoad[0] + '</strong>' : 'any of the entered IDs') +
-                ' in <strong>' + file.name + '</strong>. Please check the IDs and try again.';
-              errEl2.classList.remove("d-none");
-            }
-          });
-          return;
-        }
-
-        // Single ID → load directly (finishLoad handles handle saving via PENDING_FILE_HANDLE)
-        if (idsToLoad.length === 1) {
-          updateLoaderMsg("Processing " + found[0].rows.length + " rows for " + found[0].id + "…");
-          APP_DATA = transformData(found[0].rows);
-          APP_FILE_META = { name: file.name, lastModified: file.lastModified ? new Date(file.lastModified) : null };
-          finishLoad(file.name + " · BE GEO ID " + found[0].id, APP_DATA.length, false, "cpi-" + found[0].id);
-          return;
-        }
-
-        // Multiple IDs → transform each on its own tick then save all to IDB
-        if (notFound.length > 0) console.warn("No data for: " + notFound.map(function(s){return s.id;}).join(", "));
-        var _multiHandle = PENDING_FILE_HANDLE;
-        PENDING_FILE_HANDLE = null;
-
-        // Process sessions sequentially with setTimeout to keep the UI responsive
-        function processNext(idx, done) {
-          if (idx >= found.length) { done(); return; }
-          var sess = found[idx];
-          updateLoaderMsg("Processing BE GEO ID " + sess.id + " (" + (idx + 1) + " of " + found.length + ")\u2026");
-          setTimeout(function() {
+          showDrillDownPicker(results.data, function(filteredRows, scopeType, scopeLabel) {
             try {
-              var transformed = transformData(sess.rows);
-              var idbKey = "cpi-" + sess.id;
-              sess._transformed = transformed;
-              IDB.save(idbKey, transformed, {
-                filename:         file.name + " \u00b7 BE GEO ID " + sess.id,
-                rowCount:         transformed.length,
-                loadedAt:         new Date().toISOString(),
-                fileLastModified: file.lastModified ? new Date(file.lastModified).toISOString() : null,
-                displayName:      sess.partnerName || sess.id,
-                beGeoIds:         [sess.id],
-                isDisti:          rawIsDisti,
-                hasFileHandle:    !!_multiHandle
-              }).then(function() {
-                if (_multiHandle) {
-                  IDB.saveHandle(idbKey, _multiHandle).catch(function(e) { console.warn("Handle save failed for " + sess.id + ":", e); });
-                }
-              }).catch(function(e) { console.warn("IDB save failed for " + sess.id + ":", e); });
-              processNext(idx + 1, done);
-            } catch(err) {
-              console.error("Transform failed for " + sess.id + ":", err);
-              processNext(idx + 1, done);
+              // Build a unique key per region+scope so sessions don't overwrite each other
+              var scopeSlug = scopeType === "region" ? "" : (scopeType === "theater" ? "-th:" : "-co:") + scopeLabel;
+              var idbKey = "cpi-" + region + scopeSlug;
+              APP_DATA = transformData(filteredRows);
+              APP_IS_DISTI = rawIsDisti;
+              APP_FILE_META = { name: file.name, lastModified: file.lastModified ? new Date(file.lastModified) : null };
+              var label = file.name + " · " + region + (scopeLabel ? " · " + scopeLabel : "");
+              // Stash scope info so finishLoad can persist it
+              APP_FILE_META._scopeType  = scopeType;
+              APP_FILE_META._scopeLabel = scopeLabel;
+              finishLoad(label, APP_DATA.length, false, idbKey);
+            } catch (err) {
+              PENDING_FILE_HANDLE = null;
+              IDB.loadAllMeta().then(function(en) { restoreUploadSection(en); });
+              console.error(err);
+              alert("Error processing CPI file: " + err.message);
             }
-          }, 0);
-        }
-
-        APP_MULTI_SESSIONS = { sessions: found, fileMeta: { name: file.name, lastModified: file.lastModified ? new Date(file.lastModified) : null }, loadedAt: new Date().toISOString(), notFoundNote: notFound.length > 0 ? notFound.map(function(s){return s.id;}).join(", ") : "", hasHandle: !!_multiHandle };
-        processNext(0, function() {
+          });
+        } catch (err) {
+          PENDING_FILE_HANDLE = null;
           IDB.loadAllMeta().then(function(en) { restoreUploadSection(en); });
-        });
-
-      } catch (err) {
+          console.error(err);
+          alert("Error processing CPI file: " + err.message);
+        }
+      },
+      error: function (err) {
         PENDING_FILE_HANDLE = null;
         IDB.loadAllMeta().then(function(en) { restoreUploadSection(en); });
-        console.error(err);
-        alert("Error processing CPI file: " + err.message);
+        alert("Error reading CSV: " + err.message);
       }
-    },
-    error: function (err) {
-      PENDING_FILE_HANDLE = null;
-      IDB.loadAllMeta().then(function(en) { restoreUploadSection(en); });
-      alert("Error reading CSV: " + err.message);
-    }
-  });
+    });
   }).catch(function (err) {
     PENDING_FILE_HANDLE = null;
     IDB.loadAllMeta().then(function(en) { restoreUploadSection(en); });
@@ -1340,25 +1054,6 @@ function refreshFromHandle(type, cacheOnly) {
   }
   return IDB.loadHandle(type).then(function (handle) {
     if (!handle) {
-      // For partner sessions with no saved handle, use showOpenFilePicker to let the user re-select
-      if (type.indexOf("ws-") === 0 && typeof window.showOpenFilePicker === "function") {
-        return window.showOpenFilePicker({
-          types: [{ description: "Workspan Report", accept: { "application/octet-stream": [".xlsx", ".xls", ".csv"], "text/csv": [".csv"] } }],
-          multiple: false
-        }).then(function (handles) {
-          var newHandle = handles[0];
-          PENDING_FILE_HANDLE = newHandle;
-          return newHandle.getFile();
-        }).then(function (file) {
-          if (cacheOnly) {
-            return refreshWsCacheOnly(file, type, PENDING_FILE_HANDLE);
-          }
-          processPartnerFile(file);
-        }).catch(function (err) {
-          PENDING_FILE_HANDLE = null;
-          if (err.name !== "AbortError") throw err;
-        });
-      }
       alert("No file handle saved for this session. Re-upload the file to enable one-click refresh.");
       throw new Error("No file handle saved for this session.");
     }
@@ -1369,21 +1064,15 @@ function refreshFromHandle(type, cacheOnly) {
       if (perm !== "granted") throw new Error("Permission to read the file was denied.");
       return handle.getFile();
     }).then(function (file) {
-      if (type.indexOf("ws-") === 0) {
+      // Load saved meta to recover scope
+      return IDB.loadAllMeta().then(function(entries) {
+        var entry = entries.find(function(e) { return e.type === type; });
+        var meta = entry && entry.meta ? entry.meta : {};
+        var scopeType  = meta.scopeType  || "region";
+        var scopeLabel = meta.scopeLabel || "";
         PENDING_FILE_HANDLE = handle;
-        if (cacheOnly) {
-          return refreshWsCacheOnly(file, type, handle);
-        }
-        processPartnerFile(file);
-      } else if (type.indexOf("cpi-") === 0) {
-        var geoId = type.replace("cpi-", "");
-        // Update in-memory fileMeta with the refreshed file's lastModified date
-        if (APP_MULTI_SESSIONS && file.lastModified) {
-          APP_MULTI_SESSIONS.fileMeta.lastModified = new Date(file.lastModified);
-        }
-        PENDING_FILE_HANDLE = handle;
-        return refreshCpiFromHandle(file, geoId, cacheOnly);
-      }
+        return refreshCpiFromHandle(file, type, scopeType, scopeLabel, cacheOnly);
+      });
     });
   }).catch(function (err) {
     if (err && err.name === "AbortError") return;
@@ -1410,71 +1099,17 @@ function refreshAllPreviousSessions() {
       return refreshFromHandle(type, true).catch(function (err) {
         console.warn("Refresh failed for " + type + ":", err);
       }).then(function () {
-        // Clear dismissed notifications so fresh data shows all notifications
-        try { localStorage.removeItem(_notifStorageKey(type)); } catch(e) {}
         completed++;
         updateLoaderMsg("Refreshing sessions\u2026 (" + completed + "\u00a0/\u00a0" + total + ")");
       });
     });
   }, Promise.resolve()).then(function () {
-    if (APP_MULTI_SESSIONS) APP_MULTI_SESSIONS.loadedAt = new Date().toISOString();
     IDB.loadAllMeta().then(function (en) { restoreUploadSection(en); });
   });
 }
 
-// ── Cache-only refresh for ws- sessions (no navigation) ──────────────────────
-function refreshWsCacheOnly(file, idbType, handle) {
-  var ext = file.name.split(".").pop().toLowerCase();
-  if (ext !== "csv") {
-    // XLSX: fall back to normal load (will navigate to dashboard)
-    PENDING_FILE_HANDLE = handle;
-    processPartnerFile(file);
-    return Promise.resolve();
-  }
-  return readFileAsText(file).then(function (rawText) {
-    var text = fixUnescapedCsvQuotes(rawText);
-    return new Promise(function (resolve, reject) {
-      Papa.parse(text, {
-        header: true,
-        skipEmptyLines: true,
-        dynamicTyping: false,
-        complete: function (results) {
-          try {
-            var transformed = transformData(results.data);
-            var isDisti = transformed.some(function (r) {
-              return r["Disti name"] && String(r["Disti name"]).trim() !== "";
-            });
-            var partnerNames = [];
-            transformed.forEach(function (r) { if (r["Partner Name"]) partnerNames.push(String(r["Partner Name"]).trim()); });
-            var uniquePartners = Array.from(new Set(partnerNames)).filter(Boolean);
-            var displayName = uniquePartners.slice(0, 2).join(", ") + (uniquePartners.length > 2 ? " +" + (uniquePartners.length - 2) + " more" : "");
-            var beGeoIds = [];
-            transformed.forEach(function (r) { var v = String(r["BE GEO ID"] || "").trim(); if (v && beGeoIds.indexOf(v) === -1) beGeoIds.push(v); });
-            IDB.save(idbType, transformed, {
-              filename: file.name,
-              rowCount: transformed.length,
-              loadedAt: new Date().toISOString(),
-              displayName: displayName,
-              beGeoIds: beGeoIds,
-              isDisti: isDisti,
-              hasFileHandle: true
-            }).catch(function (e) { console.warn("IDB save failed:", e); });
-            IDB.saveHandle(idbType, handle).catch(function (e) { console.warn("Handle save failed:", e); });
-            PENDING_FILE_HANDLE = null;
-            resolve();
-          } catch (err) {
-            PENDING_FILE_HANDLE = null;
-            reject(err);
-          }
-        },
-        error: function (err) { PENDING_FILE_HANDLE = null; reject(err); }
-      });
-    });
-  });
-}
-
-
-function refreshCpiFromHandle(file, geoId, cacheOnly) {
+function refreshCpiFromHandle(file, idbKey, scopeType, scopeLabel, cacheOnly) {
+  var region = idbKey.replace(/^cpi-/, "").replace(/-(th|co):.*$/, "");
   if (!cacheOnly) showLoader("Re-reading CPI file…");
   return readFileAsText(file).then(function (rawText) {
     return new Promise(function (resolve, reject) {
@@ -1485,46 +1120,35 @@ function refreshCpiFromHandle(file, geoId, cacheOnly) {
         complete: function (results) {
           try {
             if (!results.data || results.data.length === 0) throw new Error("No data found in CSV.");
-            var rows = results.data.filter(function(r) {
-              return String(r["BE GEO ID"] || "").trim() === geoId;
-            });
-            if (rows.length === 0) throw new Error("No data found for BE GEO ID " + geoId + " in this file.");
             var rawKeys = Object.keys(results.data[0] || {});
             var rawDistiKey = rawKeys.find(function(k) { return k.trim().toLowerCase() === "disti name"; });
-            var rawIsDisti = rawDistiKey && results.data.some(function(r) {
+            var rawIsDisti = !!(rawDistiKey && results.data.some(function(r) {
               return r[rawDistiKey] && String(r[rawDistiKey]).trim() !== "";
-            });
+            }));
+
+            // Re-apply the same scope filter
+            var rows = results.data;
+            if (scopeType === "theater" && scopeLabel) {
+              rows = results.data.filter(function(r) { return String(r["Theater"] || "").trim() === scopeLabel; });
+            } else if (scopeType === "country" && scopeLabel) {
+              rows = results.data.filter(function(r) { return String(r["Partner Country"] || "").trim() === scopeLabel; });
+            }
+
+            var _handle = PENDING_FILE_HANDLE;
+            var displayLabel = region + (scopeLabel ? " · " + scopeLabel : "");
             if (cacheOnly) {
               var transformed = transformData(rows);
-              var _handle = PENDING_FILE_HANDLE;
-              // Compute displayName so the card title survives a cache-only refresh
-              var displayName = "";
-              if (rawIsDisti) {
-                var distiNames = [];
-                transformed.forEach(function(r) { if (r["Disti name"]) distiNames.push(String(r["Disti name"]).trim()); });
-                var uniqueDisti = Array.from(new Set(distiNames)).filter(Boolean);
-                displayName = uniqueDisti.slice(0, 2).join(", ") + (uniqueDisti.length > 2 ? " +" + (uniqueDisti.length - 2) + " more" : "");
-              } else {
-                var partnerNames = [];
-                transformed.forEach(function(r) { if (r["Partner Name"]) partnerNames.push(String(r["Partner Name"]).trim()); });
-                var uniquePartners = Array.from(new Set(partnerNames)).filter(Boolean);
-                displayName = uniquePartners.slice(0, 2).join(", ") + (uniquePartners.length > 2 ? " +" + (uniquePartners.length - 2) + " more" : "");
-              }
-              var beGeoIds = [];
-              transformed.forEach(function(r) { var v = String(r["BE GEO ID"] || "").trim(); if (v && beGeoIds.indexOf(v) === -1) beGeoIds.push(v); });
-              IDB.save("cpi-" + geoId, transformed, {
-                filename: file.name + " · BE GEO ID " + geoId,
-                rowCount: transformed.length,
-                loadedAt: new Date().toISOString(),
+              IDB.save(idbKey, transformed, {
+                filename:         file.name + " · " + displayLabel,
+                rowCount:         transformed.length,
+                loadedAt:         new Date().toISOString(),
                 fileLastModified: file.lastModified ? new Date(file.lastModified).toISOString() : null,
-                isDisti: !!rawIsDisti,
-                displayName: displayName,
-                beGeoIds: beGeoIds,
-                hasFileHandle: !!_handle
+                isDisti:          rawIsDisti,
+                hasFileHandle:    !!_handle,
+                scopeType:        scopeType,
+                scopeLabel:       scopeLabel
               }).then(function() {
-                if (_handle) {
-                  IDB.saveHandle("cpi-" + geoId, _handle).catch(function(e) { console.warn("Handle save failed:", e); });
-                }
+                if (_handle) IDB.saveHandle(idbKey, _handle).catch(function(e) { console.warn("Handle save failed:", e); });
                 PENDING_FILE_HANDLE = null;
                 resolve();
               }).catch(function(e) {
@@ -1533,10 +1157,10 @@ function refreshCpiFromHandle(file, geoId, cacheOnly) {
                 resolve();
               });
             } else {
-              window.APP_IS_DISTI = !!rawIsDisti;
+              window.APP_IS_DISTI = rawIsDisti;
               APP_DATA = transformData(rows);
-              APP_FILE_META = { name: file.name, lastModified: file.lastModified ? new Date(file.lastModified) : null };
-              finishLoad(file.name + " · BE GEO ID " + geoId, APP_DATA.length, false, "cpi-" + geoId);
+              APP_FILE_META = { name: file.name, lastModified: file.lastModified ? new Date(file.lastModified) : null, _scopeType: scopeType, _scopeLabel: scopeLabel };
+              finishLoad(file.name + " · " + displayLabel, APP_DATA.length, false, idbKey);
               resolve();
             }
           } catch (err) {
@@ -1582,212 +1206,12 @@ function renderActiveTab(target) {
   }
 }
 
-// ── Data load notifications ──────────────────────────────────────────────────
-function showDataNotifications(data) {
-  var container = document.getElementById("notif-toast-container");
-  if (!container || !data) return;
-  // Preserve the update-available toast (inserted by the version check) when refreshing data notifications
-  var updateToast = document.getElementById("notif-update");
-  container.innerHTML = "";
-  if (updateToast) container.appendChild(updateToast);
-  var dismissed = window._dismissedNotifs || {};
-
-  var now    = new Date();
-  var today0 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  var past14 = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 13);
-  var next14 = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 13, 23, 59, 59, 999);
-
-  function pd(x) {
-    if (!x) return null;
-    if (x instanceof Date) return isNaN(x.getTime()) ? null : x;
-    if (typeof x === "number" && x > 1000) {
-      var d = new Date(Math.round((x - 25569) * 86400000));
-      return isNaN(d.getTime()) ? null : d;
-    }
-    if (typeof x === "string" && x.trim()) {
-      var d2 = new Date(x);
-      return isNaN(d2.getTime()) ? null : d2;
-    }
-    return null;
-  }
-
-  // 1. New eligible deals booked in past 14 days with Maximum Incentive Deal Flag = Yes
-  var newEligible = 0;
-  var newEligibleKeys = new Set();
-  data.forEach(function(r) {
-    var bd = pd(r["Booking Date"]);
-    if (bd && bd >= past14 && bd <= now &&
-        String(r["Stage"] || "").toUpperCase() === "ELIGIBLE" &&
-        String(r["Adopt Rebate Opt-In Status"] || "").toUpperCase() === "PENDING") {
-      newEligible++;
-      if (r["CRPartyID-Offer"]) newEligibleKeys.add(r["CRPartyID-Offer"]);
-    }
-  });
-
-  // 1b. Opt-ins in past 14 days (stage must be Eligible)
-  var newOptIns = 0;
-  var newOptInPotential = 0;
-  data.forEach(function(r) {
-    var od = pd(r["Adopt Rebate Start Date"]);
-    if (od && od >= past14 && od <= now &&
-        String(r["Adopt Rebate Opt-In Status"] || "").toUpperCase() === "OPTED IN" &&
-        String(r["Stage"] || "").toUpperCase() === "ELIGIBLE") {
-      newOptIns++;
-      newOptInPotential += parseFloat(r["Potential Incentives"]) || 0;
-    }
-  });
-
-  // 2. Incentives earned in past 14 days: sum stage amounts where that stage was completed in window
-  var STAGE_MAP = [
-    { dateCol: "Stage Completion Date(onboard)", amtCol: "Estimated Incentive Amount(Onboard)" },
-    { dateCol: "Stage Completion Date(Use)",     amtCol: "Estimated Incentive Amount(Use)"     },
-    { dateCol: "Stage Completion Date(Engage)",  amtCol: "Estimated Incentive Amount(Engage)"  },
-    { dateCol: "Stage Completion Date(Adopt)",   amtCol: "Estimated Incentive Amount(Adopt)"   }
-  ];
-  var earnedLast14 = 0;
-  data.forEach(function(r) {
-    if (String(r["Adopt Rebate Opt-In Status"] || "").toUpperCase() !== "OPTED IN") return;
-    var stg = String(r["Stage"] || "").toUpperCase();
-    if (stg !== "ELIGIBLE") return;
-    STAGE_MAP.forEach(function(s) {
-      var d = pd(r[s.dateCol]);
-      if (d && d >= past14 && d <= now) {
-        earnedLast14 += parseFloat(r[s.amtCol]) || 0;
-      }
-    });
-  });
-
-  // 3. Opted-in eligible deals expiring in the next 14 days
-  var expiringSoon = 0;
-  data.forEach(function(r) {
-    var ed = pd(r["Deal Incentive Expiry Date"]);
-    if (ed && ed >= today0 && ed <= next14 &&
-        String(r["Stage"] || "").toUpperCase() === "ELIGIBLE" &&
-        String(r["Adopt Rebate Opt-In Status"] || "").toUpperCase() === "OPTED IN") expiringSoon++;
-  });
-
-  function fmtMoney(v) {
-    if (v >= 1000000) return "$" + (v / 1000000).toFixed(1) + "M";
-    if (v >= 1000)    return "$" + (v / 1000).toFixed(1) + "K";
-    return "$" + Math.round(v).toLocaleString();
-  }
-
-  var notifs = [
-    {
-      id: "notif-new",
-      cls: "notif-new",
-      icon: "bi-star-fill text-primary",
-      title: "New Eligible Opportunities",
-      preset: (function() {
-        var _today14 = Math.floor(Date.now() / 86400000);
-        var _from14  = _today14 - 14;
-        return { stage: ["ELIGIBLE"], optIn: ["PENDING"], bkFrom: _from14, bkTo: _today14 };
-      })(),
-      body: newEligible > 0
-        ? "<strong>" + newEligible.toLocaleString() + "</strong> new eligible opportunit" + (newEligible !== 1 ? "ies" : "y") + " booked in the past 14 days (" + newEligibleKeys.size.toLocaleString() + " unique)"
-        : null
-    },
-    {
-      id: "notif-optins",
-      cls: "notif-new",
-      icon: "bi-hand-thumbs-up-fill text-primary",
-      title: "New Opt-ins",
-      preset: (function() {
-        var _today14rs = Math.floor(Date.now() / 86400000);
-        var _from14rs  = _today14rs - 14;
-        return { optIn: ["OPTED IN", "Eligible"], rsFrom: _from14rs, rsTo: _today14rs };
-      })(),
-      body: newOptIns > 0
-        ? "<strong>" + newOptIns.toLocaleString() + "</strong> new opt-in" + (newOptIns !== 1 ? "s" : "") + " in the past 14 days"
-        : null
-    },
-    {
-      id: "notif-potential",
-      cls: "notif-earned",
-      icon: "bi-piggy-bank-fill text-success",
-      title: "New Potential",
-      preset: (function() {
-        var _today14p = Math.floor(Date.now() / 86400000);
-        var _from14p  = _today14p - 14;
-        return { optIn: ["OPTED IN", "Eligible"], rsFrom: _from14p, rsTo: _today14p };
-      })(),
-      body: newOptInPotential > 0
-        ? "<strong>" + fmtMoney(newOptInPotential) + "</strong> in potential incentives from new opt-ins"
-        : null
-    },
-    {
-      id: "notif-earned",
-      cls: "notif-earned",
-      icon: "bi-cash-coin text-success",
-      title: "Incentives Earned",
-      alwaysLink: true,
-      preset: (function() {
-        var _todayEa = Math.floor(Date.now() / 86400000);
-        var _from14ea = _todayEa - 14;
-        return { checkboxIds: ["filter-earned"], eaFrom: _from14ea, eaTo: _todayEa };
-      })(),
-      body: earnedLast14 > 0
-        ? "<strong>" + fmtMoney(earnedLast14) + "</strong> in incentives earned over the past 14 days"
-        : null
-    },
-    {
-      id: "notif-expiry",
-      cls: "notif-expiry",
-      icon: "bi-clock-history text-warning",
-      title: "Expiring Soon",
-      emptyMsg: "Nothing expiring in the coming 14 days.",
-      preset: (function() {
-        var _todayExp = Math.floor(Date.now() / 86400000);
-        var _to14exp  = _todayExp + 14;
-        return { optIn: ["OPTED IN", "Eligible"], stage: ["Eligible"], expFrom: _todayExp, expTo: _to14exp };
-      })(),
-      body: expiringSoon > 0
-        ? "<strong>" + expiringSoon.toLocaleString() + "</strong> opted-in deal" + (expiringSoon !== 1 ? "s" : "") + " expir" + (expiringSoon !== 1 ? "e" : "es") + " within 14 days"
-        : null
-    }
-  ];
-
-  notifs.forEach(function(n) {
-    if (dismissed[n.id]) return; // user already closed this one
-    var hasData = !!n.body;
-    var isClickable = hasData || !!n.alwaysLink;
-    var extraCls = hasData ? n.cls : "notif-zero";
-    var bodyContent = hasData ? n.body : '<span class="text-muted">' + (n.emptyMsg || "Nothing to report in the past 14 days.") + '</span>';
-    var bodyHtml = isClickable
-      ? '<a href="javascript:void(0)" class="notif-link d-block text-reset text-decoration-none" data-notif-id="' + n.id + '">' + bodyContent + ' <i class="bi bi-arrow-right-circle ms-1" style="font-size:0.8rem;opacity:0.6"></i></a>'
-      : bodyContent;
-    var html =
-      '<div id="' + n.id + '" class="toast show mb-2 ' + extraCls + '" role="alert" data-bs-autohide="false">' +
-        '<div class="toast-header">' +
-          '<i class="bi ' + n.icon + ' me-2"></i>' +
-          '<strong class="me-auto">' + n.title + '</strong>' +
-          '<button type="button" class="btn-close ms-2" onclick="window._dismissNotif(\'' + n.id + '\');this.closest(\'.toast\').remove()" aria-label="Close"></button>' +
-        '</div>' +
-        '<div class="toast-body small">' + bodyHtml + '</div>' +
-      '</div>';
-    container.insertAdjacentHTML("beforeend", html);
-    if (isClickable) {
-      var el = container.querySelector('#' + n.id + ' .notif-link');
-      if (el) {
-        (function(preset) {
-          el.addEventListener("click", function() { window.navigateToDetails(preset); });
-        })(n.preset);
-      }
-    }
-  });
-}
-
 function resetApp() {
   APP_FILE_META = null;
-  // Do NOT clear APP_MULTI_SESSIONS here — user may be switching between sessions
   var sb = document.getElementById("status-bar");
   sb.classList.remove("d-flex");
   sb.classList.add("d-none");
   document.getElementById("main-tab-bar").classList.add("d-none");
-
-  // Clear notifications
-  var notifC = document.getElementById("notif-toast-container");
-  if (notifC) notifC.innerHTML = "";
 
   // Reset disti mode — restore PVI tab
   APP_IS_DISTI = false;
@@ -1798,7 +1222,7 @@ function resetApp() {
   // Clear all tab panes and hide tab content until data is loaded
   APP_DATA = null;
   window.APP_DATA = null;
-  APP_FILTER_STATE = { details: null, lifecycle: null, cpiAdopt: null, testing: null };
+  APP_FILTER_STATE = { details: null, lifecycle: null, cpiAdopt: null, testing: null, overview: null };
   document.getElementById("mainTabContent").classList.add("d-none");
   ["tab-overview","tab-details","tab-pvi","tab-testing"].forEach(function (id) {
     var pane = document.getElementById(id);
@@ -1828,20 +1252,7 @@ window.renderActiveTab = renderActiveTab;
 window.renderOverview  = renderOverview;
 window.getActiveData   = getActiveData;
 
-window._dismissedNotifs = {};
 window._currentSessionKey = null;
-window._notifStorageKey = _notifStorageKey;
-window.showDataNotifications = showDataNotifications;
-
-function _notifStorageKey(sessionKey) {
-  return "dismissed-notifs-" + (sessionKey || "default");
-}
-window._dismissNotif = function(id) {
-  window._dismissedNotifs[id] = true;
-  try {
-    localStorage.setItem(_notifStorageKey(window._currentSessionKey), JSON.stringify(window._dismissedNotifs));
-  } catch(e) {}
-};
 
 // Navigate to Details tab with a preset filter
 window.navigateToDetails = function (preset) {

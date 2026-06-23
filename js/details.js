@@ -375,6 +375,15 @@ function renderDetails(data) {
   html += '</div>';
   html += '<div id="det-filter-body">';
   var has2TPartner = data.some(function (r) { return r["2T Partner Name"] && String(r["2T Partner Name"]).trim() !== ""; });
+
+  // BE GEO ID dropdown
+  var beGeoIdList = [];
+  data.forEach(function(r) { var v = String(r["BE GEO ID"] || "").trim(); if (v && beGeoIdList.indexOf(v) === -1) beGeoIdList.push(v); });
+  beGeoIdList.sort();
+  if (beGeoIdList.length > 0) {
+    var geoOpts = '<option value="">All BE GEO IDs</option>' + beGeoIdList.map(function(id) { return '<option value="' + escHtml(id) + '">' + escHtml(id) + '</option>'; }).join('');
+    html += '<div class="filter-group"><label class="group-label">BE GEO ID</label><select id="filter-begeoid" class="form-select form-select-sm">' + geoOpts + '</select></div>';
+  }
   if (has2TPartner) {
     html += '<div class="filter-group"><div class="position-relative"><input type="text" id="filter-2tpartner" class="form-control form-control-sm pe-4" placeholder="&#128269; 2T Partner..." /><button id="det-2tpartner-clear" type="button" class="btn btn-link p-0 position-absolute top-50 end-0 translate-middle-y me-2 d-none" style="font-size:0.8rem;color:#999;line-height:1" tabindex="-1"><i class="bi bi-x-lg"></i></button></div></div>';
   }
@@ -547,6 +556,8 @@ function renderDetails(data) {
   });
   document.getElementById("filter-offer").addEventListener("change", function () { refreshUcDropdown(); currentPage = 1; applyFiltersAndRender(); });
   document.getElementById("filter-uc").addEventListener("change", function () { currentPage = 1; applyFiltersAndRender(); });
+  var beGeoSel = document.getElementById("filter-begeoid");
+  if (beGeoSel) beGeoSel.addEventListener("change", function () { currentPage = 1; applyFiltersAndRender(); });
   ["det-bk","det-rs","det-ea","det-exp"].forEach(function (prefix) {
     ["from","to"].forEach(function (side) {
       var el2 = document.getElementById(prefix + "-" + side);
@@ -627,6 +638,7 @@ function renderDetails(data) {
     var _clrBtns = ["det-2tpartner-clear","det-crparty-clear"];
     _clrBtns.forEach(function(id) { var b = document.getElementById(id); if (b) b.classList.add("d-none"); });
     el.querySelectorAll('input[type=checkbox]').forEach(function (cb) { cb.checked = false; });
+    if (document.getElementById("filter-begeoid")) document.getElementById("filter-begeoid").value = "";
     document.getElementById("filter-portfolio").value = "";
     document.getElementById("filter-offer").value = "";
     document.getElementById("filter-uc").value = "";
@@ -673,7 +685,8 @@ function renderDetails(data) {
       }
     }
     if (dl.offer) { var _ofEl = document.getElementById("filter-offer"); if (_ofEl) _ofEl.value = dl.offer; refreshUcDropdown(); }
-    if (dl.uc)    { var _ucEl = document.getElementById("filter-uc");    if (_ucEl) _ucEl.value = dl.uc; }
+    if (dl.uc)      { var _ucEl = document.getElementById("filter-uc");      if (_ucEl) _ucEl.value = dl.uc; }
+    if (dl.beGeoId) { var _bgEl = document.getElementById("filter-begeoid"); if (_bgEl) _bgEl.value = dl.beGeoId; }
     if (dl.csFrom !== undefined || dl.csTo !== undefined) {
       var _csFrom = document.getElementById("det-cs-from");
       var _csTo   = document.getElementById("det-cs-to");
@@ -734,6 +747,9 @@ function renderDetails(data) {
   });
 
   function _restoreDetailsState(st) {
+    // BE GEO ID dropdown
+    var bgEl = document.getElementById("filter-begeoid");
+    if (bgEl && st.beGeoId) bgEl.value = st.beGeoId;
     // Text inputs
     var crEl = document.getElementById("filter-crparty");
     if (crEl && st.crParty) {
@@ -812,6 +828,7 @@ function renderDetails(data) {
         showDaysSinceOptIn:  showDaysSinceOptIn,
         showOverallProgress: showOverallProgress,
         ucMissedPreset: ucMissedPreset,
+        beGeoId:       (document.getElementById("filter-begeoid")    || {value:""}).value,
         crParty:       (document.getElementById("filter-crparty")    || {value:""}).value,
         twoTPartner:   (document.getElementById("filter-2tpartner")  || {value:""}).value,
         portfolio:     (document.getElementById("filter-portfolio")  || {value:""}).value,
@@ -845,6 +862,7 @@ function renderDetails(data) {
       };
     }
     var twoTVal          = document.getElementById("filter-2tpartner") ? document.getElementById("filter-2tpartner").value.trim().toLowerCase() : "";
+    var beGeoIdVal       = document.getElementById("filter-begeoid") ? document.getElementById("filter-begeoid").value : "";
     var crPartyVal       = document.getElementById("filter-crparty").value.trim().toLowerCase();
     var stageChecked     = getChecked("filter-stage");
     var optInChecked     = getChecked("filter-optin");
@@ -894,6 +912,7 @@ function renderDetails(data) {
     var csActive  = csFromEl && csToEl && !(parseInt(csFromEl.value) === parseInt(csFromEl.min) && parseInt(csToEl.value) === parseInt(csToEl.max));
 
     filteredData = data.filter(function (r) {
+      if (beGeoIdVal && String(r["BE GEO ID"] || "").trim() !== beGeoIdVal) return false;
       if (twoTVal    && String(r["2T Partner Name"] || "").toLowerCase().indexOf(twoTVal) === -1
                      && String(r["2T Partner BE GEO ID - (Disti Only)"] || "").toLowerCase().indexOf(twoTVal) === -1) return false;
       if (crPartyVal && String(r["CR Party Name"] || "").toLowerCase().indexOf(crPartyVal) === -1
@@ -1128,6 +1147,7 @@ function renderDetails(data) {
     var has2TPartner = data.some(function (r) { return r["2T Partner Name"] && String(r["2T Partner Name"]).trim() !== ""; });
 
     var cols = [
+      { label: "Partner", field: "Partner Name", isPartnerCell: true, style: "min-width:160px" },
       ...(has2TPartner ? [{ label: "2T Partner Name", field: "2T Partner Name" }] : []),
       { label: "CR Party Name",              field: "CR Party Name",                style: "min-width:180px" },
       { label: "Use Case",                   field: "Sub-Track",                    style: "min-width:160px" },
@@ -1296,6 +1316,11 @@ function renderDetails(data) {
             cell = '<td>' + fmtDate(val) + '</td>';
             tbody += cell;
             return;
+          } else if (c.isPartnerCell) {
+            var isDisti = !!window.APP_IS_DISTI;
+            var pName  = escHtml(String(isDisti ? (r["Disti name"] || "") : (r["Partner Name"] || "")));
+            var pGeoId = escHtml(String(r["BE GEO ID"] || ""));
+            cell = pName + (pGeoId ? '<div style="font-size:0.72rem;color:#888;margin-top:1px">BE GEO ID: ' + pGeoId + '</div>' : '');
           } else if (c.field === "CR Party Name") {
             var crNameEsc = escHtml(String(r["CR Party Name"] || ""));
             var crId  = escHtml(String(r["CR Party ID"] || ""));
@@ -1655,6 +1680,8 @@ function renderDetails(data) {
         // Column definitions
         var has2T = data.some(function(r){ return r["2T Partner Name"] && String(r["2T Partner Name"]).trim() !== ""; });
         var colDefs = [
+          { label:"Partner Name", field:"Partner Name" },
+          { label:"BE GEO ID",   field:"BE GEO ID" },
           ...(has2T ? [{ label:"2T Partner Name", field:"2T Partner Name" }] : []),
           { label:"CR Party Name",           field:"CR Party Name" },
           { label:"CR Party ID",             field:"CR Party ID" },

@@ -47,6 +47,11 @@
   font-weight: 600;
 }
 
+/* ── Tab pane padding ────────────────────────────────────── */
+.tab-pane {
+  padding: 0 0.5rem;
+}
+
 /* ── Upload card ─────────────────────────────────────────── */
 .upload-card {
   max-width: 760px;
