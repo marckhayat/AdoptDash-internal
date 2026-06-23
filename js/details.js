@@ -376,14 +376,6 @@ function renderDetails(data) {
   html += '<div id="det-filter-body">';
   var has2TPartner = data.some(function (r) { return r["2T Partner Name"] && String(r["2T Partner Name"]).trim() !== ""; });
 
-  // BE GEO ID dropdown
-  var beGeoIdList = [];
-  data.forEach(function(r) { var v = String(r["BE GEO ID"] || "").trim(); if (v && beGeoIdList.indexOf(v) === -1) beGeoIdList.push(v); });
-  beGeoIdList.sort();
-  if (beGeoIdList.length > 0) {
-    var geoOpts = '<option value="">All BE GEO IDs</option>' + beGeoIdList.map(function(id) { return '<option value="' + escHtml(id) + '">' + escHtml(id) + '</option>'; }).join('');
-    html += '<div class="filter-group"><label class="group-label">BE GEO ID</label><select id="filter-begeoid" class="form-select form-select-sm">' + geoOpts + '</select></div>';
-  }
   if (has2TPartner) {
     html += '<div class="filter-group"><div class="position-relative"><input type="text" id="filter-2tpartner" class="form-control form-control-sm pe-4" placeholder="&#128269; 2T Partner..." /><button id="det-2tpartner-clear" type="button" class="btn btn-link p-0 position-absolute top-50 end-0 translate-middle-y me-2 d-none" style="font-size:0.8rem;color:#999;line-height:1" tabindex="-1"><i class="bi bi-x-lg"></i></button></div></div>';
   }
@@ -556,8 +548,6 @@ function renderDetails(data) {
   });
   document.getElementById("filter-offer").addEventListener("change", function () { refreshUcDropdown(); currentPage = 1; applyFiltersAndRender(); });
   document.getElementById("filter-uc").addEventListener("change", function () { currentPage = 1; applyFiltersAndRender(); });
-  var beGeoSel = document.getElementById("filter-begeoid");
-  if (beGeoSel) beGeoSel.addEventListener("change", function () { currentPage = 1; applyFiltersAndRender(); });
   ["det-bk","det-rs","det-ea","det-exp"].forEach(function (prefix) {
     ["from","to"].forEach(function (side) {
       var el2 = document.getElementById(prefix + "-" + side);
@@ -638,8 +628,7 @@ function renderDetails(data) {
     var _clrBtns = ["det-2tpartner-clear","det-crparty-clear"];
     _clrBtns.forEach(function(id) { var b = document.getElementById(id); if (b) b.classList.add("d-none"); });
     el.querySelectorAll('input[type=checkbox]').forEach(function (cb) { cb.checked = false; });
-    if (document.getElementById("filter-begeoid")) document.getElementById("filter-begeoid").value = "";
-    document.getElementById("filter-portfolio").value = "";
+    if (document.getElementById("filter-portfolio").value !== "") document.getElementById("filter-portfolio").value = "";
     document.getElementById("filter-offer").value = "";
     document.getElementById("filter-uc").value = "";
     refreshUcDropdown();
@@ -686,7 +675,6 @@ function renderDetails(data) {
     }
     if (dl.offer) { var _ofEl = document.getElementById("filter-offer"); if (_ofEl) _ofEl.value = dl.offer; refreshUcDropdown(); }
     if (dl.uc)      { var _ucEl = document.getElementById("filter-uc");      if (_ucEl) _ucEl.value = dl.uc; }
-    if (dl.beGeoId) { var _bgEl = document.getElementById("filter-begeoid"); if (_bgEl) _bgEl.value = dl.beGeoId; }
     if (dl.csFrom !== undefined || dl.csTo !== undefined) {
       var _csFrom = document.getElementById("det-cs-from");
       var _csTo   = document.getElementById("det-cs-to");
@@ -747,9 +735,6 @@ function renderDetails(data) {
   });
 
   function _restoreDetailsState(st) {
-    // BE GEO ID dropdown
-    var bgEl = document.getElementById("filter-begeoid");
-    if (bgEl && st.beGeoId) bgEl.value = st.beGeoId;
     // Text inputs
     var crEl = document.getElementById("filter-crparty");
     if (crEl && st.crParty) {
@@ -828,7 +813,6 @@ function renderDetails(data) {
         showDaysSinceOptIn:  showDaysSinceOptIn,
         showOverallProgress: showOverallProgress,
         ucMissedPreset: ucMissedPreset,
-        beGeoId:       (document.getElementById("filter-begeoid")    || {value:""}).value,
         crParty:       (document.getElementById("filter-crparty")    || {value:""}).value,
         twoTPartner:   (document.getElementById("filter-2tpartner")  || {value:""}).value,
         portfolio:     (document.getElementById("filter-portfolio")  || {value:""}).value,
@@ -862,7 +846,7 @@ function renderDetails(data) {
       };
     }
     var twoTVal          = document.getElementById("filter-2tpartner") ? document.getElementById("filter-2tpartner").value.trim().toLowerCase() : "";
-    var beGeoIdVal       = document.getElementById("filter-begeoid") ? document.getElementById("filter-begeoid").value : "";
+    var beGeoIdVal       = (window.APP_FILTER_STATE && window.APP_FILTER_STATE.overview && window.APP_FILTER_STATE.overview.beGeoId) || "";
     var crPartyVal       = document.getElementById("filter-crparty").value.trim().toLowerCase();
     var stageChecked     = getChecked("filter-stage");
     var optInChecked     = getChecked("filter-optin");

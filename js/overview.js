@@ -192,11 +192,8 @@ function renderOverview(data) {
     }
   }
 
-  // Drilldown helper — merges the currently-selected BE GEO ID into the preset
+  // Drilldown helper — navigates to Details tab with the given preset
   window.ovwDrilldown = function(preset) {
-    var geoEl = document.getElementById("ovw-begeoid-sel");
-    var geo = geoEl ? geoEl.value : "";
-    if (geo) preset = Object.assign({}, preset, { beGeoId: geo });
     window.navigateToDetails(preset);
   };
 

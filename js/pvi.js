@@ -67,28 +67,11 @@ function renderPVI(data) {
     return { portfolio, eligUC, eligBook, onbUC, onbBook, adpUC, adpBook, onbRatio, adpRatio, onbScore, adpScore, totalScore };
   }
 
-  // ── Get unique BE GEO IDs
-  var beGeoIds = [];
-  data.forEach(function(r) { var v = String(r["BE GEO ID"] || "").trim(); if (v && beGeoIds.indexOf(v) === -1) beGeoIds.push(v); });
-  beGeoIds.sort();
+  // ── Get GEO from global Overview filter
+  var activeGeo = (window.APP_FILTER_STATE && window.APP_FILTER_STATE.overview && window.APP_FILTER_STATE.overview.beGeoId) || "";
 
-  // ── Restore previous selection
-  var _prevGeo = (function() {
-    var prev = document.getElementById("pvi-begeoid-sel");
-    if (prev) return prev.value;
-    return (window.APP_FILTER_STATE && window.APP_FILTER_STATE.pvi) ? (window.APP_FILTER_STATE.pvi.beGeoId || "") : "";
-  })();
-
-  // ── Build static HTML shell
-  var geoOpts = '<option value="">— Select a BE GEO ID —</option>';
-  beGeoIds.forEach(function(id) { geoOpts += '<option value="' + id.replace(/"/g, '&quot;') + '">' + id + '</option>'; });
-
-  var html = '<div class="d-flex align-items-center gap-2 mb-3">';
-  html += '<label class="text-muted small mb-0 flex-shrink-0" for="pvi-begeoid-sel">BE GEO ID</label>';
-  html += '<select id="pvi-begeoid-sel" class="form-select form-select-sm" style="width:auto;font-size:0.85rem">' + geoOpts + '</select>';
-  html += '</div>';
-
-  html += '<div id="pvi-content"></div>';
+  // ── Build static HTML shell (no dropdown needed)
+  var html = '<div id="pvi-content"></div>';
 
   html += '<div class="mt-3 p-3 rounded" style="background:#f8f9fa;border:1px solid #dee2e6;font-size:0.82rem">';
   html += '<div class="fw-semibold mb-2">PVI Engagement calculation:</div>';
@@ -106,7 +89,7 @@ function renderPVI(data) {
   function renderPortfolios(filteredData) {
     var contentEl = document.getElementById("pvi-content");
     if (!filteredData) {
-      contentEl.innerHTML = '<div class="text-muted p-3"><i class="bi bi-arrow-up me-1"></i>Select a BE GEO ID to view PVI data.</div>';
+      contentEl.innerHTML = '<div class="text-muted p-3"><i class="bi bi-filter me-1"></i>Select a BE GEO ID in the Overview tab to view PVI data.</div>';
       return;
     }
 
@@ -194,20 +177,9 @@ function renderPVI(data) {
     });
   }
 
-  // ── Wire dropdown
-  var geoSel = document.getElementById("pvi-begeoid-sel");
-  geoSel.addEventListener("change", function() {
-    var geo = this.value;
-    window.APP_FILTER_STATE = window.APP_FILTER_STATE || {};
-    window.APP_FILTER_STATE.pvi = { beGeoId: geo };
-    var filtered = geo ? data.filter(function(r) { return String(r["BE GEO ID"] || "") === geo; }) : null;
-    renderPortfolios(filtered);
-  });
-
-  // ── Restore and apply previous selection
-  if (_prevGeo && beGeoIds.indexOf(_prevGeo) !== -1) {
-    geoSel.value = _prevGeo;
-    renderPortfolios(data.filter(function(r) { return String(r["BE GEO ID"] || "") === _prevGeo; }));
+  // ── Apply global GEO filter from Overview
+  if (activeGeo) {
+    renderPortfolios(data.filter(function(r) { return String(r["BE GEO ID"] || "").trim() === activeGeo; }));
   } else {
     renderPortfolios(null);
   }
