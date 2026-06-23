@@ -24,7 +24,7 @@ var APP_LOCALE = navigator.language || undefined;
 var PENDING_FILE_HANDLE = null;
 document.addEventListener("DOMContentLoaded", function () {
   var el = document.getElementById("app-version-label");
-  if (el) el.textContent = APP_VERSION + " · Interactive";
+  if (el) el.textContent = APP_VERSION;
 });
 
 // Workspan column names used to auto-detect the header row
@@ -53,17 +53,17 @@ function init() {
 }
 
 function showLoader(message) {
-  var sec = document.getElementById("upload-section");
-  sec.classList.remove("d-none");
-  sec.innerHTML =
-    '<div class="upload-card mx-auto my-5">' +
-    '  <div class="card shadow-sm">' +
-    '    <div class="card-body p-5 text-center">' +
-    '      <div class="spinner-border text-primary mb-3" style="width:3rem;height:3rem;" role="status"></div>' +
-    '      <p class="text-muted mb-0" id="loader-msg">' + (message || "Loading…") + '</p>' +
-    '    </div>' +
-    '  </div>' +
-    '</div>';
+  var overlay = document.getElementById("loader-overlay");
+  if (!overlay) {
+    overlay = document.createElement("div");
+    overlay.id = "loader-overlay";
+    overlay.style.cssText = "position:fixed;inset:0;background:rgba(255,255,255,0.92);z-index:9998;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:1rem";
+    document.body.appendChild(overlay);
+  }
+  overlay.innerHTML =
+    '<div class="spinner-border text-primary" style="width:3rem;height:3rem;" role="status"></div>' +
+    '<p class="text-muted mb-0" id="loader-msg">' + (message || "Loading…") + '</p>';
+  overlay.style.display = "flex";
 }
 
 function updateLoaderMsg(msg) {
@@ -527,6 +527,8 @@ function finishLoad(filename, rowCount, headerAutoDetected, idbType, loadedAt, f
 
 function restoreUploadSection(cachedEntries) {
   cachedEntries = cachedEntries || [];
+  var overlay = document.getElementById("loader-overlay");
+  if (overlay) overlay.style.display = "none";
   var sec = document.getElementById("upload-section");
   sec.classList.remove("d-none");
   var isChrome = typeof navigator !== 'undefined' && /chrome/i.test(navigator.userAgent || '') && !/edg/i.test(navigator.userAgent || '');
@@ -547,7 +549,7 @@ function restoreUploadSection(cachedEntries) {
                  : scopeType === "country" ? "Country: " + scopeLabel
                  : scopeType === "begeoid" ? "BE GEO IDs: " + scopeLabel
                  : "Whole Region";
-    var html = '<div class="col-6"><div class="card border-warning mb-2 p-2">';
+    var html = '<div class="col"><div class="card border-warning mb-2 p-2">';
     html += '<div class="d-flex justify-content-between align-items-start gap-2">';
     html += '<div style="min-width:0">';
     html += '<div class="fw-semibold small">' + region + ' &mdash; ' + scopeStr + '</div>';
@@ -589,13 +591,14 @@ function restoreUploadSection(cachedEntries) {
     weekOptions += '<option value="' + wLabel + '">' + wLabel + '</option>';
   }
 
-  // ── Build single-column layout ────────────────────────────────────────────
+  // ── Build two-column layout ───────────────────────────────────────────────
   sec.innerHTML =
     '<div class="container-fluid py-4" style="max-width:1400px">' +
     '<div class="row g-4">' +
 
-    // ── Cisco-internal column ──────────────────────────────────────────────
-    '<div class="col-12">' +
+    // ── Left col: file picker + previous sessions ──────────────────────────
+    '<div class="col-12" id="upload-left-col">' +
+    '<div id="upload-left-inner" style="max-width:560px;margin:0 auto">' +
 
     // Cisco CPI card
     '<div class="card shadow-sm border-warning mb-3">' +
@@ -624,20 +627,27 @@ function restoreUploadSection(cachedEntries) {
     '</div>'+
     '</div></div>' +
 
-    // Previous CPI sessions
+    '</div>' + // /upload-left-inner
+    '</div>' + // /left col
+
+    // ── Right col: scope picker (shown after file load) ────────────────────
+    '<div class="col-12 col-lg-7" id="scope-panel-col" style="display:none">' +
+    '<div id="scope-panel"></div>' +
+    '</div>' +
+
+    '</div>' + // /row
+
+    // Previous CPI sessions — full width below both columns
     (function() {
       if (cpiEntries.length === 0) return '';
-      return '<div class="card shadow-sm border-warning">' +
+      return '<div class="card shadow-sm border-warning mt-2">' +
         '<div class="card-header bg-warning bg-opacity-10 fw-semibold d-flex justify-content-between align-items-center gap-2" style="font-size:0.85rem"><span><i class="bi bi-lightning-charge-fill me-2 text-warning"></i>Previous sessions</span>' +
         (isChrome ? '<button id="cpi-refresh-all-btn" class="btn btn-sm btn-outline-primary py-0 flex-shrink-0" title="Refresh all previous sessions"><i class="bi bi-arrow-clockwise me-1"></i>Refresh all</button>' : '') +
         '</div>' +
-        '<div class="card-body p-2" id="cpi-prev-sessions-body"><div class="row g-2">' +
+        '<div class="card-body p-2" id="cpi-prev-sessions-body"><div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-2">' +
         cpiEntries.map(resumeCard).join("") +
         '</div></div></div>';
     })()+
-
-    '</div>' + // /right col
-    '</div>' +
     // ── Clear all data button ─────────────────────────────────────────────
     '<div class="text-center mt-2 mb-1">' +
     '<p class="text-muted small mb-2"><i class="bi bi-shield-lock me-1"></i>All data is processed entirely in your browser — nothing is sent to any server.</p>' +
@@ -847,11 +857,20 @@ function renderMultiPicker() {
 
 // ── Drill-down scope picker — shown after file is parsed, before transform ────
 function showDrillDownPicker(rawRows, onConfirm) {
-  var sec = document.getElementById("upload-section");
-  sec.classList.remove("d-none");
+  // Show the right-side panel column; remove centering from left col
+  var col = document.getElementById("scope-panel-col");
+  var panel = document.getElementById("scope-panel");
+  var inner = document.getElementById("upload-left-inner");
+  var overlay = document.getElementById("loader-overlay");
+  if (overlay) overlay.style.display = "none";
+  if (col) col.style.display = "";
+  if (inner) { inner.style.maxWidth = ""; inner.style.margin = ""; }
+  var leftCol = document.getElementById("upload-left-col");
+  if (leftCol) { leftCol.className = "col-12 col-lg-5"; }
+  if (!panel) return;
 
   // Build theater → countries map
-  var theaterMap = {}; // { theaterName: [country, ...] }
+  var theaterMap = {};
   rawRows.forEach(function(r) {
     var t = String(r["Theater"] || "").trim();
     var c = String(r["Partner Country"] || "").trim();
@@ -878,10 +897,9 @@ function showDrillDownPicker(rawRows, onConfirm) {
         '<label class="form-check-label small" for="bgcb-' + id.replace(/\W/g,'_') + '">' + id + '</label></div>';
     }).join('');
 
-    sec.innerHTML =
-      '<div class="upload-card mx-auto my-5">' +
-      '<div class="card shadow-sm border-warning">' +
-      '<div class="card-header bg-warning bg-opacity-10 fw-semibold"><i class="bi bi-funnel me-2 text-warning"></i>Select Analysis Scope</div>' +
+    panel.innerHTML =
+      '<div class="card shadow-sm border-primary h-100">' +
+      '<div class="card-header bg-primary bg-opacity-10 fw-semibold"><i class="bi bi-funnel me-2 text-primary"></i>Select Analysis Scope</div>' +
       '<div class="card-body p-4">' +
       '<p class="text-muted small mb-3">Choose the granularity for this session. You can reload the file at any time to change it.</p>' +
 
@@ -903,7 +921,7 @@ function showDrillDownPicker(rawRows, onConfirm) {
         '</div>'
       : '') +
 
-      // Country (grayed out by default, enabled when a theater is selected)
+      // Country
       '<div class="form-check mb-2" id="scope-country-row">' +
         '<input class="form-check-input" type="radio" name="scope-level" id="scope-country" value="country" disabled>' +
         '<label class="form-check-label text-muted" for="scope-country" id="scope-country-label"><strong>Country</strong> <span class="small">— select a theater first</span></label>' +
@@ -936,7 +954,7 @@ function showDrillDownPicker(rawRows, onConfirm) {
       '<div class="mt-3">' +
         '<button id="scope-confirm-btn" class="btn btn-warning px-4"><i class="bi bi-play-fill me-2"></i>Continue</button>' +
       '</div>' +
-      '</div></div></div>';
+      '</div></div>';
 
     function getSelectedTheater() {
       var sel = document.getElementById("scope-theater-sel");
@@ -1101,13 +1119,26 @@ function showDrillDownPicker(rawRows, onConfirm) {
         if (selectedGeos.length === 0) { alert("Please select at least one BE GEO ID."); return; }
         filteredRows = rawRows.filter(function(r) { return selectedGeos.indexOf(String(r["BE GEO ID"] || "").trim()) !== -1; });
         scopeLabel = selectedGeos.join(",");
+      } else if (level === "region") {
+        // Drop "NOT ELIGIBLE" rows to reduce memory footprint for large regional files
+        filteredRows = rawRows.filter(function(r) { return String(r["Stage"] || "").trim().toUpperCase() !== "NOT ELIGIBLE"; });
       }
-      showLoader("Processing " + filteredRows.length.toLocaleString() + " rows\u2026");
+      var loaderMsg = "Processing " + filteredRows.length.toLocaleString() + " rows\u2026";
+      if (level === "region" && filteredRows.length < rawRows.length) {
+        loaderMsg += " (" + (rawRows.length - filteredRows.length).toLocaleString() + " not-eligible rows excluded)";
+      }
+      showLoader(loaderMsg);
+      // Hide scope panel while loading
+      var _col = document.getElementById("scope-panel-col");
+      if (_col) _col.style.display = "none";
       setTimeout(function() { onConfirm(filteredRows, level, scopeLabel); }, 0);
     });
   }
 
   render();
+  // Scroll scope panel into view on small screens
+  var _panelEl = document.getElementById("scope-panel");
+  if (_panelEl) _panelEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 
 // ── CPI file processing — loads all rows, sessions keyed by region ───────────

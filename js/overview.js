@@ -421,11 +421,11 @@ function renderOverview(data) {
     });
     tbody += "</tbody>";
 
-    // Totals row aligned with columns — shown in tfoot
+    // Totals row — use offer+UC in key so a customer counts once per UC (not once overall)
     var totalN_ids = new Set(), totalO = 0, totalQ = 0;
     fd.forEach(function (r) {
       if (norm(r["Adopt Rebate Opt-In Status"]) === "OPTED IN" && norm(r["Stage"]) === "ELIGIBLE") {
-        totalN_ids.add(r["CR Party ID"] + "|" + r["BE GEO ID"]);
+        totalN_ids.add(r["CR Party ID"] + "|" + r["BE GEO ID"] + "|" + (r["Track"] || "") + "|" + (r["Sub-Track"] || ""));
         totalO += (r["Potential Incentives"] || 0);
       }
       totalQ += (r["Estimated Earned Incentives"] || 0);
@@ -612,7 +612,7 @@ function renderOverview(data) {
         // Totals row
         var totalN_ids = new Set(), totalO=0, totalQ=0;
         fd.forEach(function(r){
-          if((r["Adopt Rebate Opt-In Status"]||"").toUpperCase()==="OPTED IN" && (r["Stage"]||"").toUpperCase()==="ELIGIBLE"){ totalN_ids.add(r["CR Party ID"] + "|" + r["BE GEO ID"]); totalO+=(r["Potential Incentives"]||0); }
+          if((r["Adopt Rebate Opt-In Status"]||"").toUpperCase()==="OPTED IN" && (r["Stage"]||"").toUpperCase()==="ELIGIBLE"){ totalN_ids.add(r["CR Party ID"] + "|" + r["BE GEO ID"] + "|" + (r["Track"]||"") + "|" + (r["Sub-Track"]||"")); totalO+=(r["Potential Incentives"]||0); }
           totalQ+=(r["Estimated Earned Incentives"]||0);
         });
         var totalN = totalN_ids.size;

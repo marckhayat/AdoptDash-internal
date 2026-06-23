@@ -101,7 +101,8 @@ function renderCompare(data) {
   var _selectedFY        = (_saved && _saved.fy != null) ? _saved.fy : (fyList.indexOf(_currentFY) !== -1 ? _currentFY : (fyList[fyList.length - 1] || _currentFY));
   var _selectedPortfolio = (_saved && _saved.portfolio) || "";
   var _selectedOffer     = (_saved && _saved.offer)     || "";
-  var showAll = true;
+  var _logScale          = (_saved && _saved.logScale)  || false;
+  var _topN              = (_saved && _saved.topN  != null) ? _saved.topN : 0; // 0 = all
 
   function getOfferOptions(pf) {
     var opts = pf ? Array.from(offersByPortfolio[pf] || []) : (function() {
@@ -145,6 +146,20 @@ function renderCompare(data) {
   getOfferOptions(_selectedPortfolio).forEach(function(o) { html += '<option value="' + escHtml(o) + '"' + (o === _selectedOffer ? ' selected' : '') + '>' + escHtml(o) + '</option>'; });
   html += '</select></div>';
 
+  // Top N
+  html += '<div class="d-flex flex-column"><label class="small text-muted mb-1">Show</label>';
+  html += '<select id="cmp-topn" class="form-select form-select-sm">';
+  html += '<option value="0"' + (_topN === 0   ? ' selected' : '') + '>All</option>';
+  html += '<option value="10"' + (_topN === 10 ? ' selected' : '') + '>Top 10</option>';
+  html += '</select></div>';
+
+  // Log scale — pushed to the right end of the row
+  html += '<div class="d-flex flex-column ms-auto justify-content-end">';
+  html += '<div class="form-check form-switch mb-0">';
+  html += '<input class="form-check-input" type="checkbox" id="cmp-log-toggle"' + (_logScale ? ' checked' : '') + '>';
+  html += '<label class="form-check-label small text-muted" for="cmp-log-toggle">Log scale</label>';
+  html += '</div></div>';
+
   html += '</div>'; // end slicer-row
 
   // Scope context badge
@@ -162,14 +177,14 @@ function renderCompare(data) {
   html += '<div class="card-header fw-semibold d-flex align-items-center justify-content-between">';
   html += '<span><i class="bi bi-hand-thumbs-up-fill me-2 text-success"></i>Opt-in Count by ' + dimLabel + '</span>';
   html += '<span id="cmp-optin-total" class="fw-normal text-muted" style="font-size:0.82rem"></span></div>';
-  html += '<div class="card-body p-3" id="cmp-optin-body" style="min-height:280px;height:280px"><canvas id="cmp-chart-optin"></canvas></div>';
+  html += '<div class="card-body p-3" id="cmp-optin-body" style="min-height:400px;height:400px"><canvas id="cmp-chart-optin"></canvas></div>';
   html += '</div></div>';
 
   html += '<div class="col-12 col-xl-6"><div class="card shadow-sm">';
   html += '<div class="card-header fw-semibold d-flex align-items-center justify-content-between">';
   html += '<span><i class="bi bi-cash-stack me-2 text-warning"></i>Estimated Earned Incentives</span>';
   html += '<span id="cmp-earned-total" class="fw-normal text-muted" style="font-size:0.82rem"></span></div>';
-  html += '<div class="card-body p-3" id="cmp-earned-body" style="min-height:280px;height:280px"><canvas id="cmp-chart-earned"></canvas></div>';
+  html += '<div class="card-body p-3" id="cmp-earned-body" style="min-height:400px;height:400px"><canvas id="cmp-chart-earned"></canvas></div>';
   html += '</div></div>';
 
   html += '</div></div>'; // end row + p-3
@@ -196,10 +211,11 @@ function renderCompare(data) {
   function computeData() {
     var portfolio = document.getElementById("cmp-portfolio").value;
     var offer     = document.getElementById("cmp-offer").value;
+    _topN = parseInt(document.getElementById("cmp-topn").value, 10) || 0;
 
     // Save state
     if (window.APP_FILTER_STATE) {
-      window.APP_FILTER_STATE.compare = { fy: _selectedFY, portfolio: portfolio, offer: offer };
+      window.APP_FILTER_STATE.compare = { fy: _selectedFY, portfolio: portfolio, offer: offer, logScale: _logScale, topN: _topN };
     }
 
     // Filter: eligible rows (MaxFlag=YES), optional portfolio + offer
@@ -210,28 +226,27 @@ function renderCompare(data) {
       return true;
     });
 
-    // Opt-ins: keyed by Adopt Rebate Start Date falling in FY (matches cpi-adopt chart 3)
+    // Opt-ins: Stage ELIGIBLE or EXPIRED, Adopt Rebate Opt-In Status = OPTED IN, Start Date in FY
     var optInRows = eligRows.filter(function(r) {
-      if (!r["Offer opted-in?"]) return false;
+      var st = String(r["Stage"] || "").trim().toUpperCase();
+      if (st !== "ELIGIBLE" && st !== "EXPIRED") return false;
+      if (String(r["Adopt Rebate Opt-In Status"] || "").trim().toUpperCase() !== "OPTED IN") return false;
       if (_selectedFY === "all") return true;
       var d = new Date(r["Adopt Rebate Start Date"]);
-      return dateInFY(d, _selectedFY);    });
+      return dateInFY(d, _selectedFY);
+    });
 
     // Earned: keyed by Stage Completion Date falling in FY (matches cpi-adopt chart 5)
     // Uses per-stage amounts, checks Earned? flag and lciStart/expiry bounds
     var entityMap = {};
 
-    // First pass: opt-ins
+    // First pass: opt-ins — count rows (matching cpi-adopt chart 3, no dedup)
     optInRows.forEach(function(r) {
       var entity = String(r[dimField] || "").trim() || "(unknown)";
-      if (!entityMap[entity]) entityMap[entity] = { eligKeys: new Set(), optInKeys: new Set(), optInByP: {}, earnedByP: {} };
-      var key = String(r["CRPartyID-Offer"] || "");
-      entityMap[entity].eligKeys.add(key);
+      if (!entityMap[entity]) entityMap[entity] = { optIn: 0, optInByP: {}, earnedByP: {} };
       var p = r["Deal CPI Portfolio"] || "Other";
-      if (!entityMap[entity].optInKeys.has(key)) {
-        entityMap[entity].optInByP[p] = (entityMap[entity].optInByP[p] || 0) + 1;
-      }
-      entityMap[entity].optInKeys.add(key);
+      entityMap[entity].optIn++;
+      entityMap[entity].optInByP[p] = (entityMap[entity].optInByP[p] || 0) + 1;
     });
 
     // Second pass: earned incentives by stage completion date
@@ -240,7 +255,7 @@ function renderCompare(data) {
       var p = r["Deal CPI Portfolio"] || "Other";
       if (portfolio && p !== portfolio) return;
       var entity = String(r[dimField] || "").trim() || "(unknown)";
-      if (!entityMap[entity]) entityMap[entity] = { eligKeys: new Set(), optInKeys: new Set(), optInByP: {}, earnedByP: {} };
+      if (!entityMap[entity]) entityMap[entity] = { optIn: 0, optInByP: {}, earnedByP: {} };
       var lciStart = new Date(r["Adopt Rebate Start Date"]);
       var expiry   = new Date(r["Deal Incentive Expiry Date"]);
       if (isNaN(lciStart.getTime()) || isNaN(expiry.getTime())) return;
@@ -265,12 +280,13 @@ function renderCompare(data) {
       } else {
         label = entity;
       }
-      return { entity: entity, label: label, eligible: m.eligKeys.size, optIn: m.optInKeys.size, optInByP: m.optInByP, earnedByP: m.earnedByP, totalEarned: totalEarned };
+      return { entity: entity, label: label, optIn: m.optIn, optInByP: m.optInByP, earnedByP: m.earnedByP, totalEarned: totalEarned };
     });
 
     var pfList = portfolio ? [portfolio] : portfolios;
     var byOptIn  = entries.slice().sort(function(a, b) { return b.optIn       - a.optIn;       });
     var byEarned = entries.slice().sort(function(a, b) { return b.totalEarned - a.totalEarned; });
+    if (_topN > 0) { byOptIn = byOptIn.slice(0, _topN); byEarned = byEarned.slice(0, _topN); }
     return { byOptIn: byOptIn, byEarned: byEarned, pfList: pfList };
   }
 
@@ -313,7 +329,7 @@ function renderCompare(data) {
         maintainAspectRatio: false,
         scales: {
           x: { stacked: true, grid: { display: false }, ticks: { font: { size: 11 }, maxRotation: 45 } },
-          y: { stacked: true, beginAtZero: true, ticks: { font: { size: 10 } }, title: { display: true, text: "Unique Offer Opt-ins" } }
+          y: { stacked: true, type: _logScale ? "logarithmic" : "linear", beginAtZero: !_logScale, ticks: { font: { size: 10 } }, title: { display: true, text: "Unique Offer Opt-ins" } }
         },
         plugins: {
           legend: { position: "bottom" },
@@ -361,7 +377,8 @@ function renderCompare(data) {
           x: { stacked: true, grid: { display: false }, ticks: { font: { size: 11 }, maxRotation: 45 } },
           y: {
             stacked: true,
-            beginAtZero: true,
+            type: _logScale ? "logarithmic" : "linear",
+            beginAtZero: !_logScale,
             ticks: { font: { size: 10 }, callback: fmtTick },
             title: { display: true, text: "Estimated Earned ($)" }
           }
@@ -412,6 +429,15 @@ function renderCompare(data) {
   });
 
   if (ofSelEl) ofSelEl.addEventListener("change", render);
+
+  var logToggle = document.getElementById("cmp-log-toggle");
+  if (logToggle) logToggle.addEventListener("change", function() {
+    _logScale = this.checked;
+    render();
+  });
+
+  var topNEl = document.getElementById("cmp-topn");
+  if (topNEl) topNEl.addEventListener("change", render);
 
   render();
 }
