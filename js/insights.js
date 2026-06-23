@@ -278,7 +278,6 @@ function renderTesting(data) {
       insightNavTabs.style.cssText = "display:flex;flex-wrap:wrap;align-items:center";
       insightNavTabs.appendChild(insightExclBtn);
     }
-  }
 
   // ── Render function ────────────────────────────────────────────────────────
   function renderPareto() {
