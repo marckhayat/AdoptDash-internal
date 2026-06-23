@@ -472,7 +472,7 @@ function finishLoad(filename, rowCount, headerAutoDetected, idbType, loadedAt, f
     IDB.save(idbType, APP_DATA, {
       filename:         filename,
       rowCount:         rowCount,
-      loadedAt:         new Date().toISOString(),
+      loadedAt:         fromCache ? loadedAt : new Date().toISOString(),
       fileLastModified: APP_FILE_META && APP_FILE_META.lastModified ? APP_FILE_META.lastModified.toISOString() : null,
       displayName:      displayName,
       beGeoIds:         beGeoIds,
