@@ -1222,7 +1222,7 @@ function resetApp() {
   // Clear all tab panes and hide tab content until data is loaded
   APP_DATA = null;
   window.APP_DATA = null;
-  APP_FILTER_STATE = { details: null, lifecycle: null, cpiAdopt: null, testing: null, overview: null };
+  APP_FILTER_STATE = { details: null, lifecycle: null, cpiAdopt: null, testing: null, overview: null, pvi: null };
   document.getElementById("mainTabContent").classList.add("d-none");
   ["tab-overview","tab-details","tab-pvi","tab-testing"].forEach(function (id) {
     var pane = document.getElementById(id);

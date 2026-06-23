@@ -120,7 +120,7 @@ function transformData(rawRows) {
 
   var optedInKeys = new Set();
   rawRows.forEach(function (r) {
-    var key = String(r["CR Party ID"] || "") + String(r["Track"] || "");
+    var key = String(r["BE GEO ID"] || "") + String(r["CR Party ID"] || "") + String(r["Track"] || "");
     if (norm(r["Adopt Rebate Opt-In Status"]) === "OPTED IN") {
       optedInKeys.add(key);
     }
@@ -172,8 +172,8 @@ function transformData(rawRows) {
       r["Deal CPI Portfolio"] = fixedPortfolio;
     }
 
-    // Step 3: CRPartyID-Offer composite key
-    r["CRPartyID-Offer"] = String(r["CR Party ID"] || "") + String(r["Track"] || "");
+    // Step 3: CRPartyID-Offer composite key (partner-aware)
+    r["CRPartyID-Offer"] = String(r["BE GEO ID"] || "") + String(r["CR Party ID"] || "") + String(r["Track"] || "");
 
     // Strip trailing .0 from CX Customer BU ID (CSV numeric artifact)
     if (r["CX Customer BU ID"] !== undefined && r["CX Customer BU ID"] !== null) {
@@ -259,8 +259,8 @@ function transformData(rawRows) {
     var expiryMidnight = expiryDate ? new Date(expiryDate.getFullYear(), expiryDate.getMonth(), expiryDate.getDate()) : null;
     r["Expires <3M?"] = (expiryMidnight !== null && expiryMidnight >= today && expiryMidnight < in1Month) ? "Yes" : "No";
 
-    // Step 10: Offer opted-in?
-    r["Offer opted-in?"] = optedInKeys.has(r["CRPartyID-Offer"]);
+    // Step 10: Offer opted-in? (partner-aware key)
+    r["Offer opted-in?"] = optedInKeys.has(String(r["BE GEO ID"] || "") + String(r["CR Party ID"] || "") + String(r["Track"] || ""));
 
     // Step 11: Missed Incentives
     var bookDate  = r["Booking Date"];

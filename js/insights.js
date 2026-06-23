@@ -105,14 +105,27 @@ function renderTesting(data) {
   // ── Build HTML ─────────────────────────────────────────────────────────────
   var html = '<div class="p-3">';
 
-  // View switcher
-  html += '<ul class="nav nav-pills mb-4" id="testing-view-tabs">';
+  // Build BE GEO ID list for dropdown
+  var _insBeGeoIds = [];
+  data.forEach(function(r) { var v = String(r["BE GEO ID"] || "").trim(); if (v && _insBeGeoIds.indexOf(v) === -1) _insBeGeoIds.push(v); });
+  _insBeGeoIds.sort();
+  var _insGeoOpts = '<option value="">All BE GEO IDs</option>';
+  _insBeGeoIds.forEach(function(id) { _insGeoOpts += '<option value="' + id.replace(/"/g,'&quot;') + '">' + id + '</option>'; });
+
+  // View switcher + BE GEO ID dropdown (right-aligned)
+  html += '<div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-4">';
+  html += '<ul class="nav nav-pills mb-0" id="testing-view-tabs">';
   html += '<li class="nav-item"><button class="nav-link active" id="tab-btn-cpi"><i class="bi bi-graph-up-arrow me-1"></i>CPI Adopt</button></li>';
   var _newTag = new Date() < new Date('2026-06-29') ? '<span class="position-absolute text-danger fw-bold" style="top:1px;right:2px;font-size:0.5rem;line-height:1">NEW</span>' : '';
   html += '<li class="nav-item position-relative"><button class="nav-link" id="tab-btn-pareto"><i class="bi bi-bar-chart-steps me-1"></i>Customer Analysis</button>' + _newTag + '</li>';
   html += '<li class="nav-item position-relative"><button class="nav-link" id="tab-btn-uch"><i class="bi bi-heart-pulse me-1"></i>UC Health</button>' + _newTag + '</li>';
   html += '<li class="nav-item"><button class="nav-link" id="tab-btn-lifecycle"><i class="bi bi-bar-chart me-1"></i>Lifecycle</button></li>';
   html += '</ul>';
+  html += '<div class="d-flex align-items-center gap-2">';
+  html += '<label class="text-muted small mb-0 flex-shrink-0" for="insights-begeoid-sel">BE GEO ID</label>';
+  html += '<select id="insights-begeoid-sel" class="form-select form-select-sm" style="width:auto;font-size:0.85rem">' + _insGeoOpts + '</select>';
+  html += '</div>';
+  html += '</div>';
 
   // ── CPI Adopt sub-view ────────────────────────────────────────────────────
   html += '<div id="testing-view-cpi">';
@@ -225,11 +238,32 @@ function renderTesting(data) {
   // Always returns data respecting current APP_EXCL_ACTIVE state
   function getEffectiveData() {
     var base = (window.APP_DATA && window.APP_DATA.length) ? window.APP_DATA : data;
-    return (window.APP_EXCL_ACTIVE && window.getActiveData) ? window.getActiveData() : base;
+    var result = (window.APP_EXCL_ACTIVE && window.getActiveData) ? window.getActiveData() : base;
+    var geoSel = document.getElementById("insights-begeoid-sel");
+    var geo = geoSel ? geoSel.value : "";
+    if (geo) result = result.filter(function(r) { return String(r["BE GEO ID"] || "") === geo; });
+    return result;
   }
 
   // ── Exclude toggle button (shared across all subtabs) ─────────────────────
   var insightNavTabs = document.getElementById("testing-view-tabs");
+
+  // Wire BE GEO ID dropdown — re-renders the active subtab on change
+  var _insGeoSelEl = document.getElementById("insights-begeoid-sel");
+  if (_insGeoSelEl) {
+    _insGeoSelEl.addEventListener("change", function() {
+      if (window.APP_FILTER_STATE) {
+        var cur = window.APP_FILTER_STATE.testing || {};
+        window.APP_FILTER_STATE.testing = Object.assign({}, cur, { beGeoId: this.value });
+      }
+      // Re-render active subtab with filtered data
+      if (_activeSubView === "cpi")             renderCPIAdopt(getEffectiveData());
+      else if (_activeSubView === "pareto")     renderPareto();
+      else if (_activeSubView === "uch")        renderUCHDonut();
+      else if (_activeSubView === "lifecycle")  renderLifecycle(getEffectiveData());
+    });
+  }
+
   if (insightNavTabs) {
     var _insightAllWsIds = new Set((window.APP_DATA || data).map(function(r) { return String(r["Deal WS-ID"] || ""); }));
     var _insightExclCount = ANNOTATIONS.getExcludedWsIds().filter(function(id) { return _insightAllWsIds.has(id); }).length;
@@ -375,7 +409,8 @@ function renderTesting(data) {
       var _cur = window.APP_FILTER_STATE.testing || {};
       window.APP_FILTER_STATE.testing = { view: _cur.view || "pareto", portfolio: portfolioFilter, offer: offerFilter, topN: String(topN), mode: mode, csFrom: csFromIdx, csTo: csToIdx,
         optedInHidden: !!_cur.optedInHidden,
-        notOptedInHidden: !!_cur.notOptedInHidden };
+        notOptedInHidden: !!_cur.notOptedInHidden,
+        beGeoId: _cur.beGeoId || "" };
     }
 
     // KPIs
@@ -412,7 +447,10 @@ function renderTesting(data) {
 
     document.getElementById("pareto-deeplink").addEventListener("click", function(e) {
       e.preventDefault();
-      window.navigateToDetails(_deepLinkPreset);
+      var geoEl = document.getElementById("insights-begeoid-sel");
+      var geo = geoEl ? geoEl.value : "";
+      var preset = geo ? Object.assign({}, _deepLinkPreset, { beGeoId: geo }) : _deepLinkPreset;
+      window.navigateToDetails(preset);
     });
 
     // Chart — stacked bars (one dataset per deal rank)
@@ -952,7 +990,13 @@ function renderTesting(data) {
         kh += '<a href="#" id="uch-deeplink" class="small"><i class="bi bi-box-arrow-up-right me-1"></i>Open in Details tab</a>';
         kpiArea.innerHTML = kh;
         var dlLink = document.getElementById("uch-deeplink");
-        if (dlLink) dlLink.addEventListener("click", function(e) { e.preventDefault(); window.navigateToDetails(uchPreset); });
+        if (dlLink) dlLink.addEventListener("click", function(e) {
+          e.preventDefault();
+          var geoEl = document.getElementById("insights-begeoid-sel");
+          var geo = geoEl ? geoEl.value : "";
+          var preset = geo ? Object.assign({}, uchPreset, { beGeoId: geo }) : uchPreset;
+          window.navigateToDetails(preset);
+        });
       }
     }
 
@@ -1147,12 +1191,7 @@ function renderTesting(data) {
     uchRenderStep(1);
   });
   uchUpdateBreadcrumb();
-  renderUCHDonut();
-  if (_uchState.portfolio) {
-    var _restoreStep = _uchState.uc ? 2 : (_uchState.offer ? 2 : 1);
-    uchRenderStep(_restoreStep);
-    if (_uchState.uc) renderUCHealth();
-  }
+  // renderUCHDonut + _uchState restore is called after GEO restore below, so it picks up the correct filter
 
   // Pareto slicer events
   document.getElementById("pareto-mode").addEventListener("change", renderPareto);
@@ -1175,13 +1214,24 @@ function renderTesting(data) {
     showSubView("pareto");
     renderPareto();
   });
-  document.getElementById("tab-btn-uch").addEventListener("click", function() { showSubView("uch"); });
+  document.getElementById("tab-btn-uch").addEventListener("click", function() { showSubView("uch"); renderUCHDonut(); });
   document.getElementById("tab-btn-lifecycle").addEventListener("click", function() {
     showSubView("lifecycle");
     renderLifecycle(getEffectiveData());
   });
 
   // Restore active sub-view (or default to CPI Adopt)
+  // Restore BE GEO ID first so getEffectiveData() is correctly filtered for initial render
+  if (_saved && _saved.beGeoId && _insGeoSelEl) _insGeoSelEl.value = _saved.beGeoId;
+
+  // Always initialize UCH donut (canvas exists in DOM regardless of active view)
+  renderUCHDonut();
+  if (_uchState.portfolio) {
+    var _restoreStep = _uchState.uc ? 2 : (_uchState.offer ? 2 : 1);
+    uchRenderStep(_restoreStep);
+    if (_uchState.uc) renderUCHealth();
+  }
+
   var savedView = _saved && _saved.view;
   if (savedView === "pareto") {
     showSubView("pareto");

@@ -242,39 +242,43 @@ function renderOverview(data) {
       function forUC(ucRows) {
         var colE_ids = new Set();
         ucRows.forEach(function (r) {
-          if (!r["Offer opted-in?"] && norm(r["Stage"]) === "ELIGIBLE") colE_ids.add(r["CR Party ID"]);
+          if (!r["Offer opted-in?"] && norm(r["Stage"]) === "ELIGIBLE") colE_ids.add(r["CR Party ID"] + "|" + r["BE GEO ID"]);
         });
         var colE = colE_ids.size;
 
         var colF = dedupeSum(ucRows.filter(function (r) { return !r["Offer opted-in?"] && norm(r["Stage"]) === "ELIGIBLE"; }), "Potential Incentives");
 
         var colG_ids = new Set();
-        ucRows.forEach(function (r) { if (r["UC 25-50% eligible w/o opt-in"]) colG_ids.add(r["CR Party ID"]); });
+        ucRows.forEach(function (r) { if (r["UC 25-50% eligible w/o opt-in"]) colG_ids.add(r["CR Party ID"] + "|" + r["BE GEO ID"]); });
         var colG = colG_ids.size;
 
         var colH = dedupeSum(ucRows.filter(function (r) { return r["UC 25-50% eligible w/o opt-in"]; }), "Potential Incentives");
 
         var colI_ids = new Set();
-        ucRows.forEach(function (r) { if (r["UC 75% eligible w/o opt-in"]) colI_ids.add(r["CR Party ID"]); });
+        ucRows.forEach(function (r) { if (r["UC 75% eligible w/o opt-in"]) colI_ids.add(r["CR Party ID"] + "|" + r["BE GEO ID"]); });
         var colI = colI_ids.size;
 
         var colJ = dedupeSum(ucRows.filter(function (r) { return r["UC 75% eligible w/o opt-in"]; }), "Missed Incentives");
         var colK = dedupeSum(ucRows.filter(function (r) { return r["UC 75% eligible w/o opt-in"]; }), "Potential Incentives");
 
         var colL_ids = new Set();
-        ucRows.forEach(function (r) { if (r["UC progressed and missed w/o opt-in"]) colL_ids.add(r["CR Party ID"]); });
+        ucRows.forEach(function (r) { if (r["UC progressed and missed w/o opt-in"]) colL_ids.add(r["CR Party ID"] + "|" + r["BE GEO ID"]); });
         var colL = colL_ids.size;
 
         var colM = dedupeSum(ucRows.filter(function (r) { return r["UC progressed and missed w/o opt-in"]; }), "Missed Incentives");
 
-        var colN = ucRows.filter(function (r) { return norm(r["Adopt Rebate Opt-In Status"]) === "OPTED IN" && norm(r["Stage"]) === "ELIGIBLE"; }).length;
+        var colN_ids = new Set();
+        ucRows.forEach(function (r) { if (norm(r["Adopt Rebate Opt-In Status"]) === "OPTED IN" && norm(r["Stage"]) === "ELIGIBLE") colN_ids.add(r["CR Party ID"] + "|" + r["BE GEO ID"]); });
+        var colN = colN_ids.size;
 
         var colO = 0;
         ucRows.forEach(function (r) {
           if (norm(r["Adopt Rebate Opt-In Status"]) === "OPTED IN" && norm(r["Stage"]) === "ELIGIBLE") colO += (r["Potential Incentives"] || 0);
         });
 
-        var colP = ucRows.filter(function (r) { return r["Earned?"] === true; }).length;
+        var colP_ids = new Set();
+        ucRows.forEach(function (r) { if (r["Earned?"] === true) colP_ids.add(r["CR Party ID"] + "|" + r["BE GEO ID"]); });
+        var colP = colP_ids.size;
 
         var colQ = 0;
         ucRows.forEach(function (r) { colQ += (r["Estimated Earned Incentives"] || 0); });
@@ -287,7 +291,7 @@ function renderOverview(data) {
     function dedupeSum(rows, field) {
       var map = {};
       rows.forEach(function (r) {
-        var key = r["CRPartyID-Offer"] || "";
+        var key = (r["CRPartyID-Offer"] || "") + "|" + (r["BE GEO ID"] || "");
         var v   = r[field] || 0;
         if (map[key] === undefined || v > map[key]) map[key] = v;
       });
@@ -421,14 +425,15 @@ function renderOverview(data) {
     tbody += "</tbody>";
 
     // Totals row aligned with columns — shown in tfoot
-    var totalN = 0, totalO = 0, totalQ = 0;
+    var totalN_ids = new Set(), totalO = 0, totalQ = 0;
     fd.forEach(function (r) {
       if (norm(r["Adopt Rebate Opt-In Status"]) === "OPTED IN" && norm(r["Stage"]) === "ELIGIBLE") {
-        totalN++;
+        totalN_ids.add(r["CR Party ID"] + "|" + r["BE GEO ID"]);
         totalO += (r["Potential Incentives"] || 0);
       }
       totalQ += (r["Estimated Earned Incentives"] || 0);
     });
+    var totalN = totalN_ids.size;
     var totalsRow = '<tr class="table-active fw-semibold"><td>Totals</td>';
     cols.forEach(function (c) {
       if (c === "N") totalsRow += '<td class="text-end ' + colGroup[c] + '-cell">' + fmtCount(totalN) + '</td>';
@@ -553,28 +558,30 @@ function renderOverview(data) {
 
         function calcRow(rows) {
           var colE_ids = new Set();
-          rows.forEach(function(r){ if (!r["Offer opted-in?"] && (r["Stage"]||"").toUpperCase()==="ELIGIBLE") colE_ids.add(r["CR Party ID"]); });
+          rows.forEach(function(r){ if (!r["Offer opted-in?"] && (r["Stage"]||"").toUpperCase()==="ELIGIBLE") colE_ids.add(r["CR Party ID"] + "|" + r["BE GEO ID"]); });
           var colE = colE_ids.size;
           var colF = dedupeSum(rows.filter(function(r){ return !r["Offer opted-in?"] && (r["Stage"]||"").toUpperCase()==="ELIGIBLE"; }), "Potential Incentives");
-          var colG_ids = new Set(); rows.forEach(function(r){ if(r["UC 25-50% eligible w/o opt-in"]) colG_ids.add(r["CR Party ID"]); });
+          var colG_ids = new Set(); rows.forEach(function(r){ if(r["UC 25-50% eligible w/o opt-in"]) colG_ids.add(r["CR Party ID"] + "|" + r["BE GEO ID"]); });
           var colG = colG_ids.size;
           var colH = dedupeSum(rows.filter(function(r){ return r["UC 25-50% eligible w/o opt-in"]; }), "Potential Incentives");
-          var colI_ids = new Set(); rows.forEach(function(r){ if(r["UC 75% eligible w/o opt-in"]) colI_ids.add(r["CR Party ID"]); });
+          var colI_ids = new Set(); rows.forEach(function(r){ if(r["UC 75% eligible w/o opt-in"]) colI_ids.add(r["CR Party ID"] + "|" + r["BE GEO ID"]); });
           var colI = colI_ids.size;
           var colJ = dedupeSum(rows.filter(function(r){ return r["UC 75% eligible w/o opt-in"]; }), "Missed Incentives");
           var colK = dedupeSum(rows.filter(function(r){ return r["UC 75% eligible w/o opt-in"]; }), "Potential Incentives");
-          var colL_ids = new Set(); rows.forEach(function(r){ if(r["UC progressed and missed w/o opt-in"]) colL_ids.add(r["CR Party ID"]); });
+          var colL_ids = new Set(); rows.forEach(function(r){ if(r["UC progressed and missed w/o opt-in"]) colL_ids.add(r["CR Party ID"] + "|" + r["BE GEO ID"]); });
           var colL = colL_ids.size;
           var colM = dedupeSum(rows.filter(function(r){ return r["UC progressed and missed w/o opt-in"]; }), "Missed Incentives");
-          var colN = rows.filter(function(r){ return (r["Adopt Rebate Opt-In Status"]||"").toUpperCase()==="OPTED IN" && (r["Stage"]||"").toUpperCase()==="ELIGIBLE"; }).length;
+          var colN_ids = new Set(); rows.forEach(function(r){ if((r["Adopt Rebate Opt-In Status"]||"").toUpperCase()==="OPTED IN" && (r["Stage"]||"").toUpperCase()==="ELIGIBLE") colN_ids.add(r["CR Party ID"] + "|" + r["BE GEO ID"]); });
+          var colN = colN_ids.size;
           var colO = 0; rows.forEach(function(r){ if((r["Adopt Rebate Opt-In Status"]||"").toUpperCase()==="OPTED IN" && (r["Stage"]||"").toUpperCase()==="ELIGIBLE") colO+=(r["Potential Incentives"]||0); });
-          var colP = rows.filter(function(r){ return r["Earned?"]===true; }).length;
+          var colP_ids = new Set(); rows.forEach(function(r){ if(r["Earned?"]===true) colP_ids.add(r["CR Party ID"] + "|" + r["BE GEO ID"]); });
+          var colP = colP_ids.size;
           var colQ = 0; rows.forEach(function(r){ colQ+=(r["Estimated Earned Incentives"]||0); });
           return [colE,colF,colG,colH,colI,colJ,colK,colL,colM,colN,colO,colQ];
         }
         function dedupeSum(rows, field) {
           var map = {};
-          rows.forEach(function(r){ var k=r["CRPartyID-Offer"]||"", v=r[field]||0; if(map[k]===undefined||v>map[k]) map[k]=v; });
+          rows.forEach(function(r){ var k=(r["CRPartyID-Offer"]||"") + "|" + (r["BE GEO ID"]||""), v=r[field]||0; if(map[k]===undefined||v>map[k]) map[k]=v; });
           var t=0; Object.keys(map).forEach(function(k){ t+=map[k]; }); return t;
         }
 
@@ -606,11 +613,12 @@ function renderOverview(data) {
         });
 
         // Totals row
-        var totalN=0, totalO=0, totalQ=0;
+        var totalN_ids = new Set(), totalO=0, totalQ=0;
         fd.forEach(function(r){
-          if((r["Adopt Rebate Opt-In Status"]||"").toUpperCase()==="OPTED IN" && (r["Stage"]||"").toUpperCase()==="ELIGIBLE"){ totalN++; totalO+=(r["Potential Incentives"]||0); }
+          if((r["Adopt Rebate Opt-In Status"]||"").toUpperCase()==="OPTED IN" && (r["Stage"]||"").toUpperCase()==="ELIGIBLE"){ totalN_ids.add(r["CR Party ID"] + "|" + r["BE GEO ID"]); totalO+=(r["Potential Incentives"]||0); }
           totalQ+=(r["Estimated Earned Incentives"]||0);
         });
+        var totalN = totalN_ids.size;
         var totalsVals = cols.map(function(c){ if(c==="N") return totalN; if(c==="O") return totalO; if(c==="Q") return totalQ; return ""; });
         sheetData.push(["Totals"].concat(totalsVals));
         rowMeta.push("totals");
