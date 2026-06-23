@@ -69,9 +69,10 @@ var IDB = (function () {
       return new Promise(function (resolve, reject) {
         var tx    = db.transaction(STORE, "readwrite");
         var store = tx.objectStore(STORE);
-        var req   = store.put({ type: type, data: data, meta: meta });
-        req.onsuccess = resolve;
-        req.onerror   = function (e) { reject(e.target.error); };
+        store.put({ type: type, data: data, meta: meta });
+        tx.oncomplete = resolve;
+        tx.onerror    = function (e) { _lsRemoveMeta(type); reject(e.target.error); };
+        tx.onabort    = function (e) { _lsRemoveMeta(type); reject(tx.error || new Error("IDB transaction aborted")); };
       });
     });
   }

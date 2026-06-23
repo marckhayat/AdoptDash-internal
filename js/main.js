@@ -13,7 +13,7 @@ window.addEventListener("unhandledrejection", function (e) {
 // Store file metadata globally so tabs can access it
 var APP_DATA = null;
 var APP_FILE_META = null;
-var APP_FILTER_STATE = { details: null, lifecycle: null, cpiAdopt: null, customer: null, testing: null };
+var APP_FILTER_STATE = { details: null, lifecycle: null, cpiAdopt: null, customer: null, testing: null, overview: null, pvi: null, compare: null };
 var APP_IS_DISTI = false;
 var APP_MULTI_SESSIONS = null; // { sessions: [...], fileMeta: {...} }
 var APP_EXCL_ACTIVE = false;   // when true, excluded deals are removed from overview/pvi/insights calculations
@@ -480,7 +480,16 @@ function finishLoad(filename, rowCount, headerAutoDetected, idbType, loadedAt, f
       hasFileHandle:    !!_pendingHandle,
       scopeType:        APP_FILE_META && APP_FILE_META._scopeType  ? APP_FILE_META._scopeType  : "region",
       scopeLabel:       APP_FILE_META && APP_FILE_META._scopeLabel ? APP_FILE_META._scopeLabel : ""
-    }).catch(function (e) { console.warn("IDB save failed:", e); });
+    }).catch(function (e) {
+      console.warn("IDB save failed (dataset too large for browser cache):", e);
+      // Keep the session metadata — Resume will reload from file handle instead.
+      // Only remove the card if there's no file handle to fall back on.
+      if (!_pendingHandle) {
+        IDB.remove(idbType);
+        setTimeout(function() { alert("This dataset is too large to cache and no file handle is available.\nPlease re-upload the file each time."); }, 200);
+      }
+      // else: session card stays, Resume auto-reloads from file handle silently
+    });
     if (_pendingHandle) {
       IDB.saveHandle(idbType, _pendingHandle).catch(function(e) { console.warn("Handle save failed:", e); });
     }
@@ -531,11 +540,12 @@ function restoreUploadSection(cachedEntries) {
 
   function resumeCard(entry) {
     var key = entry.type; // e.g. "cpi-EMEA", "cpi-EMEA-th:Southern Europe", "cpi-EMEA-co:France"
-    var region = key.replace(/^cpi-/, "").replace(/-(th|co):.*$/, "");
+    var region = key.replace(/^cpi-/, "").replace(/-(th|co|bgeo):.*$/, "");
     var scopeType  = entry.meta.scopeType  || "region";
     var scopeLabel = entry.meta.scopeLabel || "";
     var scopeStr = scopeType === "theater" ? "Theater: " + scopeLabel
                  : scopeType === "country" ? "Country: " + scopeLabel
+                 : scopeType === "begeoid" ? "BE GEO IDs: " + scopeLabel
                  : "Whole Region";
     var html = '<div class="col-6"><div class="card border-warning mb-2 p-2">';
     html += '<div class="d-flex justify-content-between align-items-start gap-2">';
@@ -641,11 +651,26 @@ function restoreUploadSection(cachedEntries) {
       var type = this.dataset.idbtype;
       showLoader("Loading from cache…");
       IDB.load(type).then(function (entry) {
-        if (!entry || !entry.data) { IDB.loadAllMeta().then(function(e){restoreUploadSection(e);}); alert("Cache not found."); return; }
-        APP_DATA = entry.data;
-        APP_FILE_META = { name: entry.meta.filename, lastModified: entry.meta.fileLastModified ? new Date(entry.meta.fileLastModified) : null, cachedAt: entry.meta.loadedAt ? new Date(entry.meta.loadedAt) : null, _scopeType: entry.meta.scopeType || "region", _scopeLabel: entry.meta.scopeLabel || "" };
-        window.APP_IS_DISTI = !!entry.meta.isDisti;
-        finishLoad(entry.meta.filename, entry.meta.rowCount, false, type, entry.meta.loadedAt, true);
+        if (entry && entry.data) {
+          // Cache hit — load normally
+          APP_DATA = entry.data;
+          APP_FILE_META = { name: entry.meta.filename, lastModified: entry.meta.fileLastModified ? new Date(entry.meta.fileLastModified) : null, cachedAt: entry.meta.loadedAt ? new Date(entry.meta.loadedAt) : null, _scopeType: entry.meta.scopeType || "region", _scopeLabel: entry.meta.scopeLabel || "" };
+          window.APP_IS_DISTI = !!entry.meta.isDisti;
+          finishLoad(entry.meta.filename, entry.meta.rowCount, false, type, entry.meta.loadedAt, true);
+        } else {
+          // Cache miss — try to reload from file handle
+          IDB.loadHandle(type).then(function(handle) {
+            if (handle) {
+              refreshFromHandle(type, false).catch(function() {
+                IDB.loadAllMeta().then(function(e){ restoreUploadSection(e); });
+              });
+            } else {
+              IDB.remove(type);
+              IDB.loadAllMeta().then(function(e){ restoreUploadSection(e); });
+              alert("Cache not found and no file handle available. Please re-upload the file.");
+            }
+          });
+        }
       }).catch(function (e) { IDB.loadAllMeta().then(function(en){restoreUploadSection(en);}); alert("Error loading cache: " + e); });
     });
   });
@@ -843,6 +868,16 @@ function showDrillDownPicker(rawRows, onConfirm) {
       return '<option value="' + t + '">' + t + ' (' + n + ' countr' + (n === 1 ? 'y' : 'ies') + ')</option>';
     }).join('');
 
+    // Build unique BE GEO IDs list
+    var beGeoIds = [];
+    rawRows.forEach(function(r) { var v = String(r["BE GEO ID"] || "").trim(); if (v && beGeoIds.indexOf(v) === -1) beGeoIds.push(v); });
+    beGeoIds.sort();
+    var beGeoCheckboxes = beGeoIds.map(function(id) {
+      return '<div class="form-check form-check-sm mb-1">' +
+        '<input class="form-check-input" type="checkbox" name="begeoid-cb" id="bgcb-' + id.replace(/\W/g,'_') + '" value="' + id.replace(/"/g,'&quot;') + '">' +
+        '<label class="form-check-label small" for="bgcb-' + id.replace(/\W/g,'_') + '">' + id + '</label></div>';
+    }).join('');
+
     sec.innerHTML =
       '<div class="upload-card mx-auto my-5">' +
       '<div class="card shadow-sm border-warning">' +
@@ -878,6 +913,26 @@ function showDrillDownPicker(rawRows, onConfirm) {
         '<select id="scope-country-sel" class="form-select form-select-sm"></select>' +
       '</div>' +
 
+      // Custom BE GEO IDs
+      (beGeoIds.length > 0 ?
+        '<div class="form-check mb-2">' +
+          '<input class="form-check-input" type="radio" name="scope-level" id="scope-begeoid" value="begeoid">' +
+          '<label class="form-check-label" for="scope-begeoid"><strong>Custom BE GEO IDs</strong> <span class="text-muted small">— ' + beGeoIds.length + ' available</span></label>' +
+        '</div>' +
+        '<div id="begeoid-picker-wrap" class="ms-4 mb-3 d-none" style="max-width:420px">' +
+          '<input type="text" id="begeoid-search" class="form-control form-control-sm mb-2" placeholder="&#128269; Search IDs...">' +
+          '<div id="begeoid-cb-list" style="max-height:180px;overflow-y:auto;border:1px solid #dee2e6;border-radius:4px;padding:6px 10px">' +
+            beGeoCheckboxes +
+          '</div>' +
+          '<div id="begeoid-pills" class="d-flex flex-wrap gap-1 mt-2" style="min-height:0"></div>' +
+          '<div class="mt-1 d-flex gap-3">' +
+            '<a href="#" id="begeoid-select-all" class="small">Select all</a>' +
+            '<a href="#" id="begeoid-clear-all" class="small text-muted">Clear all</a>' +
+            '<span id="begeoid-selected-count" class="small text-muted ms-auto"></span>' +
+          '</div>' +
+        '</div>'
+      : '') +
+
       '<div class="mt-3">' +
         '<button id="scope-confirm-btn" class="btn btn-warning px-4"><i class="bi bi-play-fill me-2"></i>Continue</button>' +
       '</div>' +
@@ -910,6 +965,8 @@ function showDrillDownPicker(rawRows, onConfirm) {
       theaterRadio.addEventListener("change", function() {
         document.getElementById("theater-dropdown-wrap").classList.remove("d-none");
         document.getElementById("country-dropdown-wrap").classList.add("d-none");
+        var bw = document.getElementById("begeoid-picker-wrap");
+        if (bw) bw.classList.add("d-none");
         var theater = getSelectedTheater();
         if (theater) refreshCountryDropdown(theater);
       });
@@ -936,6 +993,8 @@ function showDrillDownPicker(rawRows, onConfirm) {
         if (!this.disabled) {
           document.getElementById("theater-dropdown-wrap").classList.remove("d-none");
           document.getElementById("country-dropdown-wrap").classList.remove("d-none");
+          var bw = document.getElementById("begeoid-picker-wrap");
+          if (bw) bw.classList.add("d-none");
         }
       });
     }
@@ -946,9 +1005,83 @@ function showDrillDownPicker(rawRows, onConfirm) {
       regionRadio.addEventListener("change", function() {
         var tw = document.getElementById("theater-dropdown-wrap");
         var cw = document.getElementById("country-dropdown-wrap");
+        var bw = document.getElementById("begeoid-picker-wrap");
         if (tw) tw.classList.add("d-none");
         if (cw) cw.classList.add("d-none");
+        if (bw) bw.classList.add("d-none");
       });
+    }
+
+    // Wire BE GEO ID radio
+    var beGeoRadio = document.getElementById("scope-begeoid");
+    if (beGeoRadio) {
+      beGeoRadio.addEventListener("change", function() {
+        var tw = document.getElementById("theater-dropdown-wrap");
+        var cw = document.getElementById("country-dropdown-wrap");
+        var bw = document.getElementById("begeoid-picker-wrap");
+        if (tw) tw.classList.add("d-none");
+        if (cw) cw.classList.add("d-none");
+        if (bw) bw.classList.remove("d-none");
+        document.getElementById("begeoid-search").focus();
+      });
+    }
+
+    // Wire BE GEO ID search + select/clear all
+    function updateBeGeoCount() {
+      var countEl = document.getElementById("begeoid-selected-count");
+      var pillsEl = document.getElementById("begeoid-pills");
+      var checked = Array.prototype.map.call(
+        document.querySelectorAll('#begeoid-cb-list input[type=checkbox]:checked'),
+        function(cb) { return cb.value; }
+      );
+      if (countEl) countEl.textContent = checked.length > 0 ? checked.length + " selected" : "";
+      if (pillsEl) {
+        pillsEl.innerHTML = checked.map(function(id) {
+          return '<span class="badge rounded-pill d-inline-flex align-items-center gap-1" style="background:#0d6efd;font-size:0.75rem;font-weight:500">' +
+            id.replace(/</g,'&lt;') +
+            '<button type="button" data-geo="' + id.replace(/"/g,'&quot;') + '" style="background:none;border:none;color:#fff;padding:0;font-size:0.7rem;line-height:1;cursor:pointer;margin-left:2px" aria-label="Remove">&times;</button>' +
+          '</span>';
+        }).join('');
+        pillsEl.querySelectorAll('button[data-geo]').forEach(function(btn) {
+          btn.addEventListener("click", function() {
+            var geo = this.dataset.geo;
+            var cb = document.querySelector('#begeoid-cb-list input[value="' + geo.replace(/"/g,'\\"') + '"]');
+            if (cb) { cb.checked = false; updateBeGeoCount(); }
+          });
+        });
+      }
+    }
+    var beGeoSearch = document.getElementById("begeoid-search");
+    if (beGeoSearch) {
+      beGeoSearch.addEventListener("input", function() {
+        var q = this.value.trim().toLowerCase();
+        document.querySelectorAll('#begeoid-cb-list .form-check').forEach(function(row) {
+          var lbl = row.querySelector('label');
+          row.style.display = (!q || (lbl && lbl.textContent.toLowerCase().indexOf(q) !== -1)) ? "" : "none";
+        });
+      });
+    }
+    var selectAllBtn = document.getElementById("begeoid-select-all");
+    if (selectAllBtn) {
+      selectAllBtn.addEventListener("click", function(e) {
+        e.preventDefault();
+        document.querySelectorAll('#begeoid-cb-list .form-check').forEach(function(row) {
+          if (row.style.display !== "none") row.querySelector('input[type=checkbox]').checked = true;
+        });
+        updateBeGeoCount();
+      });
+    }
+    var clearAllBtn = document.getElementById("begeoid-clear-all");
+    if (clearAllBtn) {
+      clearAllBtn.addEventListener("click", function(e) {
+        e.preventDefault();
+        document.querySelectorAll('#begeoid-cb-list input[type=checkbox]').forEach(function(cb) { cb.checked = false; });
+        updateBeGeoCount();
+      });
+    }
+    var cbList = document.getElementById("begeoid-cb-list");
+    if (cbList) {
+      cbList.addEventListener("change", updateBeGeoCount);
     }
 
     document.getElementById("scope-confirm-btn").addEventListener("click", function() {
@@ -963,6 +1096,11 @@ function showDrillDownPicker(rawRows, onConfirm) {
         var country = document.getElementById("scope-country-sel").value;
         filteredRows = rawRows.filter(function(r) { return String(r["Partner Country"] || "").trim() === country; });
         scopeLabel = country;
+      } else if (level === "begeoid") {
+        var selectedGeos = Array.prototype.map.call(document.querySelectorAll('#begeoid-picker-wrap input[type=checkbox]:checked'), function(cb) { return cb.value; });
+        if (selectedGeos.length === 0) { alert("Please select at least one BE GEO ID."); return; }
+        filteredRows = rawRows.filter(function(r) { return selectedGeos.indexOf(String(r["BE GEO ID"] || "").trim()) !== -1; });
+        scopeLabel = selectedGeos.join(",");
       }
       showLoader("Processing " + filteredRows.length.toLocaleString() + " rows\u2026");
       setTimeout(function() { onConfirm(filteredRows, level, scopeLabel); }, 0);
@@ -1009,7 +1147,11 @@ function processCpiFile(file, region, week) {
           showDrillDownPicker(results.data, function(filteredRows, scopeType, scopeLabel) {
             try {
               // Build a unique key per region+scope so sessions don't overwrite each other
-              var scopeSlug = scopeType === "region" ? "" : (scopeType === "theater" ? "-th:" : "-co:") + scopeLabel;
+              var scopeSlug = scopeType === "region"   ? ""
+                            : scopeType === "theater"  ? "-th:" + scopeLabel
+                            : scopeType === "country"  ? "-co:" + scopeLabel
+                            : scopeType === "begeoid"  ? "-bgeo:" + scopeLabel.replace(/,/g, "_")
+                            : "";
               var idbKey = "cpi-" + region + scopeSlug;
               APP_DATA = transformData(filteredRows);
               APP_IS_DISTI = rawIsDisti;
@@ -1132,6 +1274,9 @@ function refreshCpiFromHandle(file, idbKey, scopeType, scopeLabel, cacheOnly) {
               rows = results.data.filter(function(r) { return String(r["Theater"] || "").trim() === scopeLabel; });
             } else if (scopeType === "country" && scopeLabel) {
               rows = results.data.filter(function(r) { return String(r["Partner Country"] || "").trim() === scopeLabel; });
+            } else if (scopeType === "begeoid" && scopeLabel) {
+              var _bgGeos = scopeLabel.split(",");
+              rows = results.data.filter(function(r) { return _bgGeos.indexOf(String(r["BE GEO ID"] || "").trim()) !== -1; });
             }
 
             var _handle = PENDING_FILE_HANDLE;
@@ -1203,6 +1348,7 @@ function renderActiveTab(target) {
     case "#tab-details":   renderDetails(APP_DATA);          break;  // details always shows all rows (dimmed)
     case "#tab-pvi":       renderPVI(getActiveData());       break;
     case "#tab-testing":   renderInsights(getActiveData());  break;
+    case "#tab-compare":   renderCompare(getActiveData());   break;
   }
 }
 
@@ -1222,9 +1368,9 @@ function resetApp() {
   // Clear all tab panes and hide tab content until data is loaded
   APP_DATA = null;
   window.APP_DATA = null;
-  APP_FILTER_STATE = { details: null, lifecycle: null, cpiAdopt: null, testing: null, overview: null, pvi: null };
+  APP_FILTER_STATE = { details: null, lifecycle: null, cpiAdopt: null, testing: null, overview: null, pvi: null, compare: null };
   document.getElementById("mainTabContent").classList.add("d-none");
-  ["tab-overview","tab-details","tab-pvi","tab-testing"].forEach(function (id) {
+  ["tab-overview","tab-details","tab-pvi","tab-testing","tab-compare"].forEach(function (id) {
     var pane = document.getElementById(id);
     if (pane) pane.innerHTML = "";
   });

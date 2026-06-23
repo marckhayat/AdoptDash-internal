@@ -49,12 +49,17 @@
           <i class="bi bi-speedometer2 me-1"></i>PVI
         </button>
       </li>
-      <li class="nav-item position-relative" role="presentation">
+      <li class="nav-item" role="presentation">
         <button class="nav-link" id="tab-testing-btn" data-bs-toggle="tab"
           data-bs-target="#tab-testing" type="button" role="tab">
           <i class="bi bi-lightbulb me-1"></i>Insights
         </button>
-        <span id="stats-new-tag" class="position-absolute text-danger fw-bold" style="top:1px;right:2px;font-size:0.5rem;line-height:1">NEW</span>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="tab-compare-btn" data-bs-toggle="tab"
+          data-bs-target="#tab-compare" type="button" role="tab">
+          <i class="bi bi-trophy me-1"></i>Leaderboard
+        </button>
       </li>
     </ul>
   </div>
@@ -74,6 +79,7 @@
       <div class="tab-pane fade" id="tab-details"   role="tabpanel"></div>
       <div class="tab-pane fade" id="tab-pvi"       role="tabpanel"></div>
       <div class="tab-pane fade" id="tab-testing"  role="tabpanel"></div>
+      <div class="tab-pane fade" id="tab-compare"  role="tabpanel"></div>
     </div>
 
   </div><!-- /container-fluid -->
@@ -98,6 +104,7 @@
   <script src="js/lifecycle.js"></script>
   <script src="js/cpi-adopt.js"></script>
   <script src="js/insights.js"></script>
+  <script src="js/compare.js"></script>
   <script src="js/main.js"></script>
 <footer class="border-top mt-4 bg-light">
   <!-- Disclaimer + version -->
@@ -112,7 +119,5 @@
     </div>
   </div>
 </footer>
-
-<script>if (new Date() >= new Date('2026-06-29')) { var _nt = document.getElementById('stats-new-tag'); if (_nt) _nt.remove(); }</script>
 </body>
 </html>
