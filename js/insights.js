@@ -314,15 +314,23 @@ function renderTesting(data) {
       dealCounts[dim] = (dealCounts[dim] || 0) + 1;
       if (!dimNames[dim])    dimNames[dim]    = {};
       if (!dealValueMap[dim]) dealValueMap[dim] = {};
-      dimNames[dim][name] = (dimNames[dim][name] || 0) + 1;
+      if (!dimNames[dim][name]) dimNames[dim][name] = { count: 0, value: 0 };
+      dimNames[dim][name].count += 1;
+      dimNames[dim][name].value += val;
       dealValueMap[dim][key] = { value: (dealValueMap[dim][key] ? dealValueMap[dim][key].value : 0) + val, optedIn: optedIn };
     });
 
-    // Build primary label (most frequent name) and full name list per dim
+    // Build primary label and full name list per dim.
+    // Priority: 1) highest total potential incentives, 2) highest deal count, 3) alphabetical.
     function primaryLabel(dim) {
       if (isDisti) return dim;
-      var counts = dimNames[dim] || {};
-      return Object.keys(counts).sort(function(a,b){ return counts[b]-counts[a]; })[0] || dim;
+      var names = dimNames[dim] || {};
+      return Object.keys(names).sort(function(a, b) {
+        var na = names[a], nb = names[b];
+        if (nb.value !== na.value) return nb.value - na.value;
+        if (nb.count !== na.count) return nb.count - na.count;
+        return a.localeCompare(b);
+      })[0] || dim;
     }
     function allNames(dim) {
       if (isDisti) return [dim];
@@ -580,7 +588,7 @@ function renderTesting(data) {
                 var entry = top[ctx.dataIndex];
                 var deals = entry ? entry.deals : 0;
                 var names = entry ? entry.names : [];
-                var lines = [" Total: " + fmtCurrency(entry ? entry.value : 0), " WS deals: " + deals];
+                var lines = [" Total: " + fmtCurrency(entry ? entry.value : 0), " WS deals: " + deals + (entry ? " (CX BU " + entry.id + ")" : "")];
                 if (names.length > 1) {
                   lines.push(" ─ Names:");
                   names.forEach(function(n){ lines.push("   · " + n); });
