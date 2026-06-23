@@ -503,8 +503,12 @@ function finishLoad(filename, rowCount, headerAutoDetected, idbType, loadedAt, f
   dateEl.textContent = "";
 
   var activeTab = document.querySelector(".nav-link.active[data-bs-target]");
+  var _activeTarget = activeTab ? activeTab.dataset.bsTarget : "#tab-overview";
   ANNOTATIONS.load().then(function () {
-    renderActiveTab(activeTab ? activeTab.dataset.bsTarget : "#tab-overview");
+    renderActiveTab(_activeTarget);
+  }).catch(function (err) {
+    console.warn("[AdoptDash] ANNOTATIONS.load() failed, rendering anyway:", err);
+    renderActiveTab(_activeTarget);
   });
   // Always reset first so no dismissed state bleeds from a previous session
   window._dismissedNotifs = {};
