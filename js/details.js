@@ -728,6 +728,9 @@ function renderDetails(data) {
     annotationsCache = cache;
     rebuildTagFilterUI();
     applyFiltersAndRender();
+  }).catch(function (err) {
+    console.warn("[AdoptDash] ANNOTATIONS.load() failed in Details, rendering anyway:", err);
+    applyFiltersAndRender();
   });
 
   function _restoreDetailsState(st) {
