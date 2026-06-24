@@ -154,7 +154,7 @@ function renderOverview(data) {
 
     var exportBtn = document.createElement("button");
     exportBtn.id = "ovw-export-btn";
-    exportBtn.className = "btn btn-sm btn-outline-success";
+    exportBtn.className = "btn btn-sm btn-outline-success ms-auto";
     exportBtn.innerHTML = '<i class="bi bi-file-earmark-excel me-1"></i>Export to Excel';
     exportBtn.style.cssText = "font-size:0.82rem";
     exportBtn.addEventListener("click", exportOverviewToXlsx);

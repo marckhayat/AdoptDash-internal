@@ -21,12 +21,12 @@ function renderCompare(data) {
 
   var PORTFOLIO_ORDER  = ["Networking", "Security", "Cloud + AI Infrastructure", "Collaboration"];
   var PORTFOLIO_COLORS = {
-    "Networking":                "rgba(0, 114, 198, 0.80)",
-    "Security":                  "rgba(220, 53, 69, 0.80)",
-    "Cloud + AI Infrastructure": "rgba(25, 135, 84, 0.80)",
-    "Collaboration":             "rgba(255, 193, 7, 0.85)"
+    "Networking":                "#00BCF2",
+    "Security":                  "#E55400",
+    "Cloud + AI Infrastructure": "#6BB700",
+    "Collaboration":             "#7B3F91"
   };
-  var FALLBACK_COLORS = ["rgba(108,117,125,0.75)","rgba(102,16,242,0.75)","rgba(253,126,20,0.75)","rgba(13,202,240,0.75)"];
+  var FALLBACK_COLORS = ["#FF8C00","#005B99","#D13438","#107C10"];
 
   // ── Determine comparison dimension ─────────────────────────────────────────
   var scopeType = (window.APP_FILE_META && window.APP_FILE_META._scopeType) || "region";
