@@ -118,21 +118,16 @@ function renderCompare(data) {
   // ── Build HTML ──────────────────────────────────────────────────────────────
   var html = '<div class="p-3">';
 
-  // Controls row
-  html += '<div class="slicer-row mb-4">';
+  // Scope context badge — top of page
+  var scopeLabel = (window.APP_FILE_META && window.APP_FILE_META._scopeLabel) || "";
+  var scopeDesc = scopeType === "region"  ? "Comparing all <strong>Theaters</strong>"
+                : scopeType === "theater" ? "Comparing all <strong>Countries</strong> in " + escHtml(scopeLabel)
+                : scopeType === "begeoid" ? "Comparing <strong>Partners</strong> across BE GEO IDs: " + escHtml(scopeLabel)
+                : "Comparing <strong>Partners</strong> in " + escHtml(scopeLabel);
+  html += '<div class="alert alert-light border small py-2 mb-3"><i class="bi bi-bar-chart-line me-2 text-primary"></i>' + scopeDesc + '</div>';
 
-  // FY toggle
-  html += '<div class="d-flex flex-column"><label class="small text-muted mb-1">Fiscal Year</label>';
-  html += '<div class="btn-group btn-group-sm" id="cmp-fy-toggle">';
-  html += '<button type="button" class="btn btn-outline-primary' + (_selectedFY === "all" ? ' active' : '') + '" data-fy="all">All Time</button>';
-  if (fyList.length === 0) {
-    html += '<button type="button" class="btn btn-outline-primary' + (_selectedFY === _currentFY ? ' active' : '') + '" data-fy="' + _currentFY + '">FY' + String(_currentFY).slice(-2) + '</button>';
-  } else {
-    fyList.forEach(function(fy) {
-      html += '<button type="button" class="btn btn-outline-primary' + (fy === _selectedFY ? ' active' : '') + '" data-fy="' + fy + '">FY' + String(fy).slice(-2) + '</button>';
-    });
-  }
-  html += '</div></div>';
+  // Global filters row (Portfolio / Offer / Show / Log scale) — apply to all charts
+  html += '<div class="slicer-row mb-4">';
 
   // Portfolio filter
   html += '<div class="d-flex flex-column"><label class="small text-muted mb-1">Portfolio</label>';
@@ -164,48 +159,56 @@ function renderCompare(data) {
 
   html += '</div>'; // end slicer-row
 
-  // Scope context badge
-  var scopeLabel = (window.APP_FILE_META && window.APP_FILE_META._scopeLabel) || "";
-  var scopeDesc = scopeType === "region"  ? "Comparing all <strong>Theaters</strong>"
-                : scopeType === "theater" ? "Comparing all <strong>Countries</strong> in " + escHtml(scopeLabel)
-                : scopeType === "begeoid" ? "Comparing <strong>Partners</strong> across BE GEO IDs: " + escHtml(scopeLabel)
-                : "Comparing <strong>Partners</strong> in " + escHtml(scopeLabel);
-  html += '<div class="alert alert-light border small py-2 mb-4"><i class="bi bi-bar-chart-line me-2 text-primary"></i>' + scopeDesc + '</div>';
+  // Shared card for charts 1 & 2 with FY toggle in its header
+  html += '<div class="card shadow-sm mb-4">';
+  html += '<div class="card-header fw-semibold d-flex align-items-center justify-content-between flex-wrap gap-2">';
+  html += '<span><i class="bi bi-calendar3 me-2 text-secondary"></i>Opt-in Count &amp; Estimated Earned</span>';
+  html += '<div class="btn-group btn-group-sm" id="cmp-fy-toggle">';
+  html += '<button type="button" class="btn btn-outline-primary' + (_selectedFY === "all" ? ' active' : '') + '" data-fy="all">All Time</button>';
+  if (fyList.length === 0) {
+    html += '<button type="button" class="btn btn-outline-primary' + (_selectedFY === _currentFY ? ' active' : '') + '" data-fy="' + _currentFY + '">FY' + String(_currentFY).slice(-2) + '</button>';
+  } else {
+    fyList.forEach(function(fy) {
+      html += '<button type="button" class="btn btn-outline-primary' + (fy === _selectedFY ? ' active' : '') + '" data-fy="' + fy + '">FY' + String(fy).slice(-2) + '</button>';
+    });
+  }
+  html += '</div></div>'; // end card-header
+  html += '<div class="card-body p-3"><div class="row g-4">';
 
-  // Charts row
+  html += '<div class="col-12 col-xl-6">';
+  html += '<div class="fw-semibold small mb-2 d-flex justify-content-between align-items-center">';
+  html += '<span><i class="bi bi-hand-thumbs-up-fill me-2 text-success"></i>Opt-in Count by ' + dimLabel + ' <i class="bi bi-info-circle text-muted" style="font-size:0.75rem;cursor:default" data-bs-toggle="tooltip" data-bs-placement="top" title="Number of opted-in deals per ' + dimLabel.toLowerCase() + ' during the selected fiscal year."></i></span>';
+  html += '<span id="cmp-optin-total" class="fw-normal text-muted"></span></div>';
+  html += '<div id="cmp-optin-body" style="min-height:400px;height:400px"><canvas id="cmp-chart-optin"></canvas></div>';
+  html += '</div>';
+
+  html += '<div class="col-12 col-xl-6">';
+  html += '<div class="fw-semibold small mb-2 d-flex justify-content-between align-items-center">';
+  html += '<span><i class="bi bi-cash-stack me-2 text-warning"></i>Estimated Earned Incentives by ' + dimLabel + ' <i class="bi bi-info-circle text-muted" style="font-size:0.75rem;cursor:default" data-bs-toggle="tooltip" data-bs-placement="top" title="Total estimated earned incentives per ' + dimLabel.toLowerCase() + ' during the selected fiscal year."></i></span>';
+  html += '<span id="cmp-earned-total" class="fw-normal text-muted"></span></div>';
+  html += '<div id="cmp-earned-body" style="min-height:400px;height:400px"><canvas id="cmp-chart-earned"></canvas></div>';
+  html += '</div>';
+
+  html += '</div></div></div>'; // end inner row + card-body + shared card
+
+  // Charts row 2 — ratio + potential (no FY selector)
   html += '<div class="row g-4">';
 
   html += '<div class="col-12 col-xl-6"><div class="card shadow-sm">';
   html += '<div class="card-header fw-semibold d-flex align-items-center justify-content-between">';
-  html += '<span><i class="bi bi-hand-thumbs-up-fill me-2 text-success"></i>Opt-in Count by ' + dimLabel + '</span>';
-  html += '<span id="cmp-optin-total" class="fw-normal text-muted" style="font-size:0.82rem"></span></div>';
-  html += '<div class="card-body p-3" id="cmp-optin-body" style="min-height:400px;height:400px"><canvas id="cmp-chart-optin"></canvas></div>';
-  html += '</div></div>';
-
-  html += '<div class="col-12 col-xl-6"><div class="card shadow-sm">';
-  html += '<div class="card-header fw-semibold d-flex align-items-center justify-content-between">';
-  html += '<span><i class="bi bi-cash-stack me-2 text-warning"></i>Estimated Earned Incentives</span>';
-  html += '<span id="cmp-earned-total" class="fw-normal text-muted" style="font-size:0.82rem"></span></div>';
-  html += '<div class="card-body p-3" id="cmp-earned-body" style="min-height:400px;height:400px"><canvas id="cmp-chart-earned"></canvas></div>';
-  html += '</div></div>';
-
-  html += '<div class="row g-4 mt-0">';
-
-  html += '<div class="col-12 col-xl-6"><div class="card shadow-sm">';
-  html += '<div class="card-header fw-semibold d-flex align-items-center justify-content-between">';
-  html += '<span><i class="bi bi-percent me-2 text-primary"></i>Opt-in Ratio by ' + dimLabel + '</span>';
+  html += '<span><i class="bi bi-percent me-2 text-primary"></i>Opt-in Ratio by ' + dimLabel + ' <i class="bi bi-info-circle text-muted" style="font-size:0.75rem;cursor:default" data-bs-toggle="tooltip" data-bs-placement="top" title="Share of eligible incentive value that is opted-in out of the total available eligible incentive."></i></span>';
   html += '<span id="cmp-ratio-total" class="fw-normal text-muted" style="font-size:0.82rem"></span></div>';
   html += '<div class="card-body p-3" id="cmp-ratio-body" style="min-height:400px;height:400px"><canvas id="cmp-chart-ratio"></canvas></div>';
   html += '</div></div>';
 
   html += '<div class="col-12 col-xl-6"><div class="card shadow-sm">';
   html += '<div class="card-header fw-semibold d-flex align-items-center justify-content-between">';
-  html += '<span><i class="bi bi-currency-dollar me-2 text-success"></i>Current Potential Incentives by ' + dimLabel + '</span>';
+  html += '<span><i class="bi bi-currency-dollar me-2 text-success"></i>Current Potential Incentives by ' + dimLabel + ' <i class="bi bi-info-circle text-muted" style="font-size:0.75rem;cursor:default" data-bs-toggle="tooltip" data-bs-placement="top" title="Remaining potential incentives for opted-in deals."></i></span>';
   html += '<span id="cmp-potential-total" class="fw-normal text-muted" style="font-size:0.82rem"></span></div>';
   html += '<div class="card-body p-3" id="cmp-potential-body" style="min-height:400px;height:400px"><canvas id="cmp-chart-potential"></canvas></div>';
   html += '</div></div>';
 
-  html += '</div></div>'; // end second row + p-3
+  html += '</div></div>'; // end row 2 + p-3
   el.innerHTML = html;
   var EARN_STAGES = [
     { flagField: "Stage Completion Flag(onboard)", dateField: "Stage Completion Date(onboard)", amtField: "Estimated Incentive Amount(Onboard)" },
@@ -490,7 +493,7 @@ function renderCompare(data) {
       var den = num + e.eligNotOptedMax;
       return den > 0 ? num / den * 100 : 0;
     });
-    var avg = ratios.reduce(function(s, v) { return s + v; }, 0) / Math.max(1, ratios.length);
+    var avg = globalDen > 0 ? globalNum / globalDen * 100 : 0;
 
     var ctx = document.getElementById("cmp-chart-ratio").getContext("2d");
     _cmpChartRatio = new Chart(ctx, {
@@ -500,7 +503,7 @@ function renderCompare(data) {
         datasets: [{
           label: "Opt-in Rate",
           data: ratios,
-          backgroundColor: "#00BCF2"
+          backgroundColor: "#6f42c1"
         }, {
           type: "line",
           label: "Average",
@@ -534,7 +537,7 @@ function renderCompare(data) {
                 var num = e.eligEarned + e.eligPotential;
                 var den = num + e.eligNotOptedMax;
                 var pct = den > 0 ? (num / den * 100).toFixed(1) : "0.0";
-                return "Earned+Potential: " + fmtTick(num) + "\nNot opted-in: " + fmtTick(e.eligNotOptedMax) + "\nTotal eligible: " + fmtTick(den) + " → " + pct + "%";
+                return "Earned+Potential: " + fmtTick(num) + "\nNot opted-in: " + fmtTick(e.eligNotOptedMax) + "\nTotal eligible: " + fmtTick(den) + " → " + pct + "%" + "\nOverall avg: " + globalPct + "%";
               }
             }
           }
@@ -593,7 +596,7 @@ function renderCompare(data) {
         maintainAspectRatio: false,
         scales: {
           x: { stacked: true, grid: { display: false }, ticks: { font: { size: 11 }, maxRotation: 45 } },
-          y: { stacked: true, beginAtZero: true, ticks: { font: { size: 10 }, callback: fmtTick }, title: { display: true, text: "Potential Incentives ($)" } }
+          y: { stacked: _logScale ? false : true, type: _logScale ? "logarithmic" : "linear", beginAtZero: !_logScale, ticks: { font: { size: 10 }, callback: fmtTick }, title: { display: true, text: "Potential Incentives ($)" } }
         },
         plugins: {
           legend: { position: "bottom" },
@@ -609,6 +612,12 @@ function renderCompare(data) {
         }
       }
     });
+  }
+
+  function renderFyCharts() {
+    var d = computeData();
+    renderOptInChart(d.byOptIn, d.pfList);
+    renderEarnedChart(d.byEarned, d.pfList);
   }
 
   function render() {
@@ -627,7 +636,10 @@ function renderCompare(data) {
     this.querySelectorAll("button").forEach(function(b) {
       b.classList.toggle("active", b.dataset.fy === String(_selectedFY));
     });
-    render();
+    if (window.APP_FILTER_STATE && window.APP_FILTER_STATE.compare) {
+      window.APP_FILTER_STATE.compare.fy = _selectedFY;
+    }
+    renderFyCharts();
   });
 
   var pfSelEl = document.getElementById("cmp-portfolio");

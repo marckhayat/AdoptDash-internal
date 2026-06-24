@@ -125,7 +125,7 @@ function renderCPIAdopt(data) {
   // ── By Use Case chart (all-time)
   html += '<div class="card shadow-sm mb-2" id="cpi-row-3">';
   html += '<div class="card-header fw-semibold d-flex align-items-center justify-content-between flex-wrap gap-2">';
-  html += '<span>By Use Case <small class="fw-normal text-muted">All Time</small></span>';
+  html += '<span>By Use Case <small class="fw-normal text-muted">All Time</small> <i class="bi bi-info-circle text-muted" style="font-size:0.75rem;cursor:default" data-bs-toggle="tooltip" data-bs-placement="top" title="Number of opt-ins or estimated amount of earned incentives per use case."></i></span>';
   html += '<div class="d-flex align-items-center gap-3">';
   html += '<span id="cpi-chart8-total" class="fw-normal text-muted"></span>';
   html += '<div class="btn-group btn-group-sm" id="cpi-uc-mode-toggle" role="group">';
@@ -1029,11 +1029,12 @@ function renderCPIAdopt(data) {
       type: "bar",
       data: { labels: ucList, datasets: datasets },
       options: {
+        indexAxis: "y",
         responsive: true,
         maintainAspectRatio: false,
         scales: {
-          x: { stacked: true, grid: { display: false }, ticks: { maxRotation: 45, minRotation: 30 } },
-          y: {
+          y: { stacked: true, grid: { display: false }, ticks: { font: { size: 11 } } },
+          x: {
             stacked: true,
             beginAtZero: true,
             ticks: isOptins
