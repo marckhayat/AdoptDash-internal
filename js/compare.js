@@ -30,17 +30,36 @@ function renderCompare(data) {
 
   // ── Determine comparison dimension ─────────────────────────────────────────
   var scopeType = (window.APP_FILE_META && window.APP_FILE_META._scopeType) || "region";
+  var useBeGeoKey = (scopeType !== "region" && scopeType !== "theater");
   var dimField  = scopeType === "region"  ? "Theater"
                 : scopeType === "theater" ? "Partner Country"
-                : "CR Party Name";
+                : "BE GEO ID";
   var dimLabel  = scopeType === "region"  ? "Theater"
                 : scopeType === "theater" ? "Country"
                 : "Partner";
 
-  // ── Unique portfolios in data ───────────────────────────────────────────────
+  // ── Build BE GEO ID → partner names map (from full dataset) ──────────────
+  var beGeoLabelMap = {};
+  if (useBeGeoKey) {
+    data.forEach(function(r) {
+      var geoId = String(r["BE GEO ID"] || "").trim();
+      var pname = String(r["Partner Name"] || "").trim();
+      if (!geoId || !pname) return;
+      if (!beGeoLabelMap[geoId]) beGeoLabelMap[geoId] = new Set();
+      beGeoLabelMap[geoId].add(pname);
+    });
+  }
+
+  // ── Unique portfolios + offers in data ─────────────────────────────────────
   var portfolioSet = new Set();
+  var offersByPortfolio = {};
   data.forEach(function(r) {
-    if (norm(r["Maximum Incentive Deal Flag"]) === "YES" && r["Deal CPI Portfolio"]) portfolioSet.add(r["Deal CPI Portfolio"]);
+    if (norm(r["Maximum Incentive Deal Flag"]) !== "YES") return;
+    var p = r["Deal CPI Portfolio"];
+    if (!p) return;
+    portfolioSet.add(p);
+    if (!offersByPortfolio[p]) offersByPortfolio[p] = new Set();
+    if (r["Track"]) offersByPortfolio[p].add(r["Track"]);
   });
   var portfolios = Array.from(portfolioSet).sort(function(a, b) {
     var ai = PORTFOLIO_ORDER.indexOf(a), bi = PORTFOLIO_ORDER.indexOf(b);
@@ -49,22 +68,50 @@ function renderCompare(data) {
     return ai - bi;
   });
 
-  // ── FY detection ────────────────────────────────────────────────────────────
+  // ── FY detection (using Cisco fiscal calendar) ─────────────────────────────
+  function getFyNum(dateVal) {
+    // dateVal may be an Excel serial number, string, or Date
+    var d;
+    if (typeof dateVal === "number" && dateVal > 1000) {
+      d = new Date(Math.round((dateVal - 25569) * 86400 * 1000));
+    } else if (dateVal instanceof Date) {
+      d = dateVal;
+    } else if (typeof dateVal === "string" && dateVal.trim()) {
+      d = new Date(dateVal);
+    }
+    if (!d || isNaN(d.getTime())) return null;
+    // Try fiscal calendar lookup first
+    if (window.getFiscalMonth) {
+      var fm = window.getFiscalMonth(d);
+      if (fm) return parseInt(fm.fy.replace("FY", ""), 10) + 2000;
+    }
+    // Fallback: Cisco FY starts ~late July (month index 6)
+    return d.getMonth() >= 6 ? d.getFullYear() + 1 : d.getFullYear();
+  }
+
   var fyYears = new Set();
   data.forEach(function(r) {
-    var d = r["Adopt Rebate Start Date"];
-    if (!d || !(d instanceof Date) || isNaN(d.getTime())) return;
-    var fy = d.getMonth() >= 7 ? d.getFullYear() + 1 : d.getFullYear();
-    fyYears.add(fy);
+    var fy = getFyNum(r["Adopt Rebate Start Date"]);
+    if (fy) fyYears.add(fy);
   });
   var fyList = Array.from(fyYears).sort(function(a, b) { return a - b; });
   var _now = new Date();
-  var _currentFY = _now.getMonth() >= 7 ? _now.getFullYear() + 1 : _now.getFullYear();
+  var _currentFY = getFyNum(_now) || (_now.getFullYear() + 1);
   var _saved = window.APP_FILTER_STATE && window.APP_FILTER_STATE.compare;
-  var _selectedFY        = (_saved && _saved.fy)        || (fyList.indexOf(_currentFY) !== -1 ? _currentFY : (fyList[fyList.length - 1] || _currentFY));
+  var _selectedFY        = (_saved && _saved.fy != null) ? _saved.fy : (fyList.indexOf(_currentFY) !== -1 ? _currentFY : (fyList[fyList.length - 1] || _currentFY));
   var _selectedPortfolio = (_saved && _saved.portfolio) || "";
-  var _selectedTopN      = (_saved && _saved.topN != null) ? _saved.topN : 20;
-  var showAll = scopeType === "region" || scopeType === "theater"; // small # of entities, always show all
+  var _selectedOffer     = (_saved && _saved.offer)     || "";
+  var _logScale          = (_saved && _saved.logScale)  || false;
+  var _topN              = (_saved && _saved.topN  != null) ? _saved.topN : 0; // 0 = all
+
+  function getOfferOptions(pf) {
+    var opts = pf ? Array.from(offersByPortfolio[pf] || []) : (function() {
+      var all = new Set();
+      portfolios.forEach(function(p) { offersByPortfolio[p].forEach(function(o) { all.add(o); }); });
+      return Array.from(all);
+    })();
+    return opts.sort();
+  }
 
   // ── Build HTML ──────────────────────────────────────────────────────────────
   var html = '<div class="p-3">';
@@ -75,8 +122,9 @@ function renderCompare(data) {
   // FY toggle
   html += '<div class="d-flex flex-column"><label class="small text-muted mb-1">Fiscal Year</label>';
   html += '<div class="btn-group btn-group-sm" id="cmp-fy-toggle">';
+  html += '<button type="button" class="btn btn-outline-primary' + (_selectedFY === "all" ? ' active' : '') + '" data-fy="all">All Time</button>';
   if (fyList.length === 0) {
-    html += '<button type="button" class="btn btn-outline-primary active" data-fy="' + _selectedFY + '">FY' + String(_selectedFY).slice(-2) + '</button>';
+    html += '<button type="button" class="btn btn-outline-primary' + (_selectedFY === _currentFY ? ' active' : '') + '" data-fy="' + _currentFY + '">FY' + String(_currentFY).slice(-2) + '</button>';
   } else {
     fyList.forEach(function(fy) {
       html += '<button type="button" class="btn btn-outline-primary' + (fy === _selectedFY ? ' active' : '') + '" data-fy="' + fy + '">FY' + String(fy).slice(-2) + '</button>';
@@ -91,15 +139,26 @@ function renderCompare(data) {
   portfolios.forEach(function(p) { html += '<option value="' + escHtml(p) + '"' + (p === _selectedPortfolio ? ' selected' : '') + '>' + escHtml(p) + '</option>'; });
   html += '</select></div>';
 
-  // Top N (for partner-level scope)
-  if (!showAll) {
-    html += '<div class="d-flex flex-column"><label class="small text-muted mb-1">Show top</label>';
-    html += '<select id="cmp-topn" class="form-select form-select-sm" style="width:auto">';
-    [10, 20, 30, 50, 0].forEach(function(n) {
-      html += '<option value="' + n + '"' + (n === _selectedTopN ? ' selected' : '') + '>' + (n === 0 ? 'All' : String(n)) + '</option>';
-    });
-    html += '</select></div>';
-  }
+  // Offer filter
+  html += '<div class="d-flex flex-column"><label class="small text-muted mb-1">Offer</label>';
+  html += '<select id="cmp-offer" class="form-select form-select-sm" style="min-width:200px">';
+  html += '<option value="">All Offers</option>';
+  getOfferOptions(_selectedPortfolio).forEach(function(o) { html += '<option value="' + escHtml(o) + '"' + (o === _selectedOffer ? ' selected' : '') + '>' + escHtml(o) + '</option>'; });
+  html += '</select></div>';
+
+  // Top N
+  html += '<div class="d-flex flex-column"><label class="small text-muted mb-1">Show</label>';
+  html += '<select id="cmp-topn" class="form-select form-select-sm">';
+  html += '<option value="0"' + (_topN === 0   ? ' selected' : '') + '>All</option>';
+  html += '<option value="10"' + (_topN === 10 ? ' selected' : '') + '>Top 10</option>';
+  html += '</select></div>';
+
+  // Log scale — pushed to the right end of the row
+  html += '<div class="d-flex flex-column ms-auto justify-content-end">';
+  html += '<div class="form-check form-switch mb-0">';
+  html += '<input class="form-check-input" type="checkbox" id="cmp-log-toggle"' + (_logScale ? ' checked' : '') + '>';
+  html += '<label class="form-check-label small text-muted" for="cmp-log-toggle">Log scale</label>';
+  html += '</div></div>';
 
   html += '</div>'; // end slicer-row
 
@@ -118,72 +177,127 @@ function renderCompare(data) {
   html += '<div class="card-header fw-semibold d-flex align-items-center justify-content-between">';
   html += '<span><i class="bi bi-hand-thumbs-up-fill me-2 text-success"></i>Opt-in Count by ' + dimLabel + '</span>';
   html += '<span id="cmp-optin-total" class="fw-normal text-muted" style="font-size:0.82rem"></span></div>';
-  html += '<div class="card-body p-3" id="cmp-optin-body"><canvas id="cmp-chart-optin"></canvas></div>';
+  html += '<div class="card-body p-3" id="cmp-optin-body" style="min-height:400px;height:400px"><canvas id="cmp-chart-optin"></canvas></div>';
   html += '</div></div>';
 
   html += '<div class="col-12 col-xl-6"><div class="card shadow-sm">';
   html += '<div class="card-header fw-semibold d-flex align-items-center justify-content-between">';
-  html += '<span><i class="bi bi-cash-stack me-2 text-warning"></i>Earned Incentives by ' + dimLabel + '</span>';
+  html += '<span><i class="bi bi-cash-stack me-2 text-warning"></i>Estimated Earned Incentives</span>';
   html += '<span id="cmp-earned-total" class="fw-normal text-muted" style="font-size:0.82rem"></span></div>';
-  html += '<div class="card-body p-3" id="cmp-earned-body"><canvas id="cmp-chart-earned"></canvas></div>';
+  html += '<div class="card-body p-3" id="cmp-earned-body" style="min-height:400px;height:400px"><canvas id="cmp-chart-earned"></canvas></div>';
   html += '</div></div>';
 
   html += '</div></div>'; // end row + p-3
   el.innerHTML = html;
 
+  var EARN_STAGES = [
+    { flagField: "Stage Completion Flag(onboard)", dateField: "Stage Completion Date(onboard)", amtField: "Estimated Incentive Amount(Onboard)" },
+    { flagField: "Stage Completion Flag(Use)",     dateField: "Stage Completion Date(Use)",     amtField: "Estimated Incentive Amount(Use)"     },
+    { flagField: "Stage Completion Flag(Engage)",  dateField: "Stage Completion Date(Engage)",  amtField: "Estimated Incentive Amount(Engage)"  },
+    { flagField: "Stage Completion Flag(Adopt)",   dateField: "Stage Completion Date(Adopt)",   amtField: "Estimated Incentive Amount(Adopt)"   }
+  ];
+
+  function dateInFY(d, fyNum) {
+    if (!d || isNaN(d.getTime())) return false;
+    if (window.getFiscalMonth) {
+      var fm = window.getFiscalMonth(d);
+      return fm && (parseInt(fm.fy.replace("FY", ""), 10) + 2000) === fyNum;
+    }
+    var fy = d.getMonth() >= 6 ? d.getFullYear() + 1 : d.getFullYear();
+    return fy === fyNum;
+  }
+
   // ── Data computation ────────────────────────────────────────────────────────
   function computeData() {
     var portfolio = document.getElementById("cmp-portfolio").value;
-    var topNEl    = document.getElementById("cmp-topn");
-    var topN      = showAll ? 0 : (topNEl ? parseInt(topNEl.value) : 20);
+    var offer     = document.getElementById("cmp-offer").value;
+    _topN = parseInt(document.getElementById("cmp-topn").value, 10) || 0;
 
     // Save state
     if (window.APP_FILTER_STATE) {
-      window.APP_FILTER_STATE.compare = { fy: _selectedFY, portfolio: portfolio, topN: topN };
+      window.APP_FILTER_STATE.compare = { fy: _selectedFY, portfolio: portfolio, offer: offer, logScale: _logScale, topN: _topN };
     }
 
-    // Filter: eligible + in selected FY + optional portfolio
-    var fyRows = data.filter(function(r) {
+    // Filter: eligible rows (MaxFlag=YES), optional portfolio + offer
+    var eligRows = data.filter(function(r) {
       if (norm(r["Maximum Incentive Deal Flag"]) !== "YES") return false;
-      var d = r["Adopt Rebate Start Date"];
-      if (!d || !(d instanceof Date) || isNaN(d.getTime())) return false;
-      var fy = d.getMonth() >= 7 ? d.getFullYear() + 1 : d.getFullYear();
-      if (fy !== _selectedFY) return false;
       if (portfolio && r["Deal CPI Portfolio"] !== portfolio) return false;
+      if (offer     && r["Track"]              !== offer)     return false;
       return true;
     });
 
-    // Group by entity
+    // Opt-ins: Stage ELIGIBLE or EXPIRED, Adopt Rebate Opt-In Status = OPTED IN, Start Date in FY
+    var optInRows = eligRows.filter(function(r) {
+      var st = String(r["Stage"] || "").trim().toUpperCase();
+      if (st !== "ELIGIBLE" && st !== "EXPIRED") return false;
+      if (String(r["Adopt Rebate Opt-In Status"] || "").trim().toUpperCase() !== "OPTED IN") return false;
+      if (_selectedFY === "all") return true;
+      var d = new Date(r["Adopt Rebate Start Date"]);
+      return dateInFY(d, _selectedFY);
+    });
+
+    // Earned: keyed by Stage Completion Date falling in FY (matches cpi-adopt chart 5)
+    // Uses per-stage amounts, checks Earned? flag and lciStart/expiry bounds
     var entityMap = {};
-    fyRows.forEach(function(r) {
+
+    // First pass: opt-ins — count rows (matching cpi-adopt chart 3, no dedup)
+    optInRows.forEach(function(r) {
       var entity = String(r[dimField] || "").trim() || "(unknown)";
-      if (!entityMap[entity]) entityMap[entity] = { eligKeys: new Set(), optInKeys: new Set(), earnedByP: {} };
-      var key = String(r["CRPartyID-Offer"] || "");
-      entityMap[entity].eligKeys.add(key);
-      if (r["Offer opted-in?"]) entityMap[entity].optInKeys.add(key);
-      if (r["Earned?"]) {
-        var p = r["Deal CPI Portfolio"] || "Other";
-        entityMap[entity].earnedByP[p] = (entityMap[entity].earnedByP[p] || 0) + (parseFloat(r["Estimated Earned Incentives"]) || 0);
-      }
+      if (!entityMap[entity]) entityMap[entity] = { optIn: 0, optInByP: {}, earnedByP: {} };
+      var p = r["Deal CPI Portfolio"] || "Other";
+      entityMap[entity].optIn++;
+      entityMap[entity].optInByP[p] = (entityMap[entity].optInByP[p] || 0) + 1;
+    });
+
+    // Second pass: earned incentives by stage completion date
+    eligRows.forEach(function(r) {
+      if (!r["Earned?"]) return;
+      var p = r["Deal CPI Portfolio"] || "Other";
+      if (portfolio && p !== portfolio) return;
+      var entity = String(r[dimField] || "").trim() || "(unknown)";
+      if (!entityMap[entity]) entityMap[entity] = { optIn: 0, optInByP: {}, earnedByP: {} };
+      var lciStart = new Date(r["Adopt Rebate Start Date"]);
+      var expiry   = new Date(r["Deal Incentive Expiry Date"]);
+      if (isNaN(lciStart.getTime()) || isNaN(expiry.getTime())) return;
+      EARN_STAGES.forEach(function(s) {
+        if (norm(r[s.flagField]) !== "YES") return;
+        var d = new Date(r[s.dateField]);
+        if (isNaN(d.getTime()) || d < lciStart || d > expiry) return;
+        if (_selectedFY !== "all" && !dateInFY(d, _selectedFY)) return;
+        var amt = parseFloat(r[s.amtField]) || 0;
+        if (amt === 0) return;
+        entityMap[entity].earnedByP[p] = (entityMap[entity].earnedByP[p] || 0) + amt;
+      });
     });
 
     var entries = Object.keys(entityMap).map(function(entity) {
       var m = entityMap[entity];
       var totalEarned = Object.keys(m.earnedByP).reduce(function(s, k) { return s + m.earnedByP[k]; }, 0);
-      return { entity: entity, eligible: m.eligKeys.size, optIn: m.optInKeys.size, earnedByP: m.earnedByP, totalEarned: totalEarned };
+      var label;
+      if (useBeGeoKey) {
+        var names = beGeoLabelMap[entity] ? Array.from(beGeoLabelMap[entity]) : [entity];
+        label = names.length === 1 ? names[0] : names;
+      } else {
+        label = entity;
+      }
+      return { entity: entity, label: label, optIn: m.optIn, optInByP: m.optInByP, earnedByP: m.earnedByP, totalEarned: totalEarned };
     });
 
     var pfList = portfolio ? [portfolio] : portfolios;
-    var byOptIn   = entries.slice().sort(function(a, b) { return b.optIn   - a.optIn;   });
-    var byEarned  = entries.slice().sort(function(a, b) { return b.totalEarned - a.totalEarned; });
-    if (topN > 0) { byOptIn = byOptIn.slice(0, topN); byEarned = byEarned.slice(0, topN); }
+    var byOptIn  = entries.slice().sort(function(a, b) { return b.optIn       - a.optIn;       });
+    var byEarned = entries.slice().sort(function(a, b) { return b.totalEarned - a.totalEarned; });
+    if (_topN > 0) { byOptIn = byOptIn.slice(0, _topN); byEarned = byEarned.slice(0, _topN); }
     return { byOptIn: byOptIn, byEarned: byEarned, pfList: pfList };
   }
 
   // ── Chart renderers ─────────────────────────────────────────────────────────
-  function barChartH(n) { return Math.max(280, n * Math.max(24, Math.min(44, Math.floor(500 / Math.max(n, 1))))); }
+  function fmtTick(v) {
+    if (Math.abs(v) >= 1e6) return "$" + (v/1e6).toFixed(1) + "M";
+    if (Math.abs(v) >= 1e3) return "$" + (v/1e3).toFixed(0) + "K";
+    return "$" + Math.round(v).toLocaleString();
+  }
 
-  function renderOptInChart(entries) {
+  function renderOptInChart(entries, pfList) {
     if (_cmpChartOptin) { _cmpChartOptin.destroy(); _cmpChartOptin = null; }
     var totalEl = document.getElementById("cmp-optin-total");
     var bodyEl  = document.getElementById("cmp-optin-body");
@@ -195,38 +309,38 @@ function renderCompare(data) {
     var total = entries.reduce(function(s, e) { return s + e.optIn; }, 0);
     if (totalEl) totalEl.textContent = total.toLocaleString() + " total opted-in";
 
-    var h = barChartH(entries.length);
-    var canvas = document.getElementById("cmp-chart-optin");
-    canvas.style.height = h + "px"; canvas.height = h;
+    var datasets = pfList.map(function(p, i) {
+      return {
+        label: p,
+        data: entries.map(function(e) { return e.optInByP[p] || 0; }),
+        backgroundColor: PORTFOLIO_COLORS[p] || FALLBACK_COLORS[i % FALLBACK_COLORS.length]
+      };
+    });
 
-    _cmpChartOptin = new Chart(canvas, {
+    var ctx = document.getElementById("cmp-chart-optin").getContext("2d");
+    _cmpChartOptin = new Chart(ctx, {
       type: "bar",
       data: {
-        labels: entries.map(function(e) { return e.entity; }),
-        datasets: [
-          { label: "Opted-in",              data: entries.map(function(e) { return e.optIn; }),                        backgroundColor: "rgba(25,135,84,0.82)",  borderRadius: 3 },
-          { label: "Eligible (not opted-in)", data: entries.map(function(e) { return Math.max(0, e.eligible - e.optIn); }), backgroundColor: "rgba(255,193,7,0.55)",  borderRadius: 3 }
-        ]
+        labels: entries.map(function(e) { return e.label; }),
+        datasets: datasets
       },
       options: {
-        indexAxis: "y",
         responsive: true,
         maintainAspectRatio: false,
+        scales: {
+          x: { stacked: true, grid: { display: false }, ticks: { font: { size: 11 }, maxRotation: 45 } },
+          y: { stacked: true, type: _logScale ? "logarithmic" : "linear", beginAtZero: !_logScale, ticks: { font: { size: 10 } }, title: { display: true, text: "Unique Offer Opt-ins" } }
+        },
         plugins: {
-          legend: { position: "top", labels: { font: { size: 11 } } },
+          legend: { position: "bottom" },
           tooltip: {
             callbacks: {
               footer: function(items) {
                 var e = entries[items[0].dataIndex];
-                var pct = e.eligible > 0 ? " (" + Math.round(e.optIn / e.eligible * 100) + "% opted-in)" : "";
-                return "Total eligible: " + e.eligible + pct;
+                return "Total opted-in: " + e.optIn;
               }
             }
           }
-        },
-        scales: {
-          x: { stacked: true, ticks: { font: { size: 10 } }, grid: { color: "rgba(0,0,0,0.06)" } },
-          y: { stacked: true, ticks: { font: { size: 10 }, autoSkip: false } }
         }
       }
     });
@@ -242,41 +356,44 @@ function renderCompare(data) {
       return;
     }
     var grand = entries.reduce(function(s, e) { return s + e.totalEarned; }, 0);
-    if (totalEl) totalEl.textContent = fmtCur(grand) + " total";
+    if (totalEl) totalEl.textContent = fmtTick(grand) + " total";
 
-    var h = barChartH(entries.length);
-    var canvas = document.getElementById("cmp-chart-earned");
-    canvas.style.height = h + "px"; canvas.height = h;
+    var datasets = pfList.map(function(p, i) {
+      return {
+        label: p,
+        data: entries.map(function(e) { return e.earnedByP[p] || 0; }),
+        backgroundColor: PORTFOLIO_COLORS[p] || FALLBACK_COLORS[i % FALLBACK_COLORS.length]
+      };
+    });
 
-    _cmpChartEarned = new Chart(canvas, {
+    var ctx = document.getElementById("cmp-chart-earned").getContext("2d");
+    _cmpChartEarned = new Chart(ctx, {
       type: "bar",
-      data: {
-        labels: entries.map(function(e) { return e.entity; }),
-        datasets: pfList.map(function(p, i) {
-          return {
-            label: p,
-            data: entries.map(function(e) { return e.earnedByP[p] || 0; }),
-            backgroundColor: PORTFOLIO_COLORS[p] || FALLBACK_COLORS[i % FALLBACK_COLORS.length],
-            borderRadius: 3
-          };
-        })
-      },
+      data: { labels: entries.map(function(e) { return e.label; }), datasets: datasets },
       options: {
-        indexAxis: "y",
         responsive: true,
         maintainAspectRatio: false,
-        plugins: {
-          legend: { position: "top", labels: { font: { size: 11 } } },
-          tooltip: {
-            callbacks: {
-              label: function(ctx) { return " " + ctx.dataset.label + ": " + fmtCur(ctx.raw); },
-              footer: function(items) { return "Total: " + fmtCur(entries[items[0].dataIndex].totalEarned); }
-            }
+        scales: {
+          x: { stacked: true, grid: { display: false }, ticks: { font: { size: 11 }, maxRotation: 45 } },
+          y: {
+            stacked: true,
+            type: _logScale ? "logarithmic" : "linear",
+            beginAtZero: !_logScale,
+            ticks: { font: { size: 10 }, callback: fmtTick },
+            title: { display: true, text: "Estimated Earned ($)" }
           }
         },
-        scales: {
-          x: { stacked: true, ticks: { font: { size: 10 }, callback: function(v) { return fmtCur(v); } }, grid: { color: "rgba(0,0,0,0.06)" } },
-          y: { stacked: true, ticks: { font: { size: 10 }, autoSkip: false } }
+        plugins: {
+          legend: { display: true, position: "bottom" },
+          tooltip: {
+            callbacks: {
+              label: function(ctx) { return " " + ctx.dataset.label + ": " + fmtTick(ctx.raw); },
+              footer: function(items) {
+                if (pfList.length > 1) return "Total: " + fmtTick(entries[items[0].dataIndex].totalEarned);
+                return "";
+              }
+            }
+          }
         }
       }
     });
@@ -284,7 +401,7 @@ function renderCompare(data) {
 
   function render() {
     var d = computeData();
-    renderOptInChart(d.byOptIn);
+    renderOptInChart(d.byOptIn, d.pfList);
     renderEarnedChart(d.byEarned, d.pfList);
   }
 
@@ -292,11 +409,33 @@ function renderCompare(data) {
   document.getElementById("cmp-fy-toggle").addEventListener("click", function(e) {
     var btn = e.target.closest("button[data-fy]");
     if (!btn) return;
-    _selectedFY = parseInt(btn.dataset.fy, 10);
-    this.querySelectorAll("button").forEach(function(b) { b.classList.toggle("active", parseInt(b.dataset.fy) === _selectedFY); });
+    _selectedFY = btn.dataset.fy === "all" ? "all" : parseInt(btn.dataset.fy, 10);
+    this.querySelectorAll("button").forEach(function(b) {
+      b.classList.toggle("active", b.dataset.fy === String(_selectedFY));
+    });
     render();
   });
-  document.getElementById("cmp-portfolio").addEventListener("change", render);
+
+  var pfSelEl = document.getElementById("cmp-portfolio");
+  var ofSelEl = document.getElementById("cmp-offer");
+
+  if (pfSelEl) pfSelEl.addEventListener("change", function() {
+    var pf = this.value;
+    // Repopulate offer dropdown
+    var offers = getOfferOptions(pf);
+    ofSelEl.innerHTML = '<option value="">All Offers</option>';
+    offers.forEach(function(o) { ofSelEl.innerHTML += '<option value="' + escHtml(o) + '">' + escHtml(o) + '</option>'; });
+    render();
+  });
+
+  if (ofSelEl) ofSelEl.addEventListener("change", render);
+
+  var logToggle = document.getElementById("cmp-log-toggle");
+  if (logToggle) logToggle.addEventListener("change", function() {
+    _logScale = this.checked;
+    render();
+  });
+
   var topNEl = document.getElementById("cmp-topn");
   if (topNEl) topNEl.addEventListener("change", render);
 

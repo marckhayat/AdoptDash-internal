@@ -172,8 +172,8 @@ function transformData(rawRows) {
       r["Deal CPI Portfolio"] = fixedPortfolio;
     }
 
-    // Step 3: CRPartyID-Offer composite key
-    r["CRPartyID-Offer"] = String(r["CR Party ID"] || "") + String(r["Track"] || "");
+    // Step 3: CRPartyID-Offer composite key (must match optedInKeys: BE GEO ID + CR Party ID + Track)
+    r["CRPartyID-Offer"] = String(r["BE GEO ID"] || "") + String(r["CR Party ID"] || "") + String(r["Track"] || "");
 
     // Strip trailing .0 from CX Customer BU ID (CSV numeric artifact)
     if (r["CX Customer BU ID"] !== undefined && r["CX Customer BU ID"] !== null) {
