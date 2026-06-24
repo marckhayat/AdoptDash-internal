@@ -69,7 +69,7 @@ function renderCPIAdopt(data) {
   html += '</select></div>';
   html += '</div>';
 
-  html += '<div class="row g-4 mb-4">';
+  html += '<div class="row g-4 mb-4" id="cpi-row-1">';
 
   // ── Stat charts row: Eligible-only pie | Eligible+Expired pie | Earned by Portfolio
   html += '<div class="col-12 col-lg-4">';
@@ -91,7 +91,7 @@ function renderCPIAdopt(data) {
   html += '</div>'; // stat charts row
 
   // ── Monthly charts group with shared FY toggle
-  html += '<div class="card shadow-sm mb-2">';
+  html += '<div class="card shadow-sm mb-2" id="cpi-row-2">';
   html += '<div class="card-header fw-semibold d-flex align-items-center justify-content-between flex-wrap gap-2">';
   html += '<span>Monthly Trends <small class="fw-normal">for Opted-in UCs</small></span>';
   html += '<div class="d-flex align-items-center gap-2">';
@@ -123,7 +123,7 @@ function renderCPIAdopt(data) {
   html += '</div></div>'; // card-body + card
 
   // ── By Use Case chart (all-time)
-  html += '<div class="card shadow-sm mb-2">';
+  html += '<div class="card shadow-sm mb-2" id="cpi-row-3">';
   html += '<div class="card-header fw-semibold d-flex align-items-center justify-content-between flex-wrap gap-2">';
   html += '<span>By Use Case <small class="fw-normal text-muted">All Time</small></span>';
   html += '<div class="d-flex align-items-center gap-3">';
@@ -136,6 +136,53 @@ function renderCPIAdopt(data) {
   html += '</div>';
 
   el.innerHTML = html;
+
+  // ── Scroll dot navigator ───────────────────────────────────────────────────
+  (function() {
+    var rows = [
+      { id: "cpi-row-1", label: "Incentive Overview" },
+      { id: "cpi-row-2", label: "Monthly Trends" },
+      { id: "cpi-row-3", label: "By Use Case" }
+    ];
+    var nav = document.createElement("div");
+    nav.id = "cpi-scroll-nav";
+    nav.style.cssText = "position:fixed;left:12px;top:50%;transform:translateY(-50%);z-index:999;display:flex;flex-direction:column;gap:10px;";
+    rows.forEach(function(r, i) {
+      var dot = document.createElement("div");
+      dot.dataset.target = r.id;
+      dot.title = r.label;
+      dot.style.cssText = "width:10px;height:10px;border-radius:50%;background:#ccc;cursor:pointer;transition:background 0.2s,transform 0.2s;";
+      dot.addEventListener("mouseenter", function() { if (dot.style.background !== "rgb(0, 114, 198)") dot.style.background = "#888"; });
+      dot.addEventListener("mouseleave", function() { if (dot.style.background !== "rgb(0, 114, 198)") dot.style.background = "#ccc"; });
+      dot.addEventListener("click", function() {
+        var target = document.getElementById(r.id);
+        if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+      nav.appendChild(dot);
+    });
+    // Remove old nav if re-rendering
+    var old = document.getElementById("cpi-scroll-nav");
+    if (old) old.remove();
+    document.body.appendChild(nav);
+
+    // Highlight active dot via IntersectionObserver
+    var dots = nav.querySelectorAll("div");
+    var observer = new IntersectionObserver(function(entries) {
+      entries.forEach(function(entry) {
+        var idx = rows.findIndex(function(r) { return r.id === entry.target.id; });
+        if (idx === -1) return;
+        dots[idx].style.background    = entry.isIntersecting ? "#0072C6" : "#ccc";
+        dots[idx].style.transform     = entry.isIntersecting ? "scale(1.4)" : "scale(1)";
+      });
+    }, { threshold: 0.3 });
+    rows.forEach(function(r) {
+      var el2 = document.getElementById(r.id);
+      if (el2) observer.observe(el2);
+    });
+
+    // Clean up when tab changes
+    el.addEventListener("remove", function() { observer.disconnect(); nav.remove(); }, { once: true });
+  })();
 
   // Initialise tooltips
   el.querySelectorAll("[data-bs-toggle='tooltip']").forEach(function (t) { new bootstrap.Tooltip(t, { html: false }); });

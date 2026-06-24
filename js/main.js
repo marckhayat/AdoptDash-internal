@@ -48,6 +48,11 @@ function init() {
   document.querySelectorAll('[data-bs-toggle="tab"]').forEach(function (tab) {
     tab.addEventListener("shown.bs.tab", function (e) {
       if (!APP_DATA) return;
+      // Remove CPI Adopt scroll nav when leaving that tab
+      if (e.target.dataset.bsTarget !== "#tab-testing") {
+        var nav = document.getElementById("cpi-scroll-nav");
+        if (nav) nav.remove();
+      }
       renderActiveTab(e.target.dataset.bsTarget);
     });
   });
@@ -1405,7 +1410,7 @@ function renderActiveTab(target) {
     case "#tab-details":   renderDetails(getActiveData());   break;
     case "#tab-pvi":       renderPVI(getActiveData());       break;
     case "#tab-testing":   renderInsights(getActiveData());  break;
-    case "#tab-compare":   renderCompare(getActiveData());   break;
+    case "#tab-compare":   renderCompare(window.APP_DATA);   break;
   }
 }
 
