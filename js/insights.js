@@ -226,8 +226,7 @@ function renderTesting(data) {
 
   // Always returns data respecting current APP_EXCL_ACTIVE state
   function getEffectiveData() {
-    var base = (window.APP_DATA && window.APP_DATA.length) ? window.APP_DATA : data;
-    return (window.APP_EXCL_ACTIVE && window.getActiveData) ? window.getActiveData() : base;
+    return (window.getActiveData) ? window.getActiveData() : data;
   }
 
   // ── Exclude toggle button (shared across all subtabs) ─────────────────────

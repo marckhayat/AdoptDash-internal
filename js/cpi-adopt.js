@@ -126,10 +126,12 @@ function renderCPIAdopt(data) {
   html += '<div class="card shadow-sm mb-2">';
   html += '<div class="card-header fw-semibold d-flex align-items-center justify-content-between flex-wrap gap-2">';
   html += '<span>By Use Case <small class="fw-normal text-muted">All Time</small></span>';
+  html += '<div class="d-flex align-items-center gap-3">';
+  html += '<span id="cpi-chart8-total" class="fw-normal text-muted"></span>';
   html += '<div class="btn-group btn-group-sm" id="cpi-uc-mode-toggle" role="group">';
   html += '<button type="button" class="btn btn-outline-primary active" data-ucmode="optins"># Opt-ins</button>';
   html += '<button type="button" class="btn btn-outline-primary" data-ucmode="earned">Est. Earned</button>';
-  html += '</div></div>';
+  html += '</div></div></div>';
   html += '<div class="card-body p-3" style="min-height:400px;height:400px"><canvas id="cpi-chart8"></canvas></div>';
   html += '</div>';
 
@@ -959,6 +961,20 @@ function renderCPIAdopt(data) {
         stack: "s"
       };
     });
+
+    // Compute grand total
+    var grandTotal = ucList.reduce(function (s, uc) {
+      return s + Object.values(ucPfMap[uc]).reduce(function (s2, v) { return s2 + v; }, 0);
+    }, 0);
+    var totalEl = document.getElementById("cpi-chart8-total");
+    if (totalEl) {
+      var totalFmt = isOptins ? grandTotal.toLocaleString() + " opt-in" + (grandTotal !== 1 ? "s" : "")
+        : (Math.abs(grandTotal) >= 1000000 ? "$"+(grandTotal/1000000).toFixed(2)+"M"
+          : Math.abs(grandTotal) >= 1000 ? "$"+(grandTotal/1000).toFixed(1)+"K"
+          : "$"+Math.round(grandTotal).toLocaleString());
+      totalEl.textContent = "Total: " + totalFmt;
+      totalEl.style.fontSize = "1rem"; totalEl.style.fontWeight = "600"; totalEl.style.color = "#555";
+    }
 
     if (_cpiChart8) { _cpiChart8.destroy(); _cpiChart8 = null; }
     var ctx8 = document.getElementById("cpi-chart8").getContext("2d");
