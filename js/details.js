@@ -1128,7 +1128,7 @@ function renderDetails(data) {
     var has2TPartner = data.some(function (r) { return r["2T Partner Name"] && String(r["2T Partner Name"]).trim() !== ""; });
 
     var cols = [
-      { label: "Partner", field: "Partner Name", isPartnerCell: true, style: "min-width:160px" },
+      { label: window.APP_IS_DISTI ? "Distributor" : "Partner", field: "Partner Name", isPartnerCell: true, isDistiCell: !!window.APP_IS_DISTI, style: "min-width:160px" },
       ...(has2TPartner ? [{ label: "2T Partner Name", field: "2T Partner Name" }] : []),
       { label: "CR Party Name",              field: "CR Party Name",                style: "min-width:180px" },
       { label: "Use Case",                   field: "Sub-Track",                    style: "min-width:160px" },
@@ -1297,6 +1297,14 @@ function renderDetails(data) {
             cell = '<td>' + fmtDate(val) + '</td>';
             tbody += cell;
             return;
+          } else if (c.isDistiCell) {
+            var distiNameEsc = escHtml(String(r["Disti name"] || r["Partner Name"] || ""));
+            var distiGeoId   = escHtml(String(r["BE GEO ID"] || ""));
+            cell = distiNameEsc + (distiGeoId ? '<div style="font-size:0.72rem;color:#888;margin-top:1px">ID: ' + distiGeoId + '</div>' : '');
+          } else if (c.isPartnerCell) {
+            var pNameEsc = escHtml(String(r["Partner Name"] || ""));
+            var pGeoId   = escHtml(String(r["BE GEO ID"] || ""));
+            cell = pNameEsc + (pGeoId ? '<div style="font-size:0.72rem;color:#888;margin-top:1px">ID: ' + pGeoId + '</div>' : '');
           } else if (c.field === "CR Party Name") {
             var crNameEsc = escHtml(String(r["CR Party Name"] || ""));
             var crId  = escHtml(String(r["CR Party ID"] || ""));
