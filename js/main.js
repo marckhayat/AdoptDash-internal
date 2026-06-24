@@ -514,7 +514,7 @@ function finishLoad(filename, rowCount, headerAutoDetected, idbType, loadedAt, f
     var beGeoIds = [];
     if (APP_DATA) APP_DATA.forEach(function(r) { var v = String(r["BE GEO ID"] || "").trim(); if (v && beGeoIds.indexOf(v) === -1) beGeoIds.push(v); });
     beGeoIds.sort();
-    if (beGeoIds.length <= 1) { slot.innerHTML = ""; slot.classList.add("d-none"); return; }
+    if (beGeoIds.length === 0) { slot.innerHTML = ""; slot.classList.add("d-none"); return; }
     slot.innerHTML =
       '<label class="text-muted small mb-0 text-nowrap" for="ovw-begeoid-sel" style="font-size:0.8rem">BE GEO ID</label>' +
       '<select id="ovw-begeoid-sel" class="form-select form-select-sm" style="width:auto;font-size:0.82rem">' +
