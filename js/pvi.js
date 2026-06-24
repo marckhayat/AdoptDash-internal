@@ -67,10 +67,7 @@ function renderPVI(data) {
     return { portfolio, eligUC, eligBook, onbUC, onbBook, adpUC, adpBook, onbRatio, adpRatio, onbScore, adpScore, totalScore };
   }
 
-  // ── Get GEO from global Overview filter
-  var activeGeo = (window.APP_FILTER_STATE && window.APP_FILTER_STATE.overview && window.APP_FILTER_STATE.overview.beGeoId) || "";
-
-  // ── Build static HTML shell (no dropdown needed)
+  // ── Build static HTML shell
   var html = '<div id="pvi-content"></div>';
 
   html += '<div class="mt-3 p-3 rounded" style="background:#f8f9fa;border:1px solid #dee2e6;font-size:0.82rem">';
@@ -88,8 +85,8 @@ function renderPVI(data) {
   // ── Render portfolio cards for a given filtered dataset
   function renderPortfolios(filteredData) {
     var contentEl = document.getElementById("pvi-content");
-    if (!filteredData) {
-      contentEl.innerHTML = '<div class="text-muted p-3"><i class="bi bi-filter me-1"></i>Select a BE GEO ID in the Overview tab to view PVI data.</div>';
+    if (!filteredData || filteredData.length === 0) {
+      contentEl.innerHTML = '<div class="text-muted p-3">No PVI data available for this selection.</div>';
       return;
     }
 
@@ -177,12 +174,7 @@ function renderPVI(data) {
     });
   }
 
-  // ── Apply global GEO filter from Overview
-  if (activeGeo) {
-    renderPortfolios(data.filter(function(r) { return String(r["BE GEO ID"] || "").trim() === activeGeo; }));
-  } else {
-    renderPortfolios(null);
-  }
+  renderPortfolios(data);
 }
 
 window.renderPVI = renderPVI;

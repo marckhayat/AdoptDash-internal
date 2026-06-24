@@ -15,8 +15,9 @@ var APP_DATA = null;
 var APP_FILE_META = null;
 var APP_FILTER_STATE = { details: null, lifecycle: null, cpiAdopt: null, customer: null, testing: null, overview: null, pvi: null, compare: null };
 var APP_IS_DISTI = false;
-var APP_MULTI_SESSIONS = null; // { sessions: [...], fileMeta: {...} }
-var APP_EXCL_ACTIVE = false;   // when true, excluded deals are removed from overview/pvi/insights calculations
+var APP_GEO_FILTER = "";   // BE GEO ID filter — applies to all tabs
+var APP_MULTI_SESSIONS = null;
+var APP_EXCL_ACTIVE = false;
 var APP_VERSION = "v1.0.0";
 // Use the browser's preferred language for date formatting (respects user's browser locale setting)
 var APP_LOCALE = navigator.language || undefined;
@@ -499,6 +500,29 @@ function finishLoad(filename, rowCount, headerAutoDetected, idbType, loadedAt, f
   document.getElementById("upload-section").classList.add("d-none");
   document.getElementById("mainTabContent").classList.remove("d-none");
   document.getElementById("main-tab-bar").classList.remove("d-none");
+
+  // Populate BE GEO ID global filter dropdown
+  APP_GEO_FILTER = "";
+  (function() {
+    var slot = document.getElementById("ovw-begeoid-tab-slot");
+    if (!slot) return;
+    var beGeoIds = [];
+    if (APP_DATA) APP_DATA.forEach(function(r) { var v = String(r["BE GEO ID"] || "").trim(); if (v && beGeoIds.indexOf(v) === -1) beGeoIds.push(v); });
+    beGeoIds.sort();
+    if (beGeoIds.length <= 1) { slot.innerHTML = ""; slot.classList.add("d-none"); return; }
+    slot.innerHTML =
+      '<label class="text-muted small mb-0 text-nowrap" for="ovw-begeoid-sel" style="font-size:0.8rem">BE GEO ID</label>' +
+      '<select id="ovw-begeoid-sel" class="form-select form-select-sm" style="width:auto;font-size:0.82rem">' +
+      '<option value="">All (' + beGeoIds.length + ')</option>' +
+      beGeoIds.map(function(id) { return '<option value="' + id + '">' + id + '</option>'; }).join("") +
+      '</select>';
+    slot.classList.remove("d-none");
+    document.getElementById("ovw-begeoid-sel").addEventListener("change", function() {
+      APP_GEO_FILTER = this.value;
+      var activeTab = document.querySelector(".nav-link.active[data-bs-target]");
+      if (activeTab) renderActiveTab(activeTab.dataset.bsTarget);
+    });
+  })();
   renderMultiPicker(); // re-render persistent session bar (highlights active, keeps others)
 
   var pviTab = document.getElementById("tab-pvi-btn");
@@ -1362,21 +1386,23 @@ function refreshCpiFromHandle(file, idbKey, scopeType, scopeLabel, cacheOnly) {
   });
 }
 
-// Returns APP_DATA filtered to exclude records flagged as excluded by the user
+// Returns APP_DATA filtered by GEO and excluded records
 function getActiveData() {
   if (!APP_DATA) return APP_DATA;
-  if (!window.APP_EXCL_ACTIVE) return APP_DATA;
+  var d = APP_DATA;
+  if (APP_GEO_FILTER) d = d.filter(function (r) { return String(r["BE GEO ID"] || "") === APP_GEO_FILTER; });
+  if (!window.APP_EXCL_ACTIVE) return d;
   var excludedIds = ANNOTATIONS.getExcludedWsIds();
-  if (excludedIds.length === 0) return APP_DATA;
+  if (excludedIds.length === 0) return d;
   var idSet = {};
   excludedIds.forEach(function (id) { idSet[id] = true; });
-  return APP_DATA.filter(function (r) { return !idSet[String(r["Deal WS-ID"] || "")]; });
+  return d.filter(function (r) { return !idSet[String(r["Deal WS-ID"] || "")]; });
 }
 
 function renderActiveTab(target) {
   switch (target) {
     case "#tab-overview":  renderOverview(getActiveData());  break;
-    case "#tab-details":   renderDetails(APP_DATA);          break;  // details always shows all rows (dimmed)
+    case "#tab-details":   renderDetails(getActiveData());   break;
     case "#tab-pvi":       renderPVI(getActiveData());       break;
     case "#tab-testing":   renderInsights(getActiveData());  break;
     case "#tab-compare":   renderCompare(getActiveData());   break;

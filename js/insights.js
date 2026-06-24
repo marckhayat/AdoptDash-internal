@@ -53,48 +53,37 @@ function renderTesting(data) {
   });
 
   // ── UCH: opted-in eligible only lookup structures ───────────────────────────
-  // Built lazily from getEffectiveData() so GEO filter is respected
   var uchPortfolioSet     = new Set();
   var uchOffersByPortfolio = {};
   var uchUCsByOffer        = {};
-  var uchPortfolios = [];
-  var uchAllOffers = [];
-  var uchAllUCs = [];
-
-  function uchRebuildLookups() {
-    var ed = getEffectiveData();
-    uchPortfolioSet     = new Set();
-    uchOffersByPortfolio = {};
-    uchUCsByOffer        = {};
-    ed.forEach(function(r) {
-      if (norm(r["Stage"]) !== "ELIGIBLE") return;
-      if (norm(r["Adopt Rebate Opt-In Status"]) !== "OPTED IN") return;
-      var p  = r["Deal CPI Portfolio"];
-      var o  = r["Track"];
-      var uc = r["Sub-Track"];
-      if (p) {
-        uchPortfolioSet.add(p);
-        if (!uchOffersByPortfolio[p]) uchOffersByPortfolio[p] = new Set();
-        if (o) uchOffersByPortfolio[p].add(o);
-      }
-      if (o && uc) {
-        if (!uchUCsByOffer[o]) uchUCsByOffer[o] = new Set();
-        uchUCsByOffer[o].add(uc);
-      }
-    });
-    uchPortfolios = Array.from(uchPortfolioSet).sort(function(a,b) {
-      var ai = PORTFOLIO_ORDER.indexOf(a), bi = PORTFOLIO_ORDER.indexOf(b);
-      if (ai === -1 && bi === -1) return a.localeCompare(b);
-      if (ai === -1) return 1; if (bi === -1) return -1;
-      return ai - bi;
-    });
-    uchAllOffers = Array.from(new Set(ed.filter(function(r){
-      return norm(r["Stage"]) === "ELIGIBLE" && norm(r["Adopt Rebate Opt-In Status"]) === "OPTED IN";
-    }).map(function(r){ return r["Track"]; }).filter(Boolean))).sort();
-    uchAllUCs = Array.from(new Set(ed.filter(function(r){
-      return norm(r["Stage"]) === "ELIGIBLE" && norm(r["Adopt Rebate Opt-In Status"]) === "OPTED IN";
-    }).map(function(r){ return r["Sub-Track"]; }).filter(Boolean))).sort();
-  }
+  data.forEach(function(r) {
+    if (norm(r["Stage"]) !== "ELIGIBLE") return;
+    if (norm(r["Adopt Rebate Opt-In Status"]) !== "OPTED IN") return;
+    var p  = r["Deal CPI Portfolio"];
+    var o  = r["Track"];
+    var uc = r["Sub-Track"];
+    if (p) {
+      uchPortfolioSet.add(p);
+      if (!uchOffersByPortfolio[p]) uchOffersByPortfolio[p] = new Set();
+      if (o) uchOffersByPortfolio[p].add(o);
+    }
+    if (o && uc) {
+      if (!uchUCsByOffer[o]) uchUCsByOffer[o] = new Set();
+      uchUCsByOffer[o].add(uc);
+    }
+  });
+  var uchPortfolios = Array.from(uchPortfolioSet).sort(function(a,b) {
+    var ai = PORTFOLIO_ORDER.indexOf(a), bi = PORTFOLIO_ORDER.indexOf(b);
+    if (ai === -1 && bi === -1) return a.localeCompare(b);
+    if (ai === -1) return 1; if (bi === -1) return -1;
+    return ai - bi;
+  });
+  var uchAllOffers = Array.from(new Set(data.filter(function(r){
+    return norm(r["Stage"]) === "ELIGIBLE" && norm(r["Adopt Rebate Opt-In Status"]) === "OPTED IN";
+  }).map(function(r){ return r["Track"]; }).filter(Boolean))).sort();
+  var uchAllUCs = Array.from(new Set(data.filter(function(r){
+    return norm(r["Stage"]) === "ELIGIBLE" && norm(r["Adopt Rebate Opt-In Status"]) === "OPTED IN";
+  }).map(function(r){ return r["Sub-Track"]; }).filter(Boolean))).sort();
 
   function uchUCsForPortfolio(portfolio) {
     var s = new Set();
@@ -116,12 +105,13 @@ function renderTesting(data) {
   // ── Build HTML ─────────────────────────────────────────────────────────────
   var html = '<div class="p-3">';
 
-  // View switcher only (no GEO dropdown — controlled from Overview)
+  // View switcher (right-aligned)
   html += '<div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-4">';
   html += '<ul class="nav nav-pills mb-0" id="testing-view-tabs">';
   html += '<li class="nav-item"><button class="nav-link active" id="tab-btn-cpi"><i class="bi bi-graph-up-arrow me-1"></i>CPI Adopt</button></li>';
-  html += '<li class="nav-item"><button class="nav-link" id="tab-btn-pareto"><i class="bi bi-bar-chart-steps me-1"></i>Customer Analysis</button></li>';
-  html += '<li class="nav-item"><button class="nav-link" id="tab-btn-uch"><i class="bi bi-heart-pulse me-1"></i>UC Health</button></li>';
+  var _newTag = new Date() < new Date('2026-06-29') ? '<span class="position-absolute text-danger fw-bold" style="top:1px;right:2px;font-size:0.5rem;line-height:1">NEW</span>' : '';
+  html += '<li class="nav-item position-relative"><button class="nav-link" id="tab-btn-pareto"><i class="bi bi-bar-chart-steps me-1"></i>Customer Analysis</button>' + _newTag + '</li>';
+  html += '<li class="nav-item position-relative"><button class="nav-link" id="tab-btn-uch"><i class="bi bi-heart-pulse me-1"></i>UC Health</button>' + _newTag + '</li>';
   html += '<li class="nav-item"><button class="nav-link" id="tab-btn-lifecycle"><i class="bi bi-bar-chart me-1"></i>Lifecycle</button></li>';
   html += '</ul>';
   html += '</div>';
@@ -234,17 +224,15 @@ function renderTesting(data) {
   html += '</div>'; // close outer div.p-3
   el.innerHTML = html;
 
-  // Always returns data respecting current APP_EXCL_ACTIVE state and global GEO filter
+  // Always returns data respecting current APP_EXCL_ACTIVE state
   function getEffectiveData() {
     var base = (window.APP_DATA && window.APP_DATA.length) ? window.APP_DATA : data;
-    var result = (window.APP_EXCL_ACTIVE && window.getActiveData) ? window.getActiveData() : base;
-    var geo = (window.APP_FILTER_STATE && window.APP_FILTER_STATE.overview && window.APP_FILTER_STATE.overview.beGeoId) || "";
-    if (geo) result = result.filter(function(r) { return String(r["BE GEO ID"] || "") === geo; });
-    return result;
+    return (window.APP_EXCL_ACTIVE && window.getActiveData) ? window.getActiveData() : base;
   }
 
   // ── Exclude toggle button (shared across all subtabs) ─────────────────────
   var insightNavTabs = document.getElementById("testing-view-tabs");
+  if (insightNavTabs) {
     var _insightAllWsIds = new Set((window.APP_DATA || data).map(function(r) { return String(r["Deal WS-ID"] || ""); }));
     var _insightExclCount = ANNOTATIONS.getExcludedWsIds().filter(function(id) { return _insightAllWsIds.has(id); }).length;
     if (_insightExclCount > 0) {
@@ -277,6 +265,7 @@ function renderTesting(data) {
       insightNavTabs.style.cssText = "display:flex;flex-wrap:wrap;align-items:center";
       insightNavTabs.appendChild(insightExclBtn);
     }
+  }
 
   // ── Render function ────────────────────────────────────────────────────────
   function renderPareto() {
@@ -742,7 +731,7 @@ function renderTesting(data) {
         else toEl.value = fromEl.value;
       }
       updateUCHStageSliderDisplay();
-      if (_uchState.uc) renderUCHealth(); else uchRefresh();
+      if (_uchState.uc) renderUCHealth(); else renderUCHDonut();
     });
   });
   updateUCHStageSliderDisplay();
@@ -965,10 +954,7 @@ function renderTesting(data) {
         kh += '<a href="#" id="uch-deeplink" class="small"><i class="bi bi-box-arrow-up-right me-1"></i>Open in Details tab</a>';
         kpiArea.innerHTML = kh;
         var dlLink = document.getElementById("uch-deeplink");
-        if (dlLink) dlLink.addEventListener("click", function(e) {
-          e.preventDefault();
-          window.navigateToDetails(uchPreset);
-        });
+        if (dlLink) dlLink.addEventListener("click", function(e) { e.preventDefault(); window.navigateToDetails(uchPreset); });
       }
     }
 
@@ -1108,7 +1094,6 @@ function renderTesting(data) {
     h += '</div>';
 
     statsEl.innerHTML = h;
-    // Rebuild donut only (lookups already current, no need to refresh pills)
     renderUCHDonut();
   }
 
@@ -1158,20 +1143,17 @@ function renderTesting(data) {
     updateUCHStageSliderDisplay();
   }
 
+  // Bootstrap portfolio pills (always) — then restore slide position if needed
+  uchBuildPills("uch-panel-portfolio", uchPortfolios, _uchState.portfolio, function(p) {
+    _uchState.portfolio = p; _uchState.offer = ""; _uchState.uc = "";
+    uchRenderStep(1);
+  });
   uchUpdateBreadcrumb();
-
-  // uchRefresh: rebuild lookups from filtered data, then re-render pills + donut
-  function uchRefresh() {
-    uchRebuildLookups();
-    uchBuildPills("uch-panel-portfolio", uchPortfolios, _uchState.portfolio, function(p) {
-      _uchState.portfolio = p; _uchState.offer = ""; _uchState.uc = "";
-      uchRenderStep(1);
-    });
-    if (_uchState.portfolio) {
-      var step = _uchState.uc ? 2 : (_uchState.offer ? 2 : 1);
-      uchRenderStep(step);
-    }
-    renderUCHDonut();
+  renderUCHDonut();
+  if (_uchState.portfolio) {
+    var _restoreStep = _uchState.uc ? 2 : (_uchState.offer ? 2 : 1);
+    uchRenderStep(_restoreStep);
+    if (_uchState.uc) renderUCHealth();
   }
 
   // Pareto slicer events
@@ -1195,18 +1177,13 @@ function renderTesting(data) {
     showSubView("pareto");
     renderPareto();
   });
-  document.getElementById("tab-btn-uch").addEventListener("click", function() { showSubView("uch"); uchRefresh(); });
+  document.getElementById("tab-btn-uch").addEventListener("click", function() { showSubView("uch"); });
   document.getElementById("tab-btn-lifecycle").addEventListener("click", function() {
     showSubView("lifecycle");
     renderLifecycle(getEffectiveData());
   });
 
   // Restore active sub-view (or default to CPI Adopt)
-  // getEffectiveData() now reads from APP_FILTER_STATE.overview.beGeoId directly — no restore needed here
-
-  // Always initialize UCH (rebuild lookups + pills + donut)
-  uchRefresh();
-
   var savedView = _saved && _saved.view;
   if (savedView === "pareto") {
     showSubView("pareto");

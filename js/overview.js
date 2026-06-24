@@ -6,12 +6,6 @@ function renderOverview(data) {
   var el = document.getElementById("tab-overview");
   if (!el) return;
 
-  // Preserve selected BE GEO ID across re-renders
-  var _prevGeo = (function() {
-    var prev = document.getElementById("ovw-begeoid-sel");
-    return prev ? prev.value : ((window.APP_FILTER_STATE && window.APP_FILTER_STATE.overview) ? window.APP_FILTER_STATE.overview.beGeoId || "" : "");
-  })();
-
   // ── Helpers
   function norm(x) {
     if (x === null || x === undefined) return "";
@@ -112,15 +106,7 @@ function renderOverview(data) {
   if (fileDateLabel) {
     html += '<div><span class="text-muted small">' + fileDateCaption + '</span><br/><strong class="fs-6">' + escHtml(fileDateLabel) + '</strong></div>';
   }
-  // BE GEO ID dropdown
-  if (beGeoIds.length > 0) {
-    var geoOpts = '<option value="">All BE GEO IDs (' + beGeoIds.length + ')</option>';
-    beGeoIds.forEach(function(id) { geoOpts += '<option value="' + escHtml(id) + '">' + escHtml(id) + '</option>'; });
-    html += '<div class="d-flex align-items-center gap-2 ms-auto">' +
-      '<label class="text-muted small mb-0" for="ovw-begeoid-sel">BE GEO ID</label>' +
-      '<select id="ovw-begeoid-sel" class="form-select form-select-sm" style="width:auto;font-size:0.85rem">' + geoOpts + '</select>' +
-      '</div>';
-  }
+  // BE GEO ID filtering is handled globally via APP_GEO_FILTER (dropdown in tab bar)
   html += '</div>';
 
   html += '<div id="ovw-table-area"></div>';
@@ -177,31 +163,13 @@ function renderOverview(data) {
 
   renderTable();
 
-  // Wire BE GEO ID dropdown
-  var geoSel = document.getElementById("ovw-begeoid-sel");
-  if (geoSel) {
-    geoSel.addEventListener("change", function() {
-      window.APP_FILTER_STATE = window.APP_FILTER_STATE || {};
-      window.APP_FILTER_STATE.overview = { beGeoId: this.value };
-      renderTable();
-    });
-    // Restore previously-selected value and re-apply
-    if (_prevGeo) {
-      geoSel.value = _prevGeo;
-      renderTable();
-    }
-  }
-
   // Drilldown helper — navigates to Details tab with the given preset
   window.ovwDrilldown = function(preset) {
     window.navigateToDetails(preset);
   };
 
   function getFiltered() {
-    var geoEl = document.getElementById("ovw-begeoid-sel");
-    var selectedGeo = geoEl ? geoEl.value : "";
-    if (!selectedGeo) return data;
-    return data.filter(function(r) { return String(r["BE GEO ID"] || "") === selectedGeo; });
+    return data; // data is already GEO-filtered via getActiveData()
   }
 
   function renderTable() {
