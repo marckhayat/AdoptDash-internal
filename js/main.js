@@ -1420,6 +1420,8 @@ function resetApp() {
   sb.classList.remove("d-flex");
   sb.classList.add("d-none");
   document.getElementById("main-tab-bar").classList.add("d-none");
+  var cpiNav = document.getElementById("cpi-scroll-nav");
+  if (cpiNav) cpiNav.remove();
 
   // Reset disti mode — restore PVI tab
   APP_IS_DISTI = false;
