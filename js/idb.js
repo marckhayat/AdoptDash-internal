@@ -11,7 +11,7 @@
 // =============================================================================
 
 var IDB = (function () {
-  var DB_NAME      = "AdoptionDashboard";
+  var DB_NAME      = "AdoptionDashboard_Internal";
   var DB_VERSION   = 3;
   var STORE        = "datasets";
   var HANDLE_STORE = "fileHandles";
@@ -19,7 +19,7 @@ var IDB = (function () {
   var _db          = null;
 
   // ── localStorage-backed session metadata ────────────────────────────────
-  var _META_LS_KEY = "AdoptDash_sessionMeta";
+  var _META_LS_KEY = "AdoptDash_Internal_sessionMeta";
 
   function _lsGetAll() {
     try { return JSON.parse(localStorage.getItem(_META_LS_KEY) || "[]"); } catch (e) { return []; }

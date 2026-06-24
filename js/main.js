@@ -576,7 +576,7 @@ function restoreUploadSection(cachedEntries) {
   });
 
   // ── Compute week options: Latest, then previous weeks down to 2026W23 ─────
-  var savedRegion = localStorage.getItem("lci-region") || "EMEA";
+  var savedRegion = localStorage.getItem("AdoptDash_Internal_lci-region") || "EMEA";
   function getISOWeek(date) {
     var d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
     var day = d.getUTCDay() || 7;
@@ -758,7 +758,7 @@ function restoreUploadSection(cachedEntries) {
 
   ["lci-region","lci-week"].forEach(function (id) {
     document.getElementById(id).addEventListener("change", function () {
-      if (id === "lci-region") localStorage.setItem("lci-region", this.value);
+      if (id === "lci-region") localStorage.setItem("AdoptDash_Internal_lci-region", this.value);
       updateLciHint();
     });
   });
