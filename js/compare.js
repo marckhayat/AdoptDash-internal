@@ -2,8 +2,10 @@
 // compare.js — Leaderboard tab: compare performance across theaters/countries/partners
 // =============================================================================
 
-var _cmpChartOptin  = null;
-var _cmpChartEarned = null;
+var _cmpChartOptin    = null;
+var _cmpChartEarned   = null;
+var _cmpChartRatio    = null;
+var _cmpChartPotential= null;
 
 function renderCompare(data) {
   var el = document.getElementById("tab-compare");
@@ -187,9 +189,24 @@ function renderCompare(data) {
   html += '<div class="card-body p-3" id="cmp-earned-body" style="min-height:400px;height:400px"><canvas id="cmp-chart-earned"></canvas></div>';
   html += '</div></div>';
 
-  html += '</div></div>'; // end row + p-3
-  el.innerHTML = html;
+  html += '<div class="row g-4 mt-0">';
 
+  html += '<div class="col-12 col-xl-6"><div class="card shadow-sm">';
+  html += '<div class="card-header fw-semibold d-flex align-items-center justify-content-between">';
+  html += '<span><i class="bi bi-percent me-2 text-primary"></i>Opt-in Ratio by ' + dimLabel + '</span>';
+  html += '<span id="cmp-ratio-total" class="fw-normal text-muted" style="font-size:0.82rem"></span></div>';
+  html += '<div class="card-body p-3" id="cmp-ratio-body" style="min-height:400px;height:400px"><canvas id="cmp-chart-ratio"></canvas></div>';
+  html += '</div></div>';
+
+  html += '<div class="col-12 col-xl-6"><div class="card shadow-sm">';
+  html += '<div class="card-header fw-semibold d-flex align-items-center justify-content-between">';
+  html += '<span><i class="bi bi-currency-dollar me-2 text-success"></i>Current Potential Incentives by ' + dimLabel + '</span>';
+  html += '<span id="cmp-potential-total" class="fw-normal text-muted" style="font-size:0.82rem"></span></div>';
+  html += '<div class="card-body p-3" id="cmp-potential-body" style="min-height:400px;height:400px"><canvas id="cmp-chart-potential"></canvas></div>';
+  html += '</div></div>';
+
+  html += '</div></div>'; // end second row + p-3
+  el.innerHTML = html;
   var EARN_STAGES = [
     { flagField: "Stage Completion Flag(onboard)", dateField: "Stage Completion Date(onboard)", amtField: "Estimated Incentive Amount(Onboard)" },
     { flagField: "Stage Completion Flag(Use)",     dateField: "Stage Completion Date(Use)",     amtField: "Estimated Incentive Amount(Use)"     },
@@ -243,10 +260,27 @@ function renderCompare(data) {
     // First pass: opt-ins — count rows (matching cpi-adopt chart 3, no dedup)
     optInRows.forEach(function(r) {
       var entity = String(r[dimField] || "").trim() || "(unknown)";
-      if (!entityMap[entity]) entityMap[entity] = { optIn: 0, optInByP: {}, earnedByP: {} };
+      if (!entityMap[entity]) entityMap[entity] = { optIn: 0, optInByP: {}, earnedByP: {}, eligEarned: 0, eligPotential: 0, eligNotOptedMax: 0, eligPotByP: {} };
       var p = r["Deal CPI Portfolio"] || "Other";
       entityMap[entity].optIn++;
       entityMap[entity].optInByP[p] = (entityMap[entity].optInByP[p] || 0) + 1;
+    });
+
+    // Stat pass: eligible deals (no FY filter), matching CPI Adopt buildStatCharts
+    eligRows.forEach(function(r) {
+      var isEligible = norm(r["Stage"]) === "ELIGIBLE";
+      if (!isEligible) return;
+      var isOptedIn = norm(r["Adopt Rebate Opt-In Status"]) === "OPTED IN";
+      var entity = String(r[dimField] || "").trim() || "(unknown)";
+      if (!entityMap[entity]) entityMap[entity] = { optIn: 0, optInByP: {}, earnedByP: {}, eligEarned: 0, eligPotential: 0, eligNotOptedMax: 0, eligPotByP: {} };
+      var p = r["Deal CPI Portfolio"] || "Other";
+      if (isOptedIn) {
+        entityMap[entity].eligEarned    += parseFloat(r["Estimated Earned Incentives"]) || 0;
+        entityMap[entity].eligPotential += parseFloat(r["Potential Incentives"])        || 0;
+        entityMap[entity].eligPotByP[p] = (entityMap[entity].eligPotByP[p] || 0) + (parseFloat(r["Potential Incentives"]) || 0);
+      } else {
+        entityMap[entity].eligNotOptedMax += parseFloat(r["Revised Maximum Incentive Amount"]) || 0;
+      }
     });
 
     // Second pass: earned incentives by stage completion date
@@ -255,7 +289,7 @@ function renderCompare(data) {
       var p = r["Deal CPI Portfolio"] || "Other";
       if (portfolio && p !== portfolio) return;
       var entity = String(r[dimField] || "").trim() || "(unknown)";
-      if (!entityMap[entity]) entityMap[entity] = { optIn: 0, optInByP: {}, earnedByP: {} };
+      if (!entityMap[entity]) entityMap[entity] = { optIn: 0, optInByP: {}, earnedByP: {}, eligEarned: 0, eligPotential: 0, eligNotOptedMax: 0, eligPotByP: {} };
       var lciStart = new Date(r["Adopt Rebate Start Date"]);
       var expiry   = new Date(r["Deal Incentive Expiry Date"]);
       if (isNaN(lciStart.getTime()) || isNaN(expiry.getTime())) return;
@@ -280,7 +314,7 @@ function renderCompare(data) {
       } else {
         label = entity;
       }
-      return { entity: entity, label: label, optIn: m.optIn, optInByP: m.optInByP, earnedByP: m.earnedByP, totalEarned: totalEarned };
+      return { entity: entity, label: label, optIn: m.optIn, optInByP: m.optInByP, earnedByP: m.earnedByP, totalEarned: totalEarned, eligEarned: m.eligEarned, eligPotential: m.eligPotential, eligNotOptedMax: m.eligNotOptedMax, eligPotByP: m.eligPotByP };
     });
 
     var pfList = portfolio ? [portfolio] : portfolios;
@@ -316,6 +350,19 @@ function renderCompare(data) {
         backgroundColor: PORTFOLIO_COLORS[p] || FALLBACK_COLORS[i % FALLBACK_COLORS.length]
       };
     });
+    var avg = total / entries.length;
+    datasets.push({
+      type: "line",
+      label: "Average",
+      data: entries.map(function() { return avg; }),
+      borderColor: "rgba(0,0,0,0.55)",
+      borderWidth: 2,
+      borderDash: [6, 3],
+      pointRadius: 0,
+      fill: false,
+      order: -1,
+      stack: "avg-line"
+    });
 
     var ctx = document.getElementById("cmp-chart-optin").getContext("2d");
     _cmpChartOptin = new Chart(ctx, {
@@ -337,7 +384,7 @@ function renderCompare(data) {
             callbacks: {
               footer: function(items) {
                 var e = entries[items[0].dataIndex];
-                return "Total opted-in: " + e.optIn;
+                return "Total opted-in: " + e.optIn + "\nAverage: " + Math.round(avg).toLocaleString();
               }
             }
           }
@@ -365,6 +412,19 @@ function renderCompare(data) {
         backgroundColor: PORTFOLIO_COLORS[p] || FALLBACK_COLORS[i % FALLBACK_COLORS.length]
       };
     });
+    var avgEarned = grand / entries.length;
+    datasets.push({
+      type: "line",
+      label: "Average",
+      data: entries.map(function() { return avgEarned; }),
+      borderColor: "rgba(0,0,0,0.55)",
+      borderWidth: 2,
+      borderDash: [6, 3],
+      pointRadius: 0,
+      fill: false,
+      order: -1,
+      stack: "avg-line"
+    });
 
     var ctx = document.getElementById("cmp-chart-earned").getContext("2d");
     _cmpChartEarned = new Chart(ctx, {
@@ -389,8 +449,160 @@ function renderCompare(data) {
             callbacks: {
               label: function(ctx) { return " " + ctx.dataset.label + ": " + fmtTick(ctx.raw); },
               footer: function(items) {
-                if (pfList.length > 1) return "Total: " + fmtTick(entries[items[0].dataIndex].totalEarned);
-                return "";
+                if (pfList.length > 1) return "Total: " + fmtTick(entries[items[0].dataIndex].totalEarned) + "\nAverage: " + fmtTick(avgEarned);
+                return "Average: " + fmtTick(avgEarned);
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+
+  function renderRatioChart(entries) {
+    if (_cmpChartRatio) { _cmpChartRatio.destroy(); _cmpChartRatio = null; }
+    var totalEl = document.getElementById("cmp-ratio-total");
+    var bodyEl  = document.getElementById("cmp-ratio-body");
+
+    // Sort descending by ratio; filter to entities that have any eligible data
+    var sorted = entries.slice().filter(function(e) {
+      return (e.eligEarned + e.eligPotential + e.eligNotOptedMax) > 0;
+    }).sort(function(a, b) {
+      var ra = (a.eligEarned + a.eligPotential) / (a.eligEarned + a.eligPotential + a.eligNotOptedMax);
+      var rb = (b.eligEarned + b.eligPotential) / (b.eligEarned + b.eligPotential + b.eligNotOptedMax);
+      return rb - ra;
+    });
+    if (_topN > 0) sorted = sorted.slice(0, _topN);
+
+    if (!sorted.length) {
+      if (bodyEl) bodyEl.innerHTML = '<p class="text-muted small">No eligible data for this selection.</p>';
+      if (totalEl) totalEl.textContent = "";
+      return;
+    }
+
+    var globalNum = sorted.reduce(function(s, e) { return s + e.eligEarned + e.eligPotential; }, 0);
+    var globalDen = sorted.reduce(function(s, e) { return s + e.eligEarned + e.eligPotential + e.eligNotOptedMax; }, 0);
+    var globalPct = globalDen > 0 ? Math.round(globalNum / globalDen * 100) : 0;
+    if (totalEl) totalEl.textContent = globalPct + "% overall (" + fmtTick(globalNum) + " / " + fmtTick(globalDen) + ")";
+
+    var ratios = sorted.map(function(e) {
+      var num = e.eligEarned + e.eligPotential;
+      var den = num + e.eligNotOptedMax;
+      return den > 0 ? num / den * 100 : 0;
+    });
+    var avg = ratios.reduce(function(s, v) { return s + v; }, 0) / Math.max(1, ratios.length);
+
+    var ctx = document.getElementById("cmp-chart-ratio").getContext("2d");
+    _cmpChartRatio = new Chart(ctx, {
+      type: "bar",
+      data: {
+        labels: sorted.map(function(e) { return e.label; }),
+        datasets: [{
+          label: "Opt-in Rate",
+          data: ratios,
+          backgroundColor: "#00BCF2"
+        }, {
+          type: "line",
+          label: "Average",
+          data: ratios.map(function() { return avg; }),
+          borderColor: "rgba(0,0,0,0.55)",
+          borderWidth: 2,
+          borderDash: [6, 3],
+          pointRadius: 0,
+          fill: false,
+          order: -1,
+          stack: "avg-line"
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          x: { grid: { display: false }, ticks: { font: { size: 11 }, maxRotation: 45 } },
+          y: { beginAtZero: true, min: 0, max: 100, ticks: { font: { size: 10 }, callback: function(v) { return v + "%"; } }, title: { display: true, text: "Opt-in Rate (%)" } }
+        },
+        plugins: {
+          legend: { position: "bottom" },
+          tooltip: {
+            callbacks: {
+              label: function(ctx) {
+                if (ctx.dataset.label === "Average") return " Avg: " + avg.toFixed(1) + "%";
+                return " " + ctx.raw.toFixed(1) + "%";
+              },
+              footer: function(items) {
+                var e = sorted[items[0].dataIndex];
+                var num = e.eligEarned + e.eligPotential;
+                var den = num + e.eligNotOptedMax;
+                var pct = den > 0 ? (num / den * 100).toFixed(1) : "0.0";
+                return "Earned+Potential: " + fmtTick(num) + "\nNot opted-in: " + fmtTick(e.eligNotOptedMax) + "\nTotal eligible: " + fmtTick(den) + " → " + pct + "%";
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+
+  function renderPotentialChart(entries, pfList) {
+    if (_cmpChartPotential) { _cmpChartPotential.destroy(); _cmpChartPotential = null; }
+    var totalEl = document.getElementById("cmp-potential-total");
+    var bodyEl  = document.getElementById("cmp-potential-body");
+
+    var sorted = entries.slice().sort(function(a, b) { return b.eligPotential - a.eligPotential; });
+    if (_topN > 0) sorted = sorted.slice(0, _topN);
+
+    if (!sorted.length || sorted.every(function(e) { return e.eligPotential === 0; })) {
+      if (bodyEl) bodyEl.innerHTML = '<p class="text-muted small">No potential incentives data for this selection.</p>';
+      if (totalEl) totalEl.textContent = "";
+      return;
+    }
+
+    var grand = sorted.reduce(function(s, e) { return s + e.eligPotential; }, 0);
+    if (totalEl) totalEl.textContent = fmtTick(grand) + " total";
+
+    var avgPot = grand / Math.max(1, sorted.length);
+    var datasets = pfList.map(function(p, i) {
+      return {
+        label: p,
+        data: sorted.map(function(e) { return e.eligPotByP[p] || 0; }),
+        backgroundColor: PORTFOLIO_COLORS[p] || FALLBACK_COLORS[i % FALLBACK_COLORS.length]
+      };
+    });
+    datasets.push({
+      type: "line",
+      label: "Average",
+      data: sorted.map(function() { return avgPot; }),
+      borderColor: "rgba(0,0,0,0.55)",
+      borderWidth: 2,
+      borderDash: [6, 3],
+      pointRadius: 0,
+      fill: false,
+      order: -1,
+      stack: "avg-line"
+    });
+
+    var ctx = document.getElementById("cmp-chart-potential").getContext("2d");
+    _cmpChartPotential = new Chart(ctx, {
+      type: "bar",
+      data: {
+        labels: sorted.map(function(e) { return e.label; }),
+        datasets: datasets
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          x: { stacked: true, grid: { display: false }, ticks: { font: { size: 11 }, maxRotation: 45 } },
+          y: { stacked: true, beginAtZero: true, ticks: { font: { size: 10 }, callback: fmtTick }, title: { display: true, text: "Potential Incentives ($)" } }
+        },
+        plugins: {
+          legend: { position: "bottom" },
+          tooltip: {
+            callbacks: {
+              label: function(ctx) { return " " + ctx.dataset.label + ": " + fmtTick(ctx.raw); },
+              footer: function(items) {
+                var e = sorted[items[0].dataIndex];
+                return "Total: " + fmtTick(e.eligPotential) + "\nAverage: " + fmtTick(avgPot);
               }
             }
           }
@@ -403,6 +615,8 @@ function renderCompare(data) {
     var d = computeData();
     renderOptInChart(d.byOptIn, d.pfList);
     renderEarnedChart(d.byEarned, d.pfList);
+    renderRatioChart(d.byOptIn);
+    renderPotentialChart(d.byOptIn, d.pfList);
   }
 
   // ── Wire controls ───────────────────────────────────────────────────────────

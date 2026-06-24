@@ -53,6 +53,9 @@ function init() {
         var nav = document.getElementById("cpi-scroll-nav");
         if (nav) nav.remove();
       }
+      // Hide the BE GEO ID filter on the Leaderboard tab (compares all entities)
+      var geoSlot = document.getElementById("ovw-begeoid-tab-slot");
+      if (geoSlot) geoSlot.classList.toggle("d-none", e.target.dataset.bsTarget === "#tab-compare");
       renderActiveTab(e.target.dataset.bsTarget);
     });
   });
@@ -647,10 +650,9 @@ function restoreUploadSection(cachedEntries) {
     '<div id="lci-last-file-hint" class="d-none mb-2 text-start small">' +
     '<i class="bi bi-file-earmark-check me-1 text-success"></i>' +
     '<span id="lci-last-file-name" class="fw-semibold"></span>' +
-    ' &nbsp;<a href="#" id="lci-pick-different" class="text-muted">Use different file</a>' +
     '</div>' +
     '<div class="d-flex align-items-center gap-3 flex-wrap">' +
-    '<p class="text-muted small mb-0">Locate the <span id="lci-file-hint-text" class="fw-semibold fst-italic"></span> file in your OneDrive.</p>' +
+    '<p id="lci-onedrive-hint" class="text-muted small mb-0">Locate the <span id="lci-file-hint-text" class="fw-semibold fst-italic"></span> file in your OneDrive.</p>' +
     '<button id="lci-load-btn" class="btn btn-warning px-4"><i class="bi bi-folder2-open me-2"></i>Load CPI File…</button>' +
     '<input type="file" id="lci-file-input" accept=".csv" class="d-none" />' +
     '</div>'+
@@ -789,35 +791,48 @@ function restoreUploadSection(cachedEntries) {
     document.getElementById(id).addEventListener("change", function () {
       if (id === "lci-region") localStorage.setItem("AdoptDash_Internal_lci-region", this.value);
       updateLciHint();
+      updateLastFileHint();
     });
   });
   updateLciHint();
 
   // ── Show last-used CPI file hint if a handle is stored ───────────────────
-  IDB.loadHandle("lci-last-file").then(function (handle) {
-    if (!handle) return;
+  var _lastHandleName = null;
+
+  function updateLastFileHint() {
+    if (!_lastHandleName) return;
+    var region = document.getElementById("lci-region").value;
+    var regionFile = region === "DISTI" ? "DISTI" : region;
+    var fileMatchesRegion = _lastHandleName.indexOf("_" + regionFile + "_") !== -1 ||
+                            _lastHandleName.indexOf("_" + regionFile + ".") !== -1;
     var hintEl = document.getElementById("lci-last-file-hint");
     var nameEl = document.getElementById("lci-last-file-name");
+    var onedriveHint = document.getElementById("lci-onedrive-hint");
     if (hintEl && nameEl) {
-      nameEl.textContent = handle.name;
-      hintEl.classList.remove("d-none");
+      if (fileMatchesRegion) {
+        nameEl.textContent = _lastHandleName;
+        hintEl.classList.remove("d-none");
+        if (onedriveHint) onedriveHint.classList.add("d-none");
+      } else {
+        hintEl.classList.add("d-none");
+        if (onedriveHint) onedriveHint.classList.remove("d-none");
+      }
     }
+  }
+
+  IDB.loadHandle("lci-last-file").then(function (handle) {
+    if (!handle) return;
+    _lastHandleName = handle.name;
+    updateLastFileHint();
   }).catch(function() {});
 
   // ── Load button: try last-used handle first, then fall back to file picker ──
   document.getElementById("lci-load-btn").addEventListener("click", function () {
     document.getElementById("lci-error").classList.add("d-none");
-    openCpiFile(false);
+    openCpiFile();
   });
 
-  // ── "Use different file" link ─────────────────────────────────────────────
-  document.getElementById("lci-pick-different").addEventListener("click", function (e) {
-    e.preventDefault();
-    document.getElementById("lci-error").classList.add("d-none");
-    openCpiFile(true);
-  });
-
-  function openCpiFile(forcePicker) {
+  function openCpiFile() {
     var region = document.getElementById("lci-region").value;
     var week   = document.getElementById("lci-week").value;
 
@@ -830,10 +845,8 @@ function restoreUploadSection(cachedEntries) {
           var handle = handles[0];
           PENDING_FILE_HANDLE = handle;
           IDB.saveHandle("lci-last-file", handle).then(function () {
-            var nameEl = document.getElementById("lci-last-file-name");
-            var hintEl = document.getElementById("lci-last-file-hint");
-            if (nameEl) nameEl.textContent = handle.name;
-            if (hintEl) hintEl.classList.remove("d-none");
+            _lastHandleName = handle.name;
+            updateLastFileHint();
           }).catch(function() {});
           return handle.getFile();
         }).then(function (file) {
@@ -852,11 +865,14 @@ function restoreUploadSection(cachedEntries) {
       }
     }
 
-    if (forcePicker) { openPicker(); return; }
-
-    // Try the last-used handle first
+    // Try the last-used handle only if it matches the selected region
     IDB.loadHandle("lci-last-file").then(function (handle) {
       if (!handle) { openPicker(); return; }
+      // Check if the stored filename matches the selected region
+      var regionFile = region === "DISTI" ? "DISTI" : region;
+      var fileMatchesRegion = handle.name.indexOf("_" + regionFile + "_") !== -1 ||
+                              handle.name.indexOf("_" + regionFile + ".") !== -1;
+      if (!fileMatchesRegion) { openPicker(); return; }
       handle.queryPermission({ mode: "read" }).then(function (perm) {
         if (perm === "granted") return perm;
         return handle.requestPermission({ mode: "read" });
