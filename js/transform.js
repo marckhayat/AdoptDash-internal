@@ -5,6 +5,64 @@
 // Output: array of enriched row objects with all computed columns
 // =============================================================================
 
+// =============================================================================
+// fixTheaterField — fixes blank / "All" Theater values on raw rows in-place.
+// Must be called on the full dataset BEFORE any theater-based filtering.
+// Safe to call multiple times (idempotent — already-fixed rows are skipped).
+// region (optional string) — when provided, static overrides from
+//   COUNTRY_THEATER_OVERRIDES take highest priority (manual assignments always
+//   win), followed by the data-derived lookup, then COUNTRY_THEATER_REGION_DEFAULT.
+// =============================================================================
+function fixTheaterField(rawRows, region) {
+  // Apply BE GEO ID → Partner Country overrides first
+  var geoCountryMap = (typeof BE_GEO_ID_COUNTRY_OVERRIDES !== "undefined") ? BE_GEO_ID_COUNTRY_OVERRIDES : {};
+  rawRows.forEach(function(r) {
+    var geoId = String(r["BE GEO ID"] || "").trim().replace(/\.0+$/, "");
+    if (geoId && geoCountryMap[geoId]) {
+      r["Partner Country"] = geoCountryMap[geoId];
+    }
+  });
+
+  // Static overrides and region default (from mapping.js)
+  var regionUpper   = region ? String(region).toUpperCase().replace(/^DISTI$/, "") : "";
+  var staticMap     = (typeof COUNTRY_THEATER_OVERRIDES !== "undefined" && regionUpper)
+                        ? (COUNTRY_THEATER_OVERRIDES[regionUpper] || {})
+                        : {};
+  var regionDefault = (typeof COUNTRY_THEATER_REGION_DEFAULT !== "undefined" && regionUpper)
+                        ? (COUNTRY_THEATER_REGION_DEFAULT[regionUpper] || "")
+                        : "";
+
+  // Build a case-insensitive version of the static map for resilient matching
+  var staticMapUpper = {};
+  Object.keys(staticMap).forEach(function(k) { staticMapUpper[k.toUpperCase()] = staticMap[k]; });
+
+  // Build Partner Country → first valid Theater lookup from the data itself
+  var countryToTheater = {};
+  rawRows.forEach(function(r) {
+    var t = String(r["Theater"] || "").trim();
+    var c = String(r["Partner Country"] || "").trim();
+    if (c && t && t.toUpperCase() !== "ALL" && !countryToTheater[c.toUpperCase()]) {
+      countryToTheater[c.toUpperCase()] = t;
+    }
+  });
+
+  // Fix rows whose Theater is blank or "All"
+  rawRows.forEach(function(r) {
+    var t = String(r["Theater"] || "").trim();
+    if (!t || t.toUpperCase() === "ALL") {
+      var cu = String(r["Partner Country"] || "").trim().toUpperCase();
+      // Priority: 1) manual static override  2) data-derived lookup  3) region default
+      var resolved = staticMapUpper[cu] || countryToTheater[cu] || regionDefault || "";
+      if (resolved) r["Theater"] = resolved;
+    }
+  });
+
+  return rawRows;
+}
+
+window.fixTheaterField = fixTheaterField;
+
+
 // ── Shared string sanitizer (applied to every string value before processing) ─
 function sanitizeValue(v) {
   if (typeof v !== "string") return v;
@@ -149,8 +207,11 @@ function transformData(rawRows) {
   window.APP_IS_DISTI = distiColKey !== null &&
     rawRows.some(function(r) { return r[distiColKey] && String(r[distiColKey]).trim() !== ""; });
 
+  // Fix Theater before any per-row processing (safety net for direct CSV/XLSX paths)
+  fixTheaterField(rawRows);
+
   // ── Main transformation ───────────────────────────────────────────────────
-  return rawRows.map(function (raw) {
+  var _transformed = rawRows.map(function (raw) {
     var r = sanitizeRow(Object.assign({}, raw)); // sanitize all string values first
 
     // Map disti columns to standard names
@@ -403,6 +464,8 @@ function transformData(rawRows) {
 
     return r;
   });
+
+  return _transformed;
 }
 
 window.transformData = transformData;

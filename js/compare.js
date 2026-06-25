@@ -342,6 +342,12 @@ function renderCompare(data) {
     return "$" + Math.round(v).toLocaleString();
   }
 
+  // Truncate X-axis tick labels from the end so long names don't get clipped on the left
+  function truncLabel(val) {
+    var label = typeof this.getLabelForValue === "function" ? this.getLabelForValue(val) : String(val);
+    return label && label.length > 18 ? label.slice(0, 18) + "\u2026" : label;
+  }
+
   function renderOptInChart(entries, pfList) {
     if (_cmpChartOptin) { _cmpChartOptin.destroy(); _cmpChartOptin = null; }
     var totalEl = document.getElementById("cmp-optin-total");
@@ -385,8 +391,9 @@ function renderCompare(data) {
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        layout: { padding: { left: 20 } },
         scales: {
-          x: { stacked: true, grid: { display: false }, ticks: { font: { size: 11 }, maxRotation: 45 } },
+          x: { stacked: true, grid: { display: false }, ticks: { font: { size: 11 }, maxRotation: 45, callback: truncLabel } },
           y: { stacked: true, type: _logScale ? "logarithmic" : "linear", beginAtZero: !_logScale, ticks: { font: { size: 10 } }, title: { display: true, text: "Unique Offer Opt-ins" } }
         },
         plugins: {
@@ -444,8 +451,9 @@ function renderCompare(data) {
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        layout: { padding: { left: 20 } },
         scales: {
-          x: { stacked: true, grid: { display: false }, ticks: { font: { size: 11 }, maxRotation: 45 } },
+          x: { stacked: true, grid: { display: false }, ticks: { font: { size: 11 }, maxRotation: 45, callback: truncLabel } },
           y: {
             stacked: true,
             type: _logScale ? "logarithmic" : "linear",
@@ -528,8 +536,9 @@ function renderCompare(data) {
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        layout: { padding: { left: 20 } },
         scales: {
-          x: { grid: { display: false }, ticks: { font: { size: 11 }, maxRotation: 45 } },
+          x: { grid: { display: false }, ticks: { font: { size: 11 }, maxRotation: 45, callback: truncLabel } },
           y: { beginAtZero: true, min: 0, max: 100, ticks: { font: { size: 10 }, callback: function(v) { return v + "%"; } }, title: { display: true, text: "Opt-in Rate (%)" } }
         },
         plugins: {
@@ -602,8 +611,9 @@ function renderCompare(data) {
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        layout: { padding: { left: 20 } },
         scales: {
-          x: { stacked: true, grid: { display: false }, ticks: { font: { size: 11 }, maxRotation: 45 } },
+          x: { stacked: true, grid: { display: false }, ticks: { font: { size: 11 }, maxRotation: 45, callback: truncLabel } },
           y: { stacked: _logScale ? false : true, type: _logScale ? "logarithmic" : "linear", beginAtZero: !_logScale, ticks: { font: { size: 10 }, callback: fmtTick }, title: { display: true, text: "Potential Incentives ($)" } }
         },
         plugins: {

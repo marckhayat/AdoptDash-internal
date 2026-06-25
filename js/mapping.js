@@ -70,3 +70,32 @@ var UC_GUIDE_MAP = (function () {
   return map;
 }());
 
+// ── Static country → theater overrides per region ────────────────────────────
+// Applied in fixTheaterField when the automatic lookup cannot resolve a Theater.
+var COUNTRY_THEATER_OVERRIDES = {
+  "AMERICAS": {
+    "United States": "USA",
+    "Canada":        "CANADA"
+    // All other countries fall back to "LATAM" (handled by COUNTRY_THEATER_REGION_DEFAULT)
+  },
+  "EMEA": {
+    "Malta":      "EMEA-SOUTH",
+    "Mozambique": "EMEA_MEA",
+    "Mauritius":  "EMEA_MEA",
+    "Tanzania":   "EMEA_MEA",
+    "Guinea":     "EMEA_MEA",
+    "Botswana":   "EMEA_MEA"
+  }
+};
+
+// Default theater for any unresolved country per region
+var COUNTRY_THEATER_REGION_DEFAULT = {
+  "AMERICAS": "LATAM"
+};
+
+// ── Static BE GEO ID → Partner Country overrides ─────────────────────────────
+// Applied before theater resolution so the corrected country feeds the theater lookup.
+var BE_GEO_ID_COUNTRY_OVERRIDES = {
+  "80975": "FRANCE"
+};
+

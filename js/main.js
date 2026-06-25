@@ -1220,6 +1220,7 @@ function processCpiFile(file, region, week) {
             return r[rawDistiKey] && String(r[rawDistiKey]).trim() !== "";
           }));
 
+          fixTheaterField(results.data, region);
           showDrillDownPicker(results.data, function(filteredRows, scopeType, scopeLabel) {
             try {
               // Build a unique key per region+scope so sessions don't overwrite each other
@@ -1343,6 +1344,9 @@ function refreshCpiFromHandle(file, idbKey, scopeType, scopeLabel, cacheOnly) {
             var rawIsDisti = !!(rawDistiKey && results.data.some(function(r) {
               return r[rawDistiKey] && String(r[rawDistiKey]).trim() !== "";
             }));
+
+            // Fix Theater before re-applying scope filter
+            fixTheaterField(results.data, region);
 
             // Re-apply the same scope filter
             var rows = results.data;
