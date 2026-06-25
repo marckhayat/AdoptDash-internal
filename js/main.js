@@ -951,7 +951,7 @@ function showDrillDownPicker(rawRows, onConfirm) {
       // Region
       '<div class="form-check mb-2">' +
         '<input class="form-check-input" type="radio" name="scope-level" id="scope-region" value="region" checked>' +
-        '<label class="form-check-label" for="scope-region"><strong>Whole Region</strong> <span class="text-muted small">— all ' + rawRows.length.toLocaleString() + ' rows</span></label>' +
+        '<label class="form-check-label" for="scope-region"><strong>Whole Region</strong> <span class="text-muted small">— all ' + rawRows.length.toLocaleString() + ' rows <em>(will exclude non-eligible deals)</em></span></label>' +
       '</div>' +
 
       // Theater

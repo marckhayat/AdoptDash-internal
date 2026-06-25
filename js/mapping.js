@@ -78,6 +78,25 @@ var COUNTRY_THEATER_OVERRIDES = {
     "Canada":        "CANADA"
     // All other countries fall back to "LATAM" (handled by COUNTRY_THEATER_REGION_DEFAULT)
   },
+  "APJC": {
+    "Singapore":         "ASEAN",
+    "Hong Kong":         "GREATER CHINA",
+    "India":             "INDIA",
+    "China":             "GREATER CHINA",
+    "Malaysia":          "ASEAN",
+    "Australia":         "ANZ",
+    "Vietnam":           "ASEAN",
+    "Taiwan":            "GREATER CHINA",
+    "Republic Of Korea": "KOREA",
+    "Sri Lanka":         "INDIA",
+    "Thailand":          "ASEAN",
+    "Japan":             "JAPAN",
+    "Indonesia":         "ASEAN",
+    "New Zealand":       "ANZ",
+    "Philippines":       "ASEAN",
+    "Bangladesh":        "INDIA",
+    "Myanmar":           "ASEAN"
+  },
   "EMEA": {
     "Malta":      "EMEA-SOUTH",
     "Mozambique": "EMEA_MEA",
@@ -93,7 +112,10 @@ var COUNTRY_THEATER_REGION_DEFAULT = {
   "AMER": "LATAM"
 };
 
-// ── Static BE GEO ID → Partner Country overrides ─────────────────────────────
+// ── Unconditional country → theater overrides (applied regardless of existing Theater value) ──
+var COUNTRY_THEATER_FORCE = {
+  "Australia": "ANZ"
+};
 // Applied before theater resolution so the corrected country feeds the theater lookup.
 var BE_GEO_ID_COUNTRY_OVERRIDES = {
   "80975": "FRANCE"

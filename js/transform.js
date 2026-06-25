@@ -14,6 +14,15 @@
 //   win), followed by the data-derived lookup, then COUNTRY_THEATER_REGION_DEFAULT.
 // =============================================================================
 function fixTheaterField(rawRows, region) {
+  // Apply unconditional country → theater overrides (always win, regardless of existing value)
+  var forceMap = (typeof COUNTRY_THEATER_FORCE !== "undefined") ? COUNTRY_THEATER_FORCE : {};
+  var forceMapUpper = {};
+  Object.keys(forceMap).forEach(function(k) { forceMapUpper[k.toUpperCase()] = forceMap[k]; });
+  rawRows.forEach(function(r) {
+    var cu = String(r["Partner Country"] || "").trim().toUpperCase();
+    if (cu && forceMapUpper[cu]) r["Theater"] = forceMapUpper[cu];
+  });
+
   // Apply BE GEO ID → Partner Country overrides first
   var geoCountryMap = (typeof BE_GEO_ID_COUNTRY_OVERRIDES !== "undefined") ? BE_GEO_ID_COUNTRY_OVERRIDES : {};
   rawRows.forEach(function(r) {
