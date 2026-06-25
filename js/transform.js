@@ -36,20 +36,23 @@ function fixTheaterField(rawRows, region) {
   var staticMapUpper = {};
   Object.keys(staticMap).forEach(function(k) { staticMapUpper[k.toUpperCase()] = staticMap[k]; });
 
+  // Values treated as generic/invalid — need to be resolved to a real theater
+  var GENERIC_THEATER = { "ALL": true, "AMERICAS": true };
+
   // Build Partner Country → first valid Theater lookup from the data itself
   var countryToTheater = {};
   rawRows.forEach(function(r) {
     var t = String(r["Theater"] || "").trim();
     var c = String(r["Partner Country"] || "").trim();
-    if (c && t && t.toUpperCase() !== "ALL" && !countryToTheater[c.toUpperCase()]) {
+    if (c && t && !GENERIC_THEATER[t.toUpperCase()] && !countryToTheater[c.toUpperCase()]) {
       countryToTheater[c.toUpperCase()] = t;
     }
   });
 
-  // Fix rows whose Theater is blank or "All"
+  // Fix rows whose Theater is blank or a generic region-level value
   rawRows.forEach(function(r) {
     var t = String(r["Theater"] || "").trim();
-    if (!t || t.toUpperCase() === "ALL") {
+    if (!t || GENERIC_THEATER[t.toUpperCase()]) {
       var cu = String(r["Partner Country"] || "").trim().toUpperCase();
       // Priority: 1) manual static override  2) data-derived lookup  3) region default
       var resolved = staticMapUpper[cu] || countryToTheater[cu] || regionDefault || "";

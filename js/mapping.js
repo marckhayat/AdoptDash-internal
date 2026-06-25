@@ -73,7 +73,7 @@ var UC_GUIDE_MAP = (function () {
 // ── Static country → theater overrides per region ────────────────────────────
 // Applied in fixTheaterField when the automatic lookup cannot resolve a Theater.
 var COUNTRY_THEATER_OVERRIDES = {
-  "AMERICAS": {
+  "AMER": {
     "United States": "USA",
     "Canada":        "CANADA"
     // All other countries fall back to "LATAM" (handled by COUNTRY_THEATER_REGION_DEFAULT)
@@ -90,7 +90,7 @@ var COUNTRY_THEATER_OVERRIDES = {
 
 // Default theater for any unresolved country per region
 var COUNTRY_THEATER_REGION_DEFAULT = {
-  "AMERICAS": "LATAM"
+  "AMER": "LATAM"
 };
 
 // ── Static BE GEO ID → Partner Country overrides ─────────────────────────────
