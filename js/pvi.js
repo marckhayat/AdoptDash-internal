@@ -86,7 +86,7 @@ function renderPVI(data) {
   function renderPortfolios(filteredData) {
     var contentEl = document.getElementById("pvi-content");
     if (!filteredData || filteredData.length === 0) {
-      contentEl.innerHTML = '<div class="text-danger p-3 text-end">Select a BE GEO ID from the top bar to view PVI data <i class="bi bi-arrow-up ms-1"></i></div>';
+      contentEl.innerHTML = '<div class="text-danger p-3 text-end blink">Select a BE GEO ID from the top bar to view PVI data <i class="bi bi-arrow-up ms-1"></i></div>';
       return;
     }
 

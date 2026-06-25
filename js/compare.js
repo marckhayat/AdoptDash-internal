@@ -40,15 +40,17 @@ function renderCompare(data) {
                 : scopeType === "theater" ? "Country"
                 : "Partner";
 
-  // ── Build BE GEO ID → partner names map (from full dataset) ──────────────
+  // ── Build BE GEO ID → partner name frequency map (from full dataset) ────────
+  // Tracks how many times each name appears per BE GEO ID so we can pick the
+  // most recurrent one as the canonical display label.
   var beGeoLabelMap = {};
   if (useBeGeoKey) {
     data.forEach(function(r) {
       var geoId = String(r["BE GEO ID"] || "").trim();
       var pname = String(r["Partner Name"] || "").trim();
       if (!geoId || !pname) return;
-      if (!beGeoLabelMap[geoId]) beGeoLabelMap[geoId] = new Set();
-      beGeoLabelMap[geoId].add(pname);
+      if (!beGeoLabelMap[geoId]) beGeoLabelMap[geoId] = {};
+      beGeoLabelMap[geoId][pname] = (beGeoLabelMap[geoId][pname] || 0) + 1;
     });
   }
 
@@ -312,8 +314,14 @@ function renderCompare(data) {
       var totalEarned = Object.keys(m.earnedByP).reduce(function(s, k) { return s + m.earnedByP[k]; }, 0);
       var label;
       if (useBeGeoKey) {
-        var names = beGeoLabelMap[entity] ? Array.from(beGeoLabelMap[entity]) : [entity];
-        label = names.length === 1 ? names[0] : names;
+        var freqMap = beGeoLabelMap[entity];
+        if (freqMap) {
+          label = Object.keys(freqMap).reduce(function(best, name) {
+            return freqMap[name] > freqMap[best] ? name : best;
+          });
+        } else {
+          label = entity;
+        }
       } else {
         label = entity;
       }
