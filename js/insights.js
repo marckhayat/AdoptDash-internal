@@ -207,8 +207,14 @@ function renderTesting(data) {
 
   html += '<div class="row g-3 mt-1" id="uch-main-row">';
   html += '<div class="col-12 col-lg-3"><div class="card shadow-sm h-100"><div class="card-body">';
-  html += '<h6 class="card-title mb-3" id="uch-donut-title">Stage Distribution</h6>';
-  html += '<canvas id="uch-donut-canvas"></canvas>';
+  html += '<div class="d-flex align-items-center justify-content:between mb-3">';
+  html += '<h6 class="card-title mb-0" id="uch-donut-title">Stage Distribution</h6>';
+  html += '<div class="btn-group btn-group-sm ms-auto" role="group" aria-label="Chart type">';
+  html += '<button id="uch-chart-donut-btn" class="btn btn-outline-secondary active" title="Donut view"><i class="bi bi-pie-chart-fill"></i></button>';
+  html += '<button id="uch-chart-funnel-btn" class="btn btn-outline-secondary" title="Funnel view"><i class="bi bi-filter"></i></button>';
+  html += '</div></div>';
+  html += '<div id="uch-canvas-wrap"><canvas id="uch-donut-canvas"></canvas></div>';
+  html += '<div id="uch-funnel-container" style="display:none"></div>';
   html += '</div></div></div>';
   html += '<div class="col-12 col-lg-9"><div id="uch-stats"></div></div>';
   html += '</div>';
@@ -729,7 +735,7 @@ function renderTesting(data) {
         else toEl.value = fromEl.value;
       }
       updateUCHStageSliderDisplay();
-      if (_uchState.uc) renderUCHealth(); else renderUCHDonut();
+      renderUCHealth();
     });
   });
   updateUCHStageSliderDisplay();
@@ -743,6 +749,7 @@ function renderTesting(data) {
 
   // ── UC Health: state + cascade selector ───────────────────────────────────
   var _uchState = { portfolio: "", offer: "", uc: "" };
+  var _uchChartView = "donut";
 
   function uchSaveState() {
     if (window.APP_FILTER_STATE) {
@@ -752,9 +759,25 @@ function renderTesting(data) {
       window.APP_FILTER_STATE.testing = Object.assign({}, cur, {
         view: "uch", uchPortfolio: _uchState.portfolio, uchOffer: _uchState.offer, uchUC: _uchState.uc,
         uchCsFrom: uchCsFrom ? parseInt(uchCsFrom.value) : 0,
-        uchCsTo:   uchCsTo   ? parseInt(uchCsTo.value)   : stageMaxIdx
+        uchCsTo:   uchCsTo   ? parseInt(uchCsTo.value)   : stageMaxIdx,
+        uchDistView: _uchChartView
       });
     }
+  }
+
+  function uchUpdateDistToggleUI() {
+    var donutBtn = document.getElementById("uch-chart-donut-btn");
+    var funnelBtn = document.getElementById("uch-chart-funnel-btn");
+    if (donutBtn) donutBtn.classList.toggle("active", _uchChartView === "donut");
+    if (funnelBtn) funnelBtn.classList.toggle("active", _uchChartView === "funnel");
+  }
+
+  function uchSetDistView(nextView, rerender) {
+    if (nextView !== "donut" && nextView !== "funnel") return;
+    _uchChartView = nextView;
+    uchUpdateDistToggleUI();
+    uchSaveState();
+    if (rerender) renderUCHealth();
   }
 
   function uchSlideToStep(step) {
@@ -818,8 +841,7 @@ function renderTesting(data) {
           });
           uchUpdateBreadcrumb();
           uchSlideToStep(0);
-          var se = document.getElementById("uch-stats"); if (se) se.innerHTML = "";
-          renderUCHDonut();
+          renderUCHealth();
         } else if (step === "0") {
           // Back to offer panel for this portfolio
           _uchState.offer = ""; _uchState.uc = "";
@@ -864,16 +886,13 @@ function renderTesting(data) {
     uchUpdateBreadcrumb();
     uchSlideToStep(arrivedAtStep);
     uchSaveState();
-    if (!_uchState.uc) {
-      var se = document.getElementById("uch-stats"); if (se) se.innerHTML = "";
-    }
-    // Show donut as soon as any selection is made
+    // Show stage distribution as soon as any selection is made
     var mr = document.getElementById("uch-main-row");
     if (mr) mr.style.display = "";
-    renderUCHDonut();
+    renderUCHealth();
   }
 
-  // ── UC Health: donut chart ───────────────────────────────────────────────
+  // ── UC Health: stage distribution chart ──────────────────────────────────
   var _uchDonutChart = null;
   var UCH_STAGE_COLORS = {
     "Purchase":  "#e74c3c",
@@ -884,11 +903,16 @@ function renderTesting(data) {
     "Adopt":     "#2ecc71",
     "Completed": "#1abc9c"
   };
+  var UCH_FUNNEL_COLORS = {
+    "Purchase":  "#e74c3c",
+    "Onboard":   "#f0b429",
+    "Implement": "#f0b429",
+    "Use":       "#27ae60",
+    "Engage":    "#27ae60",
+    "Adopt":     "#27ae60"
+  };
 
-  function renderUCHDonut() {
-    var canvas = document.getElementById("uch-donut-canvas");
-    if (!canvas) return;
-
+  function getUCHFilteredDeals() {
     var uchCsFromEl = document.getElementById("uch-cs-from");
     var uchCsToEl   = document.getElementById("uch-cs-to");
     var csFromIdx   = uchCsFromEl ? parseInt(uchCsFromEl.value) : 0;
@@ -910,6 +934,22 @@ function renderTesting(data) {
       if (key) { if (seenKeys[key]) return false; seenKeys[key] = true; }
       return true;
     });
+    return filtered;
+  }
+
+  function renderUCHDonut() {
+    var canvas     = document.getElementById("uch-donut-canvas");
+    var canvasWrap = document.getElementById("uch-canvas-wrap");
+    var funnelDiv  = document.getElementById("uch-funnel-container");
+    if (!canvas) return;
+    if (canvasWrap) canvasWrap.style.display = "";
+    if (funnelDiv)  funnelDiv.style.display  = "none";
+    var uchCsFromEl = document.getElementById("uch-cs-from");
+    var uchCsToEl   = document.getElementById("uch-cs-to");
+    var csFromIdx   = uchCsFromEl ? parseInt(uchCsFromEl.value) : 0;
+    var csToIdx     = uchCsToEl   ? parseInt(uchCsToEl.value)   : stageMaxIdx;
+    var csActive    = !(csFromIdx === 0 && csToIdx === stageMaxIdx);
+    var filtered = getUCHFilteredDeals();
 
     var stageCounts = {};
     STAGE_ORDER.forEach(function(s) { stageCounts[s] = 0; });
@@ -984,12 +1024,13 @@ function renderTesting(data) {
     });
   }
 
-  function renderUCHealth() {
-    var portfolio  = _uchState.portfolio;
-    var offer      = _uchState.offer;
-    var uc         = _uchState.uc;
-    var statsEl    = document.getElementById("uch-stats");
-    if (!statsEl) return;
+  function renderUCHFunnel() {
+    var canvasWrap = document.getElementById("uch-canvas-wrap");
+    var container  = document.getElementById("uch-funnel-container");
+    if (!container) return;
+    if (canvasWrap) canvasWrap.style.display = "none";
+    container.style.display = "";
+    if (_uchDonutChart) { _uchDonutChart.destroy(); _uchDonutChart = null; }
 
     var uchCsFromEl = document.getElementById("uch-cs-from");
     var uchCsToEl   = document.getElementById("uch-cs-to");
@@ -997,33 +1038,134 @@ function renderTesting(data) {
     var csToIdx     = uchCsToEl   ? parseInt(uchCsToEl.value)   : stageMaxIdx;
     var csActive    = !(csFromIdx === 0 && csToIdx === stageMaxIdx);
 
-    uchSaveState();
-    var uchCsWrap = document.getElementById("uch-cs-wrap");
-    if (!uc) { statsEl.innerHTML = ""; return; }
-    if (uchCsWrap) uchCsWrap.style.display = "";
-
-    var seenKeys = {};
-    var deals = getEffectiveData().filter(function(r) {
-      if (norm(r["Stage"]) !== "ELIGIBLE") return false;
-      if (norm(r["Adopt Rebate Opt-In Status"]) !== "OPTED IN") return false;
-      if (portfolio && r["Deal CPI Portfolio"] !== portfolio) return false;
-      if (offer && r["Track"] !== offer) return false;
-      if (r["Sub-Track"] !== uc) return false;
-      if (csActive) {
-        var si = STAGE_ORDER.indexOf(String(r["Current stage"] || ""));
-        if (si === -1 || si < csFromIdx || si > csToIdx) return false;
-      }
-      var key = String(r["CRPartyID-Offer"] || r["Deal WS-ID"] || "");
-      if (key) { if (seenKeys[key]) return false; seenKeys[key] = true; }
-      return true;
+    var filtered = getUCHFilteredDeals();
+    var stageCounts = {};
+    STAGE_ORDER.forEach(function(s) { stageCounts[s] = 0; });
+    filtered.forEach(function(r) {
+      var cs = r["Current stage"] || "Unknown";
+      if (stageCounts[cs] !== undefined) stageCounts[cs]++;
+      else stageCounts[cs] = (stageCounts[cs] || 0) + 1;
     });
 
-    if (deals.length === 0) {
-      statsEl.innerHTML = '';
+    var total = filtered.length;
+    var funnelRows = [];
+    funnelRows.push({ label: "All Eligible Opted-in", count: total, color: "#0d6efd" });
+    for (var fi = 0; fi < STAGE_ORDER.length - 1; fi++) {
+      var completedStage = STAGE_ORDER[fi];
+      var cumCount = 0;
+      for (var fj = fi + 1; fj < STAGE_ORDER.length; fj++) {
+        cumCount += (stageCounts[STAGE_ORDER[fj]] || 0);
+      }
+      if (cumCount > 0) {
+        funnelRows.push({
+          label: completedStage + " ✓",
+          count: cumCount,
+          color: UCH_FUNNEL_COLORS[completedStage] || "#adb5bd"
+        });
+      }
+    }
+
+    var titleEl = document.getElementById("uch-donut-title");
+    if (titleEl) titleEl.textContent = "Stage Distribution (" + total + " deal" + (total !== 1 ? "s" : "") + ")";
+
+    var kpiArea = document.getElementById("uch-kpi-area");
+    if (kpiArea) {
+      if (total === 0) {
+        kpiArea.innerHTML = '<span class="text-muted small">No opted-in eligible deals in this selection.</span>';
+      } else {
+        var daysVals   = filtered.map(function(r){ return r["Days in stage"]; }).filter(function(v){ return v !== null && v !== undefined && !isNaN(v); });
+        var avgDaysAll = daysVals.length ? Math.round(daysVals.reduce(function(s,v){return s+v;},0) / daysVals.length) : null;
+        var kh = '';
+        kh += '<div class="card shadow-sm"><div class="card-body p-3">';
+        kh += '<div class="text-muted small mb-1">Opted-in Deals</div><div class="fs-4 fw-bold text-success">' + total + '</div>';
+        kh += '</div></div>';
+        if (avgDaysAll !== null) {
+          kh += '<div class="card shadow-sm"><div class="card-body p-3">';
+          kh += '<div class="text-muted small mb-1">Avg Days in Stage</div><div class="fs-4 fw-bold">' + avgDaysAll + '</div>';
+          kh += '</div></div>';
+        }
+        var uchPreset = { stage: ["Eligible"], optIn: ["OPTED IN"], sortField: "Potential Incentives", sortDir: "desc" };
+        if (_uchState.portfolio) uchPreset.portfolio = _uchState.portfolio;
+        if (_uchState.offer)     uchPreset.offer     = _uchState.offer;
+        if (_uchState.uc)        uchPreset.uc        = _uchState.uc;
+        if (csActive)            { uchPreset.csFrom  = csFromIdx; uchPreset.csTo = csToIdx; }
+        kh += '<a href="#" id="uch-deeplink" class="small"><i class="bi bi-box-arrow-up-right me-1"></i>Open in Details tab</a>';
+        kpiArea.innerHTML = kh;
+        var dlLink = document.getElementById("uch-deeplink");
+        if (dlLink) dlLink.addEventListener("click", function(e) { e.preventDefault(); window.navigateToDetails(uchPreset); });
+      }
+    }
+
+    if (total === 0) {
+      container.innerHTML = '<p class="text-muted small text-center mt-3">No opted-in eligible deals.</p>';
       return;
     }
 
+    var fh = '<div style="padding:8px 0;width:100%;">';
+    funnelRows.forEach(function(row) {
+      var pct = total > 0 ? Math.round(row.count / total * 100) : 0;
+      var widPct = total > 0 ? Math.max(2, Math.round(row.count / total * 100)) : 100;
+      var tooltip = row.label === "All Eligible Opted-in" ? row.label : row.label.replace(" ✓", " completed");
+      var labelFits = (widPct / 100 * 260) >= (row.label.length * 6.5 + 55);
+      var narrow = !labelFits;
+      fh += '<div style="position:relative;width:100%;height:26px;margin-bottom:3px;" title="' + escHtml(tooltip) + ': ' + row.count + ' deals (' + pct + '%)">';
+      fh += '<div style="position:absolute;left:50%;transform:translateX(-50%);width:' + widPct + '%;height:100%;';
+      fh += 'background:' + row.color + ';border-radius:3px;box-sizing:border-box;overflow:hidden;';
+      if (!narrow) fh += 'display:flex;align-items:center;justify-content:space-between;padding:4px 8px;';
+      fh += '">';
+      if (!narrow) {
+        fh += '<span style="color:#fff;font-size:10px;font-weight:600;white-space:nowrap;flex-shrink:1;min-width:0;">' + escHtml(row.label) + '</span>';
+        fh += '<span style="color:rgba(255,255,255,0.9);font-size:10px;white-space:nowrap;flex-shrink:0;margin-left:4px;">' + row.count + '<span style="opacity:0.75"> (' + pct + '%)</span></span>';
+      }
+      fh += '</div>';
+      if (narrow) {
+        fh += '<span style="position:absolute;left:calc(50% + ' + (widPct / 2) + '% + 6px);top:50%;transform:translateY(-50%);font-size:10px;white-space:nowrap;color:#495057;">';
+        fh += escHtml(row.label) + ' <strong>' + row.count + '</strong><span style="color:#6c757d"> (' + pct + '%)</span>';
+        fh += '</span>';
+      }
+      fh += '</div>';
+    });
+    fh += '</div>';
+    container.innerHTML = fh;
+  }
+
+  function renderUCHChart() {
+    if (_uchChartView === "funnel") renderUCHFunnel();
+    else                            renderUCHDonut();
+  }
+
+  function renderUCHealth() {
+    var uc         = _uchState.uc;
+    var statsEl    = document.getElementById("uch-stats");
+    if (!statsEl) return;
+
+    uchSaveState();
+    var uchCsWrap = document.getElementById("uch-cs-wrap");
+    if (uchCsWrap) uchCsWrap.style.display = "";
+
+    var deals = getUCHFilteredDeals();
+
     var totalDeals = deals.length;
+    var topTasks = [];
+    if (uc) {
+      var taskData = {};
+      deals.forEach(function(r) {
+        var cs    = r["Current stage"] || "Unknown";
+        var tasks = r["Current stage pending tasks"];
+        if (!tasks) return;
+        tasks.split(";").forEach(function(t) {
+          var tn = t.trim().replace(/ - \d+$/, "").trim();
+          if (!tn) return;
+          if (!taskData[tn]) taskData[tn] = { count: 0, stages: {} };
+          taskData[tn].count++;
+          taskData[tn].stages[cs] = true;
+        });
+      });
+      topTasks = Object.keys(taskData).map(function(t){
+        return { name: t, count: taskData[t].count, stages: Object.keys(taskData[t].stages) };
+      });
+      topTasks.sort(function(a,b){ return b.count - a.count; });
+    }
 
     var stageGroups = {};
     deals.forEach(function(r) {
@@ -1031,22 +1173,6 @@ function renderTesting(data) {
       if (!stageGroups[cs]) stageGroups[cs] = [];
       stageGroups[cs].push(r);
     });
-
-    var taskData = {};
-    deals.forEach(function(r) {
-      var cs    = r["Current stage"] || "Unknown";
-      var tasks = r["Current stage pending tasks"];
-      if (!tasks) return;
-      tasks.split(";").forEach(function(t) {
-        var tn = t.trim().replace(/ - \d+$/, "").trim();
-        if (!tn) return;
-        if (!taskData[tn]) taskData[tn] = { count: 0, stages: {} };
-        taskData[tn].count++;
-        taskData[tn].stages[cs] = true;
-      });
-    });
-    var topTasks = Object.keys(taskData).map(function(t){ return { name: t, count: taskData[t].count, stages: Object.keys(taskData[t].stages) }; });
-    topTasks.sort(function(a,b){ return b.count - a.count; });
 
     var stagesPresent = STAGE_ORDER.filter(function(s){ return stageGroups[s] && stageGroups[s].length > 0; });
     var h = '';
@@ -1069,7 +1195,9 @@ function renderTesting(data) {
 
     h += '<div class="col-12 col-lg-8"><div class="card shadow-sm h-100"><div class="card-body">';
     h += '<h6 class="card-title mb-3">Top Pending Tasks</h6>';
-    if (topTasks.length > 0) {
+    if (!uc) {
+      h += '<p class="text-muted small mb-0">Select a UC to populate pending tasks.</p>';
+    } else if (topTasks.length > 0) {
       h += '<div class="d-flex flex-column gap-2">';
       topTasks.slice(0, 10).forEach(function(task) {
         var pct = Math.round(task.count / totalDeals * 100);
@@ -1092,7 +1220,7 @@ function renderTesting(data) {
     h += '</div>';
 
     statsEl.innerHTML = h;
-    renderUCHDonut();
+    renderUCHChart();
   }
 
   // View switcher — tracks which subtab is currently active
@@ -1135,11 +1263,20 @@ function renderTesting(data) {
       _uchState.offer     = _saved.uchOffer     || "";
       _uchState.uc        = _saved.uchUC        || "";
     }
+    if (_saved.uchDistView === "donut" || _saved.uchDistView === "funnel") {
+      _uchChartView = _saved.uchDistView;
+    }
     // Restore UCH stage slider
     if (_saved.uchCsFrom !== undefined) { var _ucf = document.getElementById("uch-cs-from"); if (_ucf) _ucf.value = _saved.uchCsFrom; }
     if (_saved.uchCsTo   !== undefined) { var _uct = document.getElementById("uch-cs-to");   if (_uct) _uct.value = _saved.uchCsTo;   }
     updateUCHStageSliderDisplay();
   }
+
+  var uchDonutBtn = document.getElementById("uch-chart-donut-btn");
+  var uchFunnelBtn = document.getElementById("uch-chart-funnel-btn");
+  if (uchDonutBtn) uchDonutBtn.addEventListener("click", function() { uchSetDistView("donut", true); });
+  if (uchFunnelBtn) uchFunnelBtn.addEventListener("click", function() { uchSetDistView("funnel", true); });
+  uchUpdateDistToggleUI();
 
   // Bootstrap portfolio pills (always) — then restore slide position if needed
   uchBuildPills("uch-panel-portfolio", uchPortfolios, _uchState.portfolio, function(p) {
@@ -1147,7 +1284,7 @@ function renderTesting(data) {
     uchRenderStep(1);
   });
   uchUpdateBreadcrumb();
-  renderUCHDonut();
+  renderUCHealth();
   if (_uchState.portfolio) {
     var _restoreStep = _uchState.uc ? 2 : (_uchState.offer ? 2 : 1);
     uchRenderStep(_restoreStep);
