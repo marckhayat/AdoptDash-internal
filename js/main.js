@@ -519,9 +519,8 @@ function finishLoad(filename, rowCount, headerAutoDetected, idbType, loadedAt, f
     beGeoIds.sort();
     if (beGeoIds.length === 0) { slot.innerHTML = ""; slot.classList.add("d-none"); return; }
     slot.innerHTML =
-      '<label class="text-muted small mb-0 text-nowrap" for="ovw-begeoid-sel" style="font-size:0.8rem">BE GEO ID</label>' +
-      '<select id="ovw-begeoid-sel" class="form-select form-select-sm" style="width:auto;font-size:0.82rem">' +
-      '<option value="">All (' + beGeoIds.length + ')</option>' +
+      '<select id="ovw-begeoid-sel" class="form-select form-select-sm" style="width:auto;font-size:0.82rem;border-color:#0070d2;color:#0070d2;font-weight:600">' +
+      '<option value="">All BE GEO IDs (' + beGeoIds.length + ')</option>' +
       beGeoIds.map(function(id) { return '<option value="' + id + '">' + id + '</option>'; }).join("") +
       '</select>';
     slot.classList.remove("d-none");
