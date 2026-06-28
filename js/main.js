@@ -900,7 +900,7 @@ function renderMultiPicker() {
 }
 
 // ── Drill-down scope picker — shown after file is parsed, before transform ────
-function showDrillDownPicker(rawRows, onConfirm) {
+function showDrillDownPicker(rawRows, onConfirm, options) {
   // Show the right-side panel column; remove centering from left col
   var col = document.getElementById("scope-panel-col");
   var panel = document.getElementById("scope-panel");
@@ -912,6 +912,9 @@ function showDrillDownPicker(rawRows, onConfirm) {
   var leftCol = document.getElementById("upload-left-col");
   if (leftCol) { leftCol.className = "col-12 col-lg-5"; }
   if (!panel) return;
+
+  var regionUpper = options && options.region ? String(options.region).toUpperCase() : "";
+  var excludeNotEligibleForWholeRegion = regionUpper !== "DISTI";
 
   // Build theater → countries map
   var theaterMap = {};
@@ -950,7 +953,7 @@ function showDrillDownPicker(rawRows, onConfirm) {
       // Region
       '<div class="form-check mb-2">' +
         '<input class="form-check-input" type="radio" name="scope-level" id="scope-region" value="region" checked>' +
-        '<label class="form-check-label" for="scope-region"><strong>Whole Region</strong> <span class="text-muted small">— all ' + rawRows.length.toLocaleString() + ' rows <em>(will exclude non-eligible deals)</em></span></label>' +
+        '<label class="form-check-label" for="scope-region"><strong>Whole Region</strong> <span class="text-muted small">— all ' + rawRows.length.toLocaleString() + ' rows' + (excludeNotEligibleForWholeRegion ? ' <em>(will exclude non-eligible deals)</em>' : '') + '</span></label>' +
       '</div>' +
 
       // Theater
@@ -1164,11 +1167,13 @@ function showDrillDownPicker(rawRows, onConfirm) {
         filteredRows = rawRows.filter(function(r) { return selectedGeos.indexOf(String(r["BE GEO ID"] || "").trim()) !== -1; });
         scopeLabel = selectedGeos.join(",");
       } else if (level === "region") {
-        // Drop "NOT ELIGIBLE" rows to reduce memory footprint for large regional files
-        filteredRows = rawRows.filter(function(r) { return String(r["Stage"] || "").trim().toUpperCase() !== "NOT ELIGIBLE"; });
+        if (excludeNotEligibleForWholeRegion) {
+          // Drop "NOT ELIGIBLE" rows to reduce memory footprint for large regional files
+          filteredRows = rawRows.filter(function(r) { return String(r["Stage"] || "").trim().toUpperCase() !== "NOT ELIGIBLE"; });
+        }
       }
       var loaderMsg = "Processing " + filteredRows.length.toLocaleString() + " rows\u2026";
-      if (level === "region" && filteredRows.length < rawRows.length) {
+      if (level === "region" && excludeNotEligibleForWholeRegion && filteredRows.length < rawRows.length) {
         loaderMsg += " (" + (rawRows.length - filteredRows.length).toLocaleString() + " not-eligible rows excluded)";
       }
       showLoader(loaderMsg);
@@ -1243,7 +1248,7 @@ function processCpiFile(file, region, week) {
               console.error(err);
               alert("Error processing CPI file: " + err.message);
             }
-          });
+          }, { region: region });
         } catch (err) {
           PENDING_FILE_HANDLE = null;
           IDB.loadAllMeta().then(function(en) { restoreUploadSection(en); });
@@ -1347,6 +1352,8 @@ function refreshCpiFromHandle(file, idbKey, scopeType, scopeLabel, cacheOnly) {
             // Fix Theater before re-applying scope filter
             fixTheaterField(results.data, region);
 
+            var regionUpper = String(region || "").toUpperCase();
+
             // Re-apply the same scope filter
             var rows = results.data;
             if (scopeType === "theater" && scopeLabel) {
@@ -1356,6 +1363,8 @@ function refreshCpiFromHandle(file, idbKey, scopeType, scopeLabel, cacheOnly) {
             } else if (scopeType === "begeoid" && scopeLabel) {
               var _bgGeos = scopeLabel.split(",");
               rows = results.data.filter(function(r) { return _bgGeos.indexOf(String(r["BE GEO ID"] || "").trim()) !== -1; });
+            } else if (scopeType === "region" && regionUpper !== "DISTI") {
+              rows = results.data.filter(function(r) { return String(r["Stage"] || "").trim().toUpperCase() !== "NOT ELIGIBLE"; });
             }
 
             var _handle = PENDING_FILE_HANDLE;
