@@ -18,7 +18,7 @@ var APP_IS_DISTI = false;
 var APP_GEO_FILTER = "";   // BE GEO ID filter — applies to all tabs
 var APP_MULTI_SESSIONS = null;
 var APP_EXCL_ACTIVE = false;
-var APP_VERSION = "v1.0.1";
+var APP_VERSION = "v1.1";
 // Use the browser's preferred language for date formatting (respects user's browser locale setting)
 var APP_LOCALE = navigator.language || undefined;
 // Holds a FileSystemFileHandle from showOpenFilePicker() to be persisted after load
@@ -801,14 +801,20 @@ function restoreUploadSection(cachedEntries) {
   function updateLastFileHint() {
     if (!_lastHandleName) return;
     var region = document.getElementById("lci-region").value;
+    var week   = document.getElementById("lci-week").value;
     var regionFile = region === "DISTI" ? "DISTI" : region;
     var fileMatchesRegion = _lastHandleName.indexOf("_" + regionFile + "_") !== -1 ||
                             _lastHandleName.indexOf("_" + regionFile + ".") !== -1;
+    // Also verify the stored filename matches the selected week.
+    // A specific week must appear in the filename; "Latest" (empty) must match the no-week variant.
+    var fileMatchesWeek = week
+      ? _lastHandleName.indexOf("_" + week + ".") !== -1 || _lastHandleName.indexOf("_" + week + "_") !== -1
+      : _lastHandleName.indexOf("_" + regionFile + ".") !== -1;  // "Latest" → no week suffix
     var hintEl = document.getElementById("lci-last-file-hint");
     var nameEl = document.getElementById("lci-last-file-name");
     var onedriveHint = document.getElementById("lci-onedrive-hint");
     if (hintEl && nameEl) {
-      if (fileMatchesRegion) {
+      if (fileMatchesRegion && fileMatchesWeek) {
         nameEl.textContent = _lastHandleName;
         hintEl.classList.remove("d-none");
         if (onedriveHint) onedriveHint.classList.add("d-none");
