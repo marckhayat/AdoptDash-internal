@@ -1963,8 +1963,8 @@ window.renderDetails = renderDetails;
   popup.addEventListener("mousedown", function (e) {
     dragging = true;
     clearTimeout(hideTimer);
-    dragOffX = e.clientX - popup.getBoundingClientRect().left;
-    dragOffY = e.clientY - popup.getBoundingClientRect().top;
+    dragOffX = e.clientX - (parseInt(popup.style.left, 10) || 0);
+    dragOffY = e.clientY - (parseInt(popup.style.top,  10) || 0);
     popup.classList.add("dragging");
     e.preventDefault();
   });
