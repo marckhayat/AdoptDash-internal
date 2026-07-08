@@ -1701,6 +1701,8 @@ function renderDetails(data) {
         // Column definitions
         var has2T = data.some(function(r){ return r["2T Partner Name"] && String(r["2T Partner Name"]).trim() !== ""; });
         var colDefs = [
+          { label: window.APP_IS_DISTI ? "Distributor Name" : "Partner Name", field:"_exportPartnerName", isExportPartnerName: true },
+          { label:"BE GEO ID",               field:"BE GEO ID" },
           ...(has2T ? [{ label:"2T Partner Name", field:"2T Partner Name" }] : []),
           { label:"CR Party Name",           field:"CR Party Name" },
           { label:"CR Party ID",             field:"CR Party ID" },
@@ -1749,6 +1751,10 @@ function renderDetails(data) {
         rows.forEach(function(r) {
           var row = colDefs.map(function(c) {
             var v = r[c.field];
+            if (c.isExportPartnerName) {
+              if (window.APP_IS_DISTI) return String(r["Disti name"] || r["Partner Name"] || "");
+              return String(r["Partner Name"] || "");
+            }
             if (c.isCurrency) return (v === null || v === undefined || isNaN(v)) ? 0 : Math.round(v);
             if (c.isRemainingIncentive) {
               var _norm2 = function(x) { return x === null || x === undefined ? "" : String(x).replace(/\u00A0/g," ").trim().toUpperCase(); };
@@ -1803,7 +1809,7 @@ function renderDetails(data) {
         // Column widths
         ws["!cols"] = colDefs.map(function(c) {
           if (c.isCurrency || c.isRemainingIncentive) return { wch: 22 };
-          if (c.field === "CR Party Name" || c.field === "2T Partner Name") return { wch: 35 };
+          if (c.isExportPartnerName || c.field === "CR Party Name" || c.field === "2T Partner Name") return { wch: 35 };
           if (c.field === "Deal WS-ID" || c.field === "Track") return { wch: 22 };
           if (c.field === "_missedStages") return { wch: 30 };
           if (c.isAnnotTags)    return { wch: 30 };
@@ -1858,11 +1864,10 @@ function renderDetails(data) {
         });
 
         // Filename
-        var beGeoStr = Array.from(new Set(data.map(function(r){ return String(r["BE GEO ID"]||""); }).filter(Boolean))).join("-") || "export";
         var dateStr = new Date().toLocaleDateString(window.APP_LOCALE, { year:"numeric", month:"2-digit", day:"2-digit" })
           .replace(/\//g,"-").replace(/\./g,"-");
         XLS.utils.book_append_sheet(wb, ws, "Details");
-        XLS.writeFile(wb, "AdoptDash_Details_" + beGeoStr + "_" + dateStr + ".xlsx");
+        XLS.writeFile(wb, "AdoptDash_Details_" + dateStr + ".xlsx");
       } catch(err) {
         alert("Export failed: " + err.message);
         console.error(err);
