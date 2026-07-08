@@ -105,7 +105,8 @@ function renderCompare(data) {
   var _selectedFY        = (_saved && _saved.fy != null) ? _saved.fy : (fyList.indexOf(_currentFY) !== -1 ? _currentFY : (fyList[fyList.length - 1] || _currentFY));
   var _selectedPortfolio = (_saved && _saved.portfolio) || "";
   var _selectedOffer     = (_saved && _saved.offer)     || "";
-  var _logScale          = (_saved && _saved.logScale)  || false;
+  var _logScale          = (_saved && _saved.logScale)   || false;
+  var _anonymize         = (_saved && _saved.anonymize)  || false;
   var _topN              = (_saved && _saved.topN  != null) ? _saved.topN : 0; // 0 = all
 
   function getOfferOptions(pf) {
@@ -154,9 +155,13 @@ function renderCompare(data) {
 
   // Log scale — pushed to the right end of the row
   html += '<div class="d-flex flex-column ms-auto justify-content-end">';
-  html += '<div class="form-check form-switch mb-0">';
+  html += '<div class="form-check form-switch mb-1">';
   html += '<input class="form-check-input" type="checkbox" id="cmp-log-toggle"' + (_logScale ? ' checked' : '') + '>';
   html += '<label class="form-check-label small text-muted" for="cmp-log-toggle">Log scale</label>';
+  html += '</div>';
+  html += '<div class="form-check form-switch mb-0">';
+  html += '<input class="form-check-input" type="checkbox" id="cmp-anonymize-toggle"' + (_anonymize ? ' checked' : '') + '>';
+  html += '<label class="form-check-label small text-muted" for="cmp-anonymize-toggle">Anonymize</label>';
   html += '</div></div>';
 
   html += '</div>'; // end slicer-row
@@ -237,7 +242,7 @@ function renderCompare(data) {
 
     // Save state
     if (window.APP_FILTER_STATE) {
-      window.APP_FILTER_STATE.compare = { fy: _selectedFY, portfolio: portfolio, offer: offer, logScale: _logScale, topN: _topN };
+      window.APP_FILTER_STATE.compare = { fy: _selectedFY, portfolio: portfolio, offer: offer, logScale: _logScale, anonymize: _anonymize, topN: _topN };
     }
 
     // Filter: eligible rows (MaxFlag=YES), optional portfolio + offer
@@ -336,6 +341,11 @@ function renderCompare(data) {
   }
 
   // ── Chart renderers ─────────────────────────────────────────────────────────
+  function makeLabels(arr) {
+    if (!_anonymize) return arr.map(function(e) { return e.label; });
+    return arr.map(function(_, i) { return dimLabel + " " + (i + 1); });
+  }
+
   function fmtTick(v) {
     if (Math.abs(v) >= 1e6) return "$" + (v/1e6).toFixed(1) + "M";
     if (Math.abs(v) >= 1e3) return "$" + (v/1e3).toFixed(0) + "K";
@@ -385,7 +395,7 @@ function renderCompare(data) {
     _cmpChartOptin = new Chart(ctx, {
       type: "bar",
       data: {
-        labels: entries.map(function(e) { return e.label; }),
+        labels: makeLabels(entries),
         datasets: datasets
       },
       options: {
@@ -447,7 +457,7 @@ function renderCompare(data) {
     var ctx = document.getElementById("cmp-chart-earned").getContext("2d");
     _cmpChartEarned = new Chart(ctx, {
       type: "bar",
-      data: { labels: entries.map(function(e) { return e.label; }), datasets: datasets },
+      data: { labels: makeLabels(entries), datasets: datasets },
       options: {
         responsive: true,
         maintainAspectRatio: false,
@@ -515,7 +525,7 @@ function renderCompare(data) {
     _cmpChartRatio = new Chart(ctx, {
       type: "bar",
       data: {
-        labels: sorted.map(function(e) { return e.label; }),
+        labels: makeLabels(sorted),
         datasets: [{
           label: "Opt-in Rate",
           data: ratios,
@@ -605,7 +615,7 @@ function renderCompare(data) {
     _cmpChartPotential = new Chart(ctx, {
       type: "bar",
       data: {
-        labels: sorted.map(function(e) { return e.label; }),
+        labels: makeLabels(sorted),
         datasets: datasets
       },
       options: {
@@ -677,6 +687,12 @@ function renderCompare(data) {
   var logToggle = document.getElementById("cmp-log-toggle");
   if (logToggle) logToggle.addEventListener("change", function() {
     _logScale = this.checked;
+    render();
+  });
+
+  var anonymizeToggle = document.getElementById("cmp-anonymize-toggle");
+  if (anonymizeToggle) anonymizeToggle.addEventListener("change", function() {
+    _anonymize = this.checked;
     render();
   });
 
