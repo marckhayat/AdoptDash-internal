@@ -18,7 +18,7 @@ var APP_IS_DISTI = false;
 var APP_GEO_FILTER = "";   // BE GEO ID filter — applies to all tabs
 var APP_MULTI_SESSIONS = null;
 var APP_EXCL_ACTIVE = false;
-var APP_VERSION = "v1.2.1";
+var APP_VERSION = "v1.2.2";
 // Use the browser's preferred language for date formatting (respects user's browser locale setting)
 var APP_LOCALE = navigator.language || undefined;
 // Holds a FileSystemFileHandle from showOpenFilePicker() to be persisted after load

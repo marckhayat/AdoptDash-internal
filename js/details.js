@@ -44,6 +44,7 @@ function renderDetails(data) {
     optIn: [],
     portfolio: "",
     offer: "",
+    country: [],
     expires: [],
     ea: [],
     risk: [],
@@ -344,9 +345,10 @@ function renderDetails(data) {
     if (bi === -1) return -1;
     return ai - bi;
   });
-  var offerList  = uniqueVals("Track");
-  var ucList     = uniqueVals("Sub-Track");
-  var eaOpts     = uniqueVals("EA Flag");
+  var offerList   = uniqueVals("Track");
+  var ucList      = uniqueVals("Sub-Track");
+  var countryList = uniqueVals("End Customer Country");
+  var eaOpts      = uniqueVals("EA Flag");
 
   // Precompute date bounds for sliders
   function getDateBounds(field) {
@@ -434,6 +436,13 @@ function renderDetails(data) {
   html += '<div class="filter-group"><label class="group-label">Opt-in Date</label>'            + makeDateSlider("det-rs",  dateBounds.rs)  + '</div>';
   html += '<div class="filter-group"><label class="group-label">Incentive Expiry Date</label>'  + makeDateSlider("det-exp", dateBounds.exp) + '</div>';
   html += '<div class="filter-group"><label class="group-label">Earn Date' + tip("Moving this slider will automatically check the Earned filter.") + '</label>'              + makeDateSlider("det-ea",  dateBounds.ea)  + '</div>';
+
+  if (countryList.length > 0) {
+    html += '<div class="filter-group"><label class="group-label">Country' + tip("Hold Ctrl/Cmd to select multiple countries.") + '</label>' +
+      '<select id="filter-country" class="form-select form-select-sm" multiple style="height:110px">' +
+      countryList.map(function(o){ return '<option value="' + escHtml(o) + '">' + escHtml(o) + '</option>'; }).join('') +
+      '</select></div>';
+  }
 
   html += '<div class="filter-group"><label class="group-label"><i class="bi bi-tags me-1"></i>Tags' +
     '<span class="tag-mode-toggle ms-2" id="tag-mode-toggle" title="Switch between matching ALL or ANY selected tags">' +
@@ -568,6 +577,9 @@ function renderDetails(data) {
   });
   document.getElementById("filter-offer").addEventListener("change", function () { refreshUcDropdown(); currentPage = 1; applyFiltersAndRender(); });
   document.getElementById("filter-uc").addEventListener("change", function () { currentPage = 1; applyFiltersAndRender(); });
+  if (document.getElementById("filter-country")) {
+    document.getElementById("filter-country").addEventListener("change", function () { currentPage = 1; applyFiltersAndRender(); });
+  }
   ["det-bk","det-rs","det-ea","det-exp"].forEach(function (prefix) {
     ["from","to"].forEach(function (side) {
       var el2 = document.getElementById(prefix + "-" + side);
@@ -652,6 +664,9 @@ function renderDetails(data) {
     document.getElementById("filter-portfolio").value = "";
     document.getElementById("filter-offer").value = "";
     document.getElementById("filter-uc").value = "";
+    if (document.getElementById("filter-country")) {
+      Array.from(document.getElementById("filter-country").options).forEach(function(o){ o.selected = false; });
+    }
     refreshUcDropdown();
     ["det-bk","det-rs","det-ea","det-exp"].forEach(function (prefix) {
       var fromEl = document.getElementById(prefix + "-from");
@@ -784,6 +799,10 @@ function renderDetails(data) {
     var ucEl2 = document.getElementById("filter-uc");
     if (ofEl  && st.offer) ofEl.value  = st.offer;
     if (ucEl2 && st.uc)    ucEl2.value = st.uc;
+    var ctEl = document.getElementById("filter-country");
+    if (ctEl && st.country && st.country.length > 0) {
+      Array.from(ctEl.options).forEach(function(o){ o.selected = st.country.indexOf(o.value) !== -1; });
+    }
     refreshUcDropdown();
     // Stage checkboxes
     if (st.stageChecked && st.stageChecked.length) {
@@ -839,6 +858,7 @@ function renderDetails(data) {
         portfolio:     (document.getElementById("filter-portfolio")  || {value:""}).value,
         offer:         (document.getElementById("filter-offer")      || {value:""}).value,
         uc:            (document.getElementById("filter-uc")         || {value:""}).value,
+        country:       (function(){ var el = document.getElementById("filter-country"); return el ? Array.from(el.selectedOptions).map(function(o){ return o.value; }) : []; })(),
         stageChecked:  getChecked("filter-stage"),
         optInChecked:  getChecked("filter-optin"),
         offerOptedInY: !!(document.getElementById("filter-offer-optedin-y") || {}).checked,
@@ -928,6 +948,9 @@ function renderDetails(data) {
       if (portfolioVal         && String(r["Deal CPI Portfolio"] || "") !== portfolioVal)                     return false;
       if (offerVal             && String(r["Track"] || "") !== offerVal)                                      return false;
       if (ucVal                && String(r["Sub-Track"] || "") !== ucVal)                                     return false;
+      var _ctryEl = document.getElementById("filter-country");
+      var _ctrySelected = _ctryEl ? Array.from(_ctryEl.selectedOptions).map(function(o){ return o.value; }) : [];
+      if (_ctrySelected.length > 0 && _ctrySelected.indexOf(String(r["End Customer Country"] || "")) === -1) return false;
       if (offerOptedIn && !offerNotOptedIn && r["Offer opted-in?"] !== true)  return false;
       if (offerNotOptedIn && !offerOptedIn && r["Offer opted-in?"] === true)   return false;
       if (pviEligible      && !r["PVI Eligible"])   return false;
@@ -1676,6 +1699,8 @@ function renderDetails(data) {
         if (ofVal) activeFilters.push("Offer: " + ofVal);
         var ucVal2 = document.getElementById("filter-uc") ? document.getElementById("filter-uc").value : "";
         if (ucVal2) activeFilters.push("Use Case: " + ucVal2);
+        var _ctryExEl = document.getElementById("filter-country");
+        if (_ctryExEl) { Array.from(_ctryExEl.selectedOptions).forEach(function(o){ activeFilters.push("Country: " + o.value); }); }
         getChecked("filter-stage").forEach(function(v) { activeFilters.push("Stage: " + v); });
         getChecked("filter-optin").forEach(function(v) { activeFilters.push("Opt-In: " + v); });
         if (document.getElementById("filter-new-eligible") && document.getElementById("filter-new-eligible").checked) activeFilters.push("New Eligible");
@@ -1707,6 +1732,7 @@ function renderDetails(data) {
           { label:"CR Party Name",           field:"CR Party Name" },
           { label:"CR Party ID",             field:"CR Party ID" },
           { label:"CX Customer BU ID",       field:"CX Customer BU ID" },
+          { label:"End Customer Country",    field:"End Customer Country" },
           { label:"Portfolio",               field:"Deal CPI Portfolio" },
           { label:"Offer",                   field:"Track" },
           { label:"Use Case",                field:"Sub-Track" },
