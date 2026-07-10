@@ -18,7 +18,7 @@ var APP_IS_DISTI = false;
 var APP_GEO_FILTER = "";   // BE GEO ID filter — applies to all tabs
 var APP_MULTI_SESSIONS = null;
 var APP_EXCL_ACTIVE = false;
-var APP_VERSION = "v1.3";
+var APP_VERSION = "v1.4";
 // Use the browser's preferred language for date formatting (respects user's browser locale setting)
 var APP_LOCALE = navigator.language || undefined;
 // Holds a FileSystemFileHandle from showOpenFilePicker() to be persisted after load
@@ -940,14 +940,29 @@ function showDrillDownPicker(rawRows, onConfirm, options) {
       return '<option value="' + t + '">' + t + ' (' + n + ' countr' + (n === 1 ? 'y' : 'ies') + ')</option>';
     }).join('');
 
-    // Build unique BE GEO IDs list
+    // Build unique BE GEO IDs list with all associated Partner Names
     var beGeoIds = [];
-    rawRows.forEach(function(r) { var v = String(r["BE GEO ID"] || "").trim(); if (v && beGeoIds.indexOf(v) === -1) beGeoIds.push(v); });
+    var beGeoToPartners = {};
+    rawRows.forEach(function(r) {
+      var v = String(r["BE GEO ID"] || "").trim();
+      if (v) {
+        if (beGeoIds.indexOf(v) === -1) beGeoIds.push(v);
+        if (r["Partner Name"]) {
+          var pn = String(r["Partner Name"]).trim();
+          if (pn) {
+            if (!beGeoToPartners[v]) beGeoToPartners[v] = [];
+            if (beGeoToPartners[v].indexOf(pn) === -1) beGeoToPartners[v].push(pn);
+          }
+        }
+      }
+    });
     beGeoIds.sort();
     var beGeoCheckboxes = beGeoIds.map(function(id) {
+      var partners = beGeoToPartners[id] || [];
+      var partnerSuffix = partners.length > 0 ? ' <span class="text-muted">— ' + partners.join(', ') + '</span>' : '';
       return '<div class="form-check form-check-sm mb-1">' +
         '<input class="form-check-input" type="checkbox" name="begeoid-cb" id="bgcb-' + id.replace(/\W/g,'_') + '" value="' + id.replace(/"/g,'&quot;') + '">' +
-        '<label class="form-check-label small" for="bgcb-' + id.replace(/\W/g,'_') + '">' + id + '</label></div>';
+        '<label class="form-check-label small" for="bgcb-' + id.replace(/\W/g,'_') + '">' + id + partnerSuffix + '</label></div>';
     }).join('');
 
     panel.innerHTML =
