@@ -509,26 +509,92 @@ function finishLoad(filename, rowCount, headerAutoDetected, idbType, loadedAt, f
   document.getElementById("mainTabContent").classList.remove("d-none");
   document.getElementById("main-tab-bar").classList.remove("d-none");
 
-  // Populate BE GEO ID global filter dropdown
+  // Populate BE GEO ID global filter dropdown + partner/file date in tab bar slot
   APP_GEO_FILTER = "";
   (function() {
     var slot = document.getElementById("ovw-begeoid-tab-slot");
     if (!slot) return;
+
     var beGeoIds = [];
     if (APP_DATA) APP_DATA.forEach(function(r) { var v = String(r["BE GEO ID"] || "").trim(); if (v && beGeoIds.indexOf(v) === -1) beGeoIds.push(v); });
     beGeoIds.sort();
-    if (beGeoIds.length === 0) { slot.innerHTML = ""; slot.classList.add("d-none"); return; }
-    slot.innerHTML =
-      '<select id="ovw-begeoid-sel" class="form-select form-select-sm" style="width:auto;font-size:0.82rem;border-color:#0070d2;color:#0070d2;font-weight:600">' +
-      '<option value="">All BE GEO IDs (' + beGeoIds.length + ')</option>' +
-      beGeoIds.map(function(id) { return '<option value="' + id + '">' + id + '</option>'; }).join("") +
-      '</select>';
+
+    // Build BE GEO ID → all partner names map
+    var beGeoToPartners = {};
+    if (APP_DATA) {
+      var nameKey = APP_IS_DISTI ? "Disti name" : "Partner Name";
+      APP_DATA.forEach(function(r) {
+        var v = String(r["BE GEO ID"] || "").trim();
+        var n = String(r[nameKey] || "").trim();
+        if (v && n) {
+          if (!beGeoToPartners[v]) beGeoToPartners[v] = [];
+          if (beGeoToPartners[v].indexOf(n) === -1) beGeoToPartners[v].push(n);
+        }
+      });
+    }
+
+    // Compute partner label for display (all unique partners across all GEOs)
+    var partnerNames = [];
+    if (APP_DATA) {
+      var nameKey2 = APP_IS_DISTI ? "Disti name" : "Partner Name";
+      APP_DATA.forEach(function(r) { var n = String(r[nameKey2] || "").trim(); if (n && partnerNames.indexOf(n) === -1) partnerNames.push(n); });
+      partnerNames.sort();
+    }
+    var partnerLabel = partnerNames.length === 0 ? ""
+                     : partnerNames.slice(0, 3).join(", ") + (partnerNames.length > 3 ? " +" + (partnerNames.length - 3) + " more" : "");
+
+    // Compute file date
+    var fileDateLabel = "";
+    if (APP_FILE_META && APP_FILE_META.lastModified) {
+      fileDateLabel = APP_FILE_META.lastModified.toLocaleDateString(APP_LOCALE, { year: "numeric", month: "short", day: "numeric" });
+    } else if (APP_FILE_META && APP_FILE_META.cachedAt) {
+      fileDateLabel = APP_FILE_META.cachedAt.toLocaleDateString(APP_LOCALE, { year: "numeric", month: "short", day: "numeric" });
+    }
+
+    var html = "";
+    if (partnerLabel) {
+      html += '<span id="ovw-partner-label" style="font-size:0.75rem;color:#9aa5b1;white-space:nowrap;max-width:220px;overflow:hidden;text-overflow:ellipsis" title="' + partnerLabel.replace(/"/g, "&quot;") + '">' + partnerLabel + '</span>';
+    }
+    if (fileDateLabel) {
+      html += '<span style="font-size:0.75rem;color:#9aa5b1;white-space:nowrap">' + fileDateLabel + '</span>';
+    }
+    if (beGeoIds.length > 0) {
+      html += '<select id="ovw-begeoid-sel" class="form-select form-select-sm" style="width:auto;font-size:0.82rem;border-color:#0070d2;color:#0070d2;font-weight:600">' +
+        '<option value="" data-short="All BE GEO IDs (' + beGeoIds.length + ')" data-long="All BE GEO IDs (' + beGeoIds.length + ')">All BE GEO IDs (' + beGeoIds.length + ')</option>' +
+        beGeoIds.map(function(id) {
+          var partners = beGeoToPartners[id] || [];
+          var longLabel = partners.length > 0 ? id + ' \u2014 ' + partners.join(', ') : id;
+          return '<option value="' + id.replace(/"/g, '&quot;') + '" data-short="' + id.replace(/"/g, '&quot;') + '" data-long="' + longLabel.replace(/"/g, '&quot;') + '">' + id + '</option>';
+        }).join("") +
+        '</select>';
+    }
+
+    if (!html) { slot.innerHTML = ""; slot.classList.add("d-none"); return; }
+    slot.innerHTML = html;
     slot.classList.remove("d-none");
-    document.getElementById("ovw-begeoid-sel").addEventListener("change", function() {
-      APP_GEO_FILTER = this.value;
-      var activeTab = document.querySelector(".nav-link.active[data-bs-target]");
-      if (activeTab) renderActiveTab(activeTab.dataset.bsTarget);
-    });
+
+    if (beGeoIds.length > 0) {
+      var sel = document.getElementById("ovw-begeoid-sel");
+
+      // Swap to long labels when dropdown opens, short labels when it closes
+      sel.addEventListener("mousedown", function() {
+        Array.prototype.forEach.call(this.options, function(opt) {
+          opt.textContent = opt.dataset.long;
+        });
+      });
+      function restoreShortLabels() {
+        Array.prototype.forEach.call(sel.options, function(opt) {
+          opt.textContent = opt.dataset.short;
+        });
+      }
+      sel.addEventListener("change", function() {
+        APP_GEO_FILTER = this.value;
+        restoreShortLabels();
+        var activeTab = document.querySelector(".nav-link.active[data-bs-target]");
+        if (activeTab) renderActiveTab(activeTab.dataset.bsTarget);
+      });
+      sel.addEventListener("blur", restoreShortLabels);
+    }
   })();
   renderMultiPicker(); // re-render persistent session bar (highlights active, keeps others)
 

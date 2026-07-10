@@ -85,29 +85,9 @@ function renderOverview(data) {
   // ── Build HTML ─────────────────────────────────────────────────────────────
   var html = "";
 
-  // File metadata
-  var fileDateLabel = "";
-  var fileDateCaption = "File Date";
-  if (window.APP_FILE_META && window.APP_FILE_META.lastModified) {
-    fileDateLabel = window.APP_FILE_META.lastModified.toLocaleDateString(window.APP_LOCALE, { year: "numeric", month: "short", day: "numeric" });
-  } else if (window.APP_FILE_META && window.APP_FILE_META.cachedAt) {
-    fileDateLabel = window.APP_FILE_META.cachedAt.toLocaleDateString(window.APP_LOCALE, { year: "numeric", month: "short", day: "numeric" });
-  }
-  var fileName  = (window.APP_FILE_META && window.APP_FILE_META.name)  ? window.APP_FILE_META.name  : "";
-  var rowsLabel = (window.APP_DATA) ? window.APP_DATA.length.toLocaleString() + " rows" : "";
-
-  // Partner / BE GEO / file date / file info header — all in one bar
-  html += '<div class="d-flex flex-wrap gap-4 align-items-center mb-3 px-1 py-2 border-bottom">';
-  if (isDisti) {
-    html += '<div><span class="text-muted small">Distributor</span><br/><strong class="fs-6" id="ovw-partner-label">' + escHtml(distiLabel) + '</strong></div>';
-  } else {
-    html += '<div><span class="text-muted small">Partner</span><br/><strong class="fs-6" id="ovw-partner-label">' + escHtml(partnerLabel) + '</strong></div>';
-  }
-  if (fileDateLabel) {
-    html += '<div><span class="text-muted small">' + fileDateCaption + '</span><br/><strong class="fs-6">' + escHtml(fileDateLabel) + '</strong></div>';
-  }
-  // BE GEO ID filtering is handled globally via APP_GEO_FILTER (dropdown in tab bar)
-  html += '</div>';
+  // Partner name and file date are shown in the tab bar slot (next to BE GEO ID dropdown)
+  // Button bar for export + exclusion toggle
+  html += '<div class="d-flex gap-2 align-items-center justify-content-end mb-2" id="ovw-btn-bar"></div>';
 
   html += '<div id="ovw-table-area"></div>';
   html += '<p class="text-muted small fst-italic mt-2" style="font-size:0.78rem">' +
@@ -118,8 +98,8 @@ function renderOverview(data) {
 
   el.innerHTML = html;
 
-  // Add export button to the header bar
-  var headerBar = el.querySelector(".border-bottom");
+  // Add export button to the button bar
+  var headerBar = el.querySelector("#ovw-btn-bar");
   if (headerBar) {
     // Exclude-toggle button — count from full APP_DATA so button persists when filter is active
     var _allWsIds = new Set((window.APP_DATA || data).map(function(r) { return String(r["Deal WS-ID"] || ""); }));
@@ -132,11 +112,11 @@ function renderOverview(data) {
       function _updateExclBtn() {
         var active = !!window.APP_EXCL_ACTIVE;
         if (active) {
-          exclToggleBtn.className = "btn btn-sm ms-auto btn-danger";
+          exclToggleBtn.className = "btn btn-sm btn-danger";
           exclToggleBtn.innerHTML = '<i class="bi bi-slash-circle-fill me-1"></i>' + exclCount + ' UCs excluded — removed from calcs';
           exclToggleBtn.title = "Excluded UCs are NOT counted. Click to include them.";
         } else {
-          exclToggleBtn.className = "btn btn-sm ms-auto btn-outline-secondary";
+          exclToggleBtn.className = "btn btn-sm btn-outline-secondary";
           exclToggleBtn.innerHTML = '<i class="bi bi-slash-circle me-1"></i>' + exclCount + ' UCs excluded — counted in calcs';
           exclToggleBtn.title = "Excluded UCs are still counted. Click to remove them.";
         }
@@ -154,7 +134,7 @@ function renderOverview(data) {
 
     var exportBtn = document.createElement("button");
     exportBtn.id = "ovw-export-btn";
-    exportBtn.className = "btn btn-sm btn-outline-success ms-auto";
+    exportBtn.className = "btn btn-sm btn-outline-success";
     exportBtn.innerHTML = '<i class="bi bi-file-earmark-excel me-1"></i>Export to Excel';
     exportBtn.style.cssText = "font-size:0.82rem";
     exportBtn.addEventListener("click", exportOverviewToXlsx);
@@ -184,6 +164,7 @@ function renderOverview(data) {
       names.sort();
       var label = names.length === 0 ? "—"
                 : names.length === 1 ? names[0]
+                : !window.APP_GEO_FILTER ? (isDisti ? "All Distributors" : "All Partners")
                 : names.slice(0, 3).join(", ") + (names.length > 3 ? " +" + (names.length - 3) + " more" : "");
       labelEl.textContent = label;
     }
