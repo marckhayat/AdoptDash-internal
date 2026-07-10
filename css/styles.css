@@ -121,6 +121,7 @@
   font-size: 0.82rem;
   min-width: 900px;
 }
+/* ── Column resize handles ──────────────────────────────── */
 .table-wrapper thead th {
   position: sticky;
   top: 0;
@@ -128,13 +129,33 @@
   color: #fff;
   font-weight: 600;
   white-space: normal;
+  word-break: break-word;
   vertical-align: bottom;
   z-index: 2;
   padding: 0.5rem 0.6rem;
+  will-change: transform;
+}
+.col-resize-handle {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 5px;
+  cursor: col-resize;
+  user-select: none;
+  z-index: 3;
+}
+.col-resize-handle:hover,
+.col-resize-handle.dragging {
+  background: rgba(255,255,255,0.35);
 }
 .table-wrapper tbody td {
   vertical-align: middle;
   padding: 0.35rem 0.6rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 0;
 }
 .table-wrapper tbody tr:hover td {
   background-color: #e8f7fd !important;
@@ -186,6 +207,13 @@
   font-weight: 900;
   line-height: 1;
 }
+.pvi-deep-link {
+  color: inherit;
+  text-decoration: none;
+  border-bottom: 1px dashed currentColor;
+  cursor: pointer;
+}
+.pvi-deep-link:hover { opacity: 0.7; }
 
 /* ── Overview table specific ─────────────────────────────── */
 .ovw-portfolio-row td { background: #1B2A3B !important; color: #fff; font-weight: 700; cursor: pointer; user-select: none; }

@@ -1201,7 +1201,7 @@ function renderDetails(data) {
       ...(showOverallProgress ? [
         { label: "Overall<br>Progress",      field: "Overall Progress",             isOverallProgress: true },
       ] : []),
-      { label: "Pending Tasks",              field: "Current stage pending tasks",  style: "max-width:80px" },
+      { label: "Pending Tasks",              field: "Current stage pending tasks",  style: "width:80px" },
       { label: "Booking Date",               field: "Booking Date",                 isDate: true, isBookingDate: true },
       ...(showDealDetails ? [
         { label: "Deal ID",                  field: "Deal ID",                                       isDealDetailCol: true },
@@ -1219,7 +1219,7 @@ function renderDetails(data) {
         { label: "Remaining<br>Engage",   isRemainingIncentive: true, stageFlag: "Stage Completion Flag(Engage)",  stageAmt: "Estimated Incentive Amount(Engage)"  },
         { label: "Remaining<br>Adopt",    isRemainingIncentive: true, stageFlag: "Stage Completion Flag(Adopt)",   stageAmt: "Estimated Incentive Amount(Adopt)"   },
       ] : []),
-      { label: "Estimated<br>Earned Incentives", field: "Estimated Earned Incentives", isCurrency: true, style: "min-width:90px;max-width:110px" },
+      { label: "Estimated<br>Earned Incentives", field: "Estimated Earned Incentives", isCurrency: true, style: "min-width:90px;width:110px" },
       { label: "Deal WS-ID",                 field: "Deal WS-ID",                   style: "min-width:140px", isWsId: true },
       { label: "Status",                     field: "_status",                      isStatus: true },
       { label: "Notes",                      field: "_annot",                       isAnnot: true, style: "min-width:90px" }
@@ -1244,14 +1244,14 @@ function renderDetails(data) {
     var thead = "<thead><tr>" + cols.map(function (c) {
       var styleAttr = c.style ? 'style="' + c.style + (sortableCols[c.field] ? ";cursor:pointer;user-select:none" : "") + '"' : '';
       if (c.isRemainingIncentive) {
-        return '<th class="text-end" style="white-space:nowrap;font-size:0.8rem;border-bottom:4px solid #7ec8e3">' + c.label + '</th>';
+        return '<th class="text-end" style="font-size:0.8rem;border-bottom:4px solid #7ec8e3">' + c.label + '</th>';
       }
       if (c.isDaysSinceOptInCol) {
         var dsoIcon = sortField === "_daysSinceOptIn" ? (sortDir === "asc" ? " ▲" : " ▼") : " ⇅";
         return '<th style="cursor:pointer;user-select:none;border-bottom:4px solid #7ec8e3" data-sortfield="_daysSinceOptIn">' + c.label + '<span style="font-size:0.7rem;opacity:0.7">' + dsoIcon + '</span></th>';
       }
       if (c.isOverallProgress) {
-        return '<th style="white-space:nowrap;font-size:0.8rem;border-bottom:4px solid #7ec8e3">' + c.label + '</th>';
+        return '<th style="font-size:0.8rem;border-bottom:4px solid #7ec8e3">' + c.label + '</th>';
       }
       if (c.isStageProgress) {
         var spToggleIcon  = showOverallProgress ? "bi-dash-circle" : "bi-plus-circle";
@@ -1269,7 +1269,7 @@ function renderDetails(data) {
           ' <i class="bi ' + disToggleIcon + '" id="det-daysoptIn-toggle" title="' + disToggleTitle + '" style="font-size:0.8rem;opacity:0.7;cursor:pointer;vertical-align:middle" onclick="event.stopPropagation()"></i></th>';
       }
       if (c.isEarnDate) {
-        return '<th style="white-space:nowrap;font-size:0.8rem;border-bottom:4px solid #7ec8e3">' + c.label + '</th>';
+        return '<th style="font-size:0.8rem;border-bottom:4px solid #7ec8e3">' + c.label + '</th>';
       }
       if (c.isDealDetailCol) {
         var ddStyleAttr = c.style ? 'style="' + c.style + ';border-bottom:4px solid #7ec8e3"' : 'style="border-bottom:4px solid #7ec8e3"';
@@ -1283,7 +1283,7 @@ function renderDetails(data) {
         var sortIcon = sortField === c.field ? (sortDir === "asc" ? " ▲" : " ▼") : " ⇅";
         var toggleIcon = showCompletionDates ? "bi-dash-circle" : "bi-plus-circle";
         var toggleTitle = showCompletionDates ? "Hide completion dates" : "Show completion dates";
-        return '<th style="cursor:pointer;user-select:none;white-space:nowrap' + (showCompletionDates ? ';border-bottom:4px solid #7ec8e3' : '') + '" data-sortfield="' + c.field + '">' +
+        return '<th style="cursor:pointer;user-select:none' + (showCompletionDates ? ';border-bottom:4px solid #7ec8e3' : '') + '" data-sortfield="' + c.field + '">' +
           c.label + '<span style="font-size:0.7rem;opacity:0.7">' + sortIcon + '</span>' +
           ' <i class="bi ' + toggleIcon + '" id="det-completion-toggle" title="' + toggleTitle + '" style="font-size:0.8rem;opacity:0.7;cursor:pointer;vertical-align:middle" onclick="event.stopPropagation()"></i></th>';
       }
@@ -1291,7 +1291,7 @@ function renderDetails(data) {
         var bdSortIcon    = sortField === c.field ? (sortDir === "asc" ? " ▲" : " ▼") : " ⇅";
         var bdToggleIcon  = showDealDetails ? "bi-dash-circle" : "bi-plus-circle";
         var bdToggleTitle = showDealDetails ? "Hide Deal ID, Booking PO Number, Net Booking & Subscription ID" : "Show Deal ID, Booking PO Number, Net Booking & Subscription ID";
-        return '<th style="white-space:nowrap;cursor:pointer;user-select:none' + (showDealDetails ? ';border-bottom:4px solid #7ec8e3' : '') + '" data-sortfield="' + c.field + '">' +
+        return '<th style="cursor:pointer;user-select:none' + (showDealDetails ? ';border-bottom:4px solid #7ec8e3' : '') + '" data-sortfield="' + c.field + '">' +
           c.label + '<span style="font-size:0.7rem;opacity:0.7">' + bdSortIcon + '</span>' +
           ' <i class="bi ' + bdToggleIcon + '" id="det-dealdetails-toggle" title="' + bdToggleTitle + '" style="font-size:0.8rem;opacity:0.7;cursor:pointer;vertical-align:middle" onclick="event.stopPropagation()"></i></th>';
       }
@@ -1486,6 +1486,13 @@ function renderDetails(data) {
               tbody += '<td><span class="text-danger fw-semibold">' + msParts.join(", ") + '</span></td>';
             }
             return;
+          } else if (c.field === "Current stage pending tasks") {
+            if (val) {
+              var tasks = String(val).replace(/N;/g, "N;\n").split("\n").map(function(t){ return t.trim(); }).filter(Boolean);
+              cell = tasks.map(function(t){ return '<div style="white-space:nowrap">' + escHtml(t) + '</div>'; }).join('');
+            } else {
+              cell = "";
+            }
           } else {
             cell = escHtml(val);
           }
@@ -1546,7 +1553,8 @@ function renderDetails(data) {
 
     // Sort on header click
     document.getElementById("det-table-area").querySelectorAll("th[data-sortfield]").forEach(function (th) {
-      th.addEventListener("click", function () {
+      th.addEventListener("click", function (e) {
+        if (e.target.classList.contains("col-resize-handle")) return;
         var field = th.dataset.sortfield;
         if (sortField === field) {
           sortDir = sortDir === "asc" ? "desc" : "asc";
@@ -1584,6 +1592,41 @@ function renderDetails(data) {
         });
       });
     });
+
+    // Column resize handles
+    (function() {
+      var table = document.querySelector("#det-table-area table");
+      if (!table) return;
+      var ths = table.querySelectorAll("thead th");
+      // Switch table to fixed layout so explicit widths are honoured
+      table.style.tableLayout = "fixed";
+      ths.forEach(function(th) {
+        // Set initial explicit width from current rendered width
+        th.style.width = th.offsetWidth + "px";
+        var handle = document.createElement("div");
+        handle.className = "col-resize-handle";
+        th.appendChild(handle);
+        var startX, startW;
+        handle.addEventListener("mousedown", function(e) {
+          e.preventDefault();
+          e.stopPropagation();
+          startX = e.clientX;
+          startW = th.offsetWidth;
+          handle.classList.add("dragging");
+          function onMove(e) {
+            var newW = Math.max(40, startW + (e.clientX - startX));
+            th.style.width = newW + "px";
+          }
+          function onUp() {
+            handle.classList.remove("dragging");
+            document.removeEventListener("mousemove", onMove);
+            document.removeEventListener("mouseup", onUp);
+          }
+          document.addEventListener("mousemove", onMove);
+          document.addEventListener("mouseup", onUp);
+        });
+      });
+    })();
 
     // Pagination
     var pgHtml = '<nav><ul class="pagination pagination-sm mb-0">';
@@ -1709,6 +1752,28 @@ function renderDetails(data) {
         if (document.getElementById("filter-ea")           && document.getElementById("filter-ea").checked)           activeFilters.push("EA");
         if (document.getElementById("filter-aap")           && document.getElementById("filter-aap").checked)           activeFilters.push("AAP");
         if (document.getElementById("filter-max-incentive") && document.getElementById("filter-max-incentive").checked) activeFilters.push("Max Incentive");
+        if (document.getElementById("filter-pvi-Eligible") && document.getElementById("filter-pvi-Eligible").checked) activeFilters.push("PVI: Eligible");
+        if (document.getElementById("filter-pvi-Onboard")  && document.getElementById("filter-pvi-Onboard").checked)  activeFilters.push("PVI: Onboard");
+        if (document.getElementById("filter-pvi-Adopt")    && document.getElementById("filter-pvi-Adopt").checked)    activeFilters.push("PVI: Adopt");
+        if (document.getElementById("filter-hide-excluded") && document.getElementById("filter-hide-excluded").checked) activeFilters.push("Hide Excluded");
+        if (document.getElementById("filter-offer-optedin-y") && document.getElementById("filter-offer-optedin-y").checked) activeFilters.push("Offer Opted-In: Y");
+        if (document.getElementById("filter-offer-optedin-n") && document.getElementById("filter-offer-optedin-n").checked) activeFilters.push("Offer Opted-In: N");
+        if (activeTagFilters.length > 0) activeFilters.push("Tags (" + tagFilterMode + "): " + activeTagFilters.join(", "));
+        if (window.APP_GEO_FILTER) activeFilters.push("BE GEO ID: " + window.APP_GEO_FILTER);
+        // Date sliders — only when user has moved them
+        var _bkFromEl = document.getElementById("det-bk-from"), _bkToEl = document.getElementById("det-bk-to");
+        function _sliderDayToLocale(el) { return el ? new Date(parseInt(el.value) * 86400000).toLocaleDateString(window.APP_LOCALE) : ""; }
+        if (window._sliderUserSet && window._sliderUserSet["det-bk"] && _bkFromEl && _bkToEl) activeFilters.push("Booking Date: " + _sliderDayToLocale(_bkFromEl) + " – " + _sliderDayToLocale(_bkToEl));
+        var _rsFromEl = document.getElementById("det-rs-from"), _rsToEl = document.getElementById("det-rs-to");
+        if (window._sliderUserSet && window._sliderUserSet["det-rs"] && _rsFromEl && _rsToEl) activeFilters.push("Opt-in Date: " + _sliderDayToLocale(_rsFromEl) + " – " + _sliderDayToLocale(_rsToEl));
+        var _expFromEl = document.getElementById("det-exp-from"), _expToEl = document.getElementById("det-exp-to");
+        if (window._sliderUserSet && window._sliderUserSet["det-exp"] && _expFromEl && _expToEl) activeFilters.push("Expiry Date: " + _sliderDayToLocale(_expFromEl) + " – " + _sliderDayToLocale(_expToEl));
+        var _eaFromEl = document.getElementById("det-ea-from"), _eaToEl = document.getElementById("det-ea-to");
+        if (window._sliderUserSet && window._sliderUserSet["det-ea"] && _eaFromEl && _eaToEl) activeFilters.push("Earn Date: " + _sliderDayToLocale(_eaFromEl) + " – " + _sliderDayToLocale(_eaToEl));
+        var _csFromEl = document.getElementById("det-cs-from"), _csToEl = document.getElementById("det-cs-to");
+        if (_csFromEl && _csToEl && (_csFromEl.value !== _csFromEl.min || _csToEl.value !== _csToEl.max)) {
+          activeFilters.push("Stage Range: " + (currentStageOrder[parseInt(_csFromEl.value)] || _csFromEl.value) + " – " + (currentStageOrder[parseInt(_csToEl.value)] || _csToEl.value));
+        }
 
         // Build sheet rows array
         var sheetData = [];

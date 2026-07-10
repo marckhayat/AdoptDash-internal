@@ -18,7 +18,7 @@ var APP_IS_DISTI = false;
 var APP_GEO_FILTER = "";   // BE GEO ID filter — applies to all tabs
 var APP_MULTI_SESSIONS = null;
 var APP_EXCL_ACTIVE = false;
-var APP_VERSION = "v1.4.1";
+var APP_VERSION = "v1.5";
 // Use the browser's preferred language for date formatting (respects user's browser locale setting)
 var APP_LOCALE = navigator.language || undefined;
 // Holds a FileSystemFileHandle from showOpenFilePicker() to be persisted after load
@@ -594,6 +594,13 @@ function finishLoad(filename, rowCount, headerAutoDetected, idbType, loadedAt, f
         if (activeTab) renderActiveTab(activeTab.dataset.bsTarget);
       });
       sel.addEventListener("blur", restoreShortLabels);
+
+      // Auto-select the only option when there is exactly one BE GEO ID
+      if (beGeoIds.length === 1) {
+        sel.value = beGeoIds[0];
+        APP_GEO_FILTER = beGeoIds[0];
+        restoreShortLabels();
+      }
     }
   })();
   renderMultiPicker(); // re-render persistent session bar (highlights active, keeps others)

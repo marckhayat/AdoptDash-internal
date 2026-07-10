@@ -127,13 +127,21 @@ function renderPVI(data) {
       var noData = m.eligUC === 0;
       var naStr  = '<span class="text-muted">N/A</span>';
 
+      // Build a deep-link anchor on a label to the Details tab with portfolio + PVI checkbox pre-applied
+      function mkLabelLink(label, checkboxId) {
+        return '<a href="#" class="pvi-deep-link" title="View in Details tab" ' +
+          'data-pvi-portfolio="' + portfolio.replace(/"/g, '&quot;') + '" ' +
+          'data-pvi-cbid="' + checkboxId + '">' +
+          label + '</a>';
+      }
+
       var metricsHtml = '<table class="table table-sm mb-0" style="font-size:0.82rem">';
       metricsHtml += '<tbody>';
-      metricsHtml += '<tr><td>Eligible UCs</td><td class="text-end fw-semibold">' + m.eligUC + '</td><td class="text-end">' + fmtCurrency(m.eligBook) + '</td></tr>';
-      metricsHtml += '<tr><td>Eligible UCs Onboarded</td><td class="text-end">' + m.onbUC + '</td><td class="text-end">' + fmtCurrency(m.onbBook) + '</td></tr>';
+      metricsHtml += '<tr><td>' + mkLabelLink("Eligible UCs", "filter-pvi-Eligible") + '</td><td class="text-end fw-semibold">' + m.eligUC + '</td><td class="text-end">' + fmtCurrency(m.eligBook) + '</td></tr>';
+      metricsHtml += '<tr><td>' + mkLabelLink("Eligible UCs Onboarded", "filter-pvi-Onboard") + '</td><td class="text-end">' + m.onbUC + '</td><td class="text-end">' + fmtCurrency(m.onbBook) + '</td></tr>';
       metricsHtml += '<tr><td>Ratio Onboarded</td><td colspan="2" class="text-end">' + (noData ? naStr : fmtPct(m.onbRatio)) + '</td></tr>';
       metricsHtml += '<tr><td>PVI Engagement - Onboard (/10)</td><td colspan="2" class="text-end"><span style="font-size:1.4rem">' + (m.onbScore !== null ? m.onbScore : "N/A") + '</span></td></tr>';
-      metricsHtml += '<tr><td>Eligible UCs Adopted</td><td class="text-end">' + m.adpUC + '</td><td class="text-end">' + fmtCurrency(m.adpBook) + '</td></tr>';
+      metricsHtml += '<tr><td>' + mkLabelLink("Eligible UCs Adopted", "filter-pvi-Adopt") + '</td><td class="text-end">' + m.adpUC + '</td><td class="text-end">' + fmtCurrency(m.adpBook) + '</td></tr>';
       metricsHtml += '<tr><td>Ratio Adopted</td><td colspan="2" class="text-end">' + (noData ? naStr : fmtPct(m.adpRatio)) + '</td></tr>';
       metricsHtml += '<tr><td>PVI Engagement - Adopt (/10)</td><td colspan="2" class="text-end"><span style="font-size:1.4rem">' + (m.adpScore !== null ? m.adpScore : "N/A") + '</span></td></tr>';
       metricsHtml += '<tr class="table-active"><td class="fw-bold">PVI Engagement Total (/10)</td><td colspan="2" class="text-end"><span class="pvi-score-total fw-bold ' + scoreClass(m.totalScore) + '">' + (m.totalScore !== null ? m.totalScore.toFixed(1) : "N/A") + '</span></td></tr>';
@@ -172,6 +180,19 @@ function renderPVI(data) {
       }
       updateSim();
     });
+
+    // Delegated listener for deep-link labels
+    var contentEl2 = document.getElementById("pvi-content");
+    if (contentEl2) {
+      contentEl2.addEventListener("click", function (e) {
+        var a = e.target.closest("a.pvi-deep-link");
+        if (!a) return;
+        e.preventDefault();
+        var pf   = a.getAttribute("data-pvi-portfolio");
+        var cbid = a.getAttribute("data-pvi-cbid");
+        window.navigateToDetails({ portfolio: pf, checkboxIds: [cbid] });
+      });
+    }
   }
 
   renderPortfolios(window.APP_GEO_FILTER ? data : null);
