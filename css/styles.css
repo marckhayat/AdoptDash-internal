@@ -303,6 +303,11 @@
 .filter-sidebar .filter-group {
   margin-bottom: 1rem;
 }
+.filter-sidebar .filter-group #filter-pvi .btn {
+  font-size: 0.82rem;
+  padding-top: 0.15rem;
+  padding-bottom: 0.15rem;
+}
 .filter-sidebar .filter-group label.group-label {
   font-weight: 700;
   color: var(--cisco-dark);
