@@ -534,6 +534,8 @@ function renderDetails(data) {
     }
     if (fromLbl) fromLbl.textContent = new Date(fromVal * 86400000).toLocaleDateString(window.APP_LOCALE);
     if (toLbl)   toLbl.textContent   = new Date(toVal   * 86400000).toLocaleDateString(window.APP_LOCALE);
+    var active = !!(window._sliderUserSet && window._sliderUserSet[prefix]);
+    if (fillEl) fillEl.style.background = active ? "var(--cisco-blue2)" : "#d9d9d9";
   }
 
   // Wire up filters

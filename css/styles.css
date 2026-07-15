@@ -308,6 +308,11 @@
   padding-top: 0.15rem;
   padding-bottom: 0.15rem;
 }
+.filter-sidebar .filter-group #filter-pvi .btn-check:checked + .btn {
+  background-color: var(--cisco-blue2);
+  border-color: var(--cisco-blue2);
+  color: #fff;
+}
 .filter-sidebar .filter-group label.group-label {
   font-weight: 700;
   color: var(--cisco-dark);
