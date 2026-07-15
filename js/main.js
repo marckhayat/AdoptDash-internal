@@ -742,13 +742,26 @@ function restoreUploadSection(cachedEntries) {
 
     // Previous CPI sessions — full width below both columns
     (function() {
-      if (cpiEntries.length === 0) return '';
+      var demoDateStr = (window.DEMO_GENERATED ? fmtDate(window.DEMO_GENERATED) : '');
+      var demoCardHtml = '<div class="col"><div class="card mb-2 p-2" style="border-color:var(--cisco-blue)">' +
+        '<div class="d-flex justify-content-between align-items-start gap-2">' +
+        '<div style="min-width:0">' +
+        '<div class="fw-semibold small" style="color:var(--cisco-blue)"><i class="bi bi-play-circle-fill me-1"></i>Demo</div>' +
+        '<div class="text-muted" style="font-size:0.72rem">671 rows</div>' +
+        '<div class="text-muted" style="font-size:0.72rem">BE GEO ID: 12345</div>' +
+        (demoDateStr ? '<div class="text-muted" style="font-size:0.72rem">' + demoDateStr + '</div>' : '') +
+        '</div>' +
+        '<div class="d-flex gap-1 flex-shrink-0">' +
+        '<button class="btn btn-sm py-0" id="demo-load-btn" style="background:var(--cisco-blue);border-color:var(--cisco-blue);color:#fff" title="Load demo"><i class="bi bi-play-fill"></i></button>' +
+        '</div></div></div></div>';
+      if (cpiEntries.length === 0 && !window.DEMO_DATA) return '';
       return '<div class="card shadow-sm border-warning mt-2">' +
         '<div class="card-header bg-warning bg-opacity-10 fw-semibold d-flex justify-content-between align-items-center gap-2" style="font-size:0.85rem"><span><i class="bi bi-lightning-charge-fill me-2 text-warning"></i>Previous sessions</span>' +
-        (isChrome ? '<button id="cpi-refresh-all-btn" class="btn btn-sm btn-outline-primary py-0 flex-shrink-0" title="Refresh all previous sessions"><i class="bi bi-arrow-clockwise me-1"></i>Refresh all</button>' : '') +
+        (isChrome && cpiEntries.length > 0 ? '<button id="cpi-refresh-all-btn" class="btn btn-sm btn-outline-primary py-0 flex-shrink-0" title="Refresh all previous sessions"><i class="bi bi-arrow-clockwise me-1"></i>Refresh all</button>' : '') +
         '</div>' +
         '<div class="card-body p-2" id="cpi-prev-sessions-body"><div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-2">' +
         cpiEntries.map(resumeCard).join("") +
+        (window.DEMO_DATA ? demoCardHtml : '') +
         '</div></div></div>';
     })()+
     // ── Clear all data button ─────────────────────────────────────────────
@@ -841,6 +854,21 @@ function restoreUploadSection(cachedEntries) {
       refreshAllPreviousSessions();
     });
   }
+
+  var demoLoadBtn = document.getElementById("demo-load-btn");
+  if (demoLoadBtn) {
+    demoLoadBtn.addEventListener("click", function () {
+      if (!window.DEMO_DATA) { alert("Demo data not loaded."); return; }
+      showLoader("Loading demo…");
+      setTimeout(function () {
+        APP_DATA = transformData(window.DEMO_DATA);
+        window.APP_IS_DISTI = false;
+        APP_FILE_META = { name: "cpi_random.xlsx", lastModified: null, cachedAt: null, _scopeType: "begeoid", _scopeLabel: "12345" };
+        finishLoad("cpi_random.xlsx", APP_DATA.length, false, null);
+      }, 50);
+    });
+  }
+
 
   document.getElementById("clear-all-btn").addEventListener("click", function () {
     if (!confirm("This will delete all cached sessions. Continue?")) return;
