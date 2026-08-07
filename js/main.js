@@ -18,7 +18,7 @@ var APP_IS_DISTI = false;
 var APP_GEO_FILTER = "";   // BE GEO ID filter — applies to all tabs
 var APP_MULTI_SESSIONS = null;
 var APP_EXCL_ACTIVE = false;
-var APP_VERSION = "v1.9.1";
+var APP_VERSION = "v1.9.2";
 // Use the browser's preferred language for date formatting (respects user's browser locale setting)
 var APP_LOCALE = navigator.language || undefined;
 // Holds a FileSystemFileHandle from showOpenFilePicker() to be persisted after load
@@ -626,7 +626,17 @@ function finishLoad(filename, rowCount, headerAutoDetected, idbType, loadedAt, f
     renderActiveTab(_activeTarget);
   });
   // Always reset first so no dismissed state bleeds from a previous session
+  window._dismissedNotifs = {};
   window._currentSessionKey = idbType || null;
+  if (fromCache) {
+    try {
+      var stored = localStorage.getItem(_notifStorageKey(window._currentSessionKey));
+      if (stored) window._dismissedNotifs = JSON.parse(stored);
+    } catch(e) {}
+  } else {
+    try { localStorage.removeItem(_notifStorageKey(window._currentSessionKey)); } catch(e) {}
+  }
+  showDataNotifications(APP_DATA);
 }
 
 function restoreUploadSection(cachedEntries) {
@@ -1573,6 +1583,10 @@ function resetApp() {
   var cpiNav = document.getElementById("cpi-scroll-nav");
   if (cpiNav) cpiNav.remove();
 
+  // Clear notifications
+  var notifC = document.getElementById("notif-toast-container");
+  if (notifC) notifC.innerHTML = "";
+
   // Reset disti mode — restore PVI tab
   APP_IS_DISTI = false;
   window.APP_IS_DISTI = false;
@@ -1612,7 +1626,206 @@ window.renderActiveTab = renderActiveTab;
 window.renderOverview  = renderOverview;
 window.getActiveData   = getActiveData;
 
+window.APP_DATA        = APP_DATA;
+window.APP_FILTER_STATE = APP_FILTER_STATE;
+window.APP_EXCL_ACTIVE  = APP_EXCL_ACTIVE;
+window.resetApp        = resetApp;
+window.renderActiveTab = renderActiveTab;
+window.renderOverview  = renderOverview;
+window.getActiveData   = getActiveData;
+
+window._dismissedNotifs = {};
 window._currentSessionKey = null;
+
+function _notifStorageKey(sessionKey) {
+  return "dismissed-notifs-" + (sessionKey || "default");
+}
+window._notifStorageKey = _notifStorageKey;
+
+window._dismissNotif = function(id) {
+  window._dismissedNotifs[id] = true;
+  try {
+    localStorage.setItem(_notifStorageKey(window._currentSessionKey), JSON.stringify(window._dismissedNotifs));
+  } catch(e) {}
+};
+
+// ── Data load notifications ──────────────────────────────────────────────────
+function showDataNotifications(data) {
+  var container = document.getElementById("notif-toast-container");
+  if (!container || !data) return;
+  var updateToast = document.getElementById("notif-update");
+  container.innerHTML = "";
+  if (updateToast) container.appendChild(updateToast);
+  var dismissed = window._dismissedNotifs || {};
+
+  var now    = new Date();
+  var today0 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  var past14 = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 14);
+  var next14 = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 14, 23, 59, 59, 999);
+
+  var _localTodayEpochDay = Math.floor(today0.getTime() / 86400000);
+  var _localFrom14        = Math.floor(past14.getTime() / 86400000);
+  var _localTo14          = Math.floor(next14.getTime() / 86400000);
+
+  function pd(x) {
+    if (!x) return null;
+    if (x instanceof Date) return isNaN(x.getTime()) ? null : x;
+    if (typeof x === "number" && x > 1000) {
+      var d = new Date(Math.round((x - 25569) * 86400000));
+      return isNaN(d.getTime()) ? null : d;
+    }
+    if (typeof x === "string" && x.trim()) {
+      var d2 = new Date(x);
+      return isNaN(d2.getTime()) ? null : d2;
+    }
+    return null;
+  }
+
+  // 1. New eligible deals booked in past 14 days
+  var newEligible = 0;
+  var newEligibleKeys = new Set();
+  data.forEach(function(r) {
+    var bd = pd(r["Booking Date"]);
+    if (bd && bd >= past14 && bd <= now &&
+        String(r["Stage"] || "").toUpperCase() === "ELIGIBLE" &&
+        String(r["Adopt Rebate Opt-In Status"] || "").toUpperCase() === "PENDING") {
+      newEligible++;
+      if (r["CRPartyID-Offer"]) newEligibleKeys.add(r["CRPartyID-Offer"]);
+    }
+  });
+
+  // 2. New opt-ins in past 14 days
+  var newOptIns = 0;
+  var newOptInPotential = 0;
+  data.forEach(function(r) {
+    var od = pd(r["Adopt Rebate Start Date"]);
+    if (od && od >= past14 && od <= now &&
+        String(r["Adopt Rebate Opt-In Status"] || "").toUpperCase() === "OPTED IN" &&
+        String(r["Stage"] || "").toUpperCase() === "ELIGIBLE") {
+      newOptIns++;
+      newOptInPotential += parseFloat(r["Potential Incentives"]) || 0;
+    }
+  });
+
+  // 3. Incentives earned in past 14 days
+  var STAGE_MAP = [
+    { dateCol: "Stage Completion Date(onboard)", amtCol: "Estimated Incentive Amount(Onboard)" },
+    { dateCol: "Stage Completion Date(Use)",     amtCol: "Estimated Incentive Amount(Use)"     },
+    { dateCol: "Stage Completion Date(Engage)",  amtCol: "Estimated Incentive Amount(Engage)"  },
+    { dateCol: "Stage Completion Date(Adopt)",   amtCol: "Estimated Incentive Amount(Adopt)"   }
+  ];
+  var earnedLast14 = 0;
+  data.forEach(function(r) {
+    if (String(r["Adopt Rebate Opt-In Status"] || "").toUpperCase() !== "OPTED IN") return;
+    if (String(r["Stage"] || "").toUpperCase() !== "ELIGIBLE") return;
+    STAGE_MAP.forEach(function(s) {
+      var d = pd(r[s.dateCol]);
+      if (d && d >= past14 && d <= now) {
+        earnedLast14 += parseFloat(r[s.amtCol]) || 0;
+      }
+    });
+  });
+
+  // 4. Opted-in eligible deals expiring in the next 14 days
+  var expiringSoon = 0;
+  data.forEach(function(r) {
+    var ed = pd(r["Deal Incentive Expiry Date"]);
+    if (ed && ed >= today0 && ed <= next14 &&
+        String(r["Stage"] || "").toUpperCase() === "ELIGIBLE" &&
+        String(r["Adopt Rebate Opt-In Status"] || "").toUpperCase() === "OPTED IN") expiringSoon++;
+  });
+
+  function fmtMoney(v) {
+    if (v >= 1000000) return "$" + (v / 1000000).toFixed(1) + "M";
+    if (v >= 1000)    return "$" + (v / 1000).toFixed(1) + "K";
+    return "$" + Math.round(v).toLocaleString();
+  }
+
+  var notifs = [
+    {
+      id: "notif-new",
+      cls: "notif-new",
+      icon: "bi-star-fill text-primary",
+      title: "New Eligible Opportunities",
+      preset: { stage: ["ELIGIBLE"], optIn: ["PENDING"], bkFrom: _localFrom14, bkTo: _localTodayEpochDay },
+      body: newEligible > 0
+        ? "<strong>" + newEligible.toLocaleString() + "</strong> new eligible opportunit" + (newEligible !== 1 ? "ies" : "y") + " booked in the past 14 days (" + newEligibleKeys.size.toLocaleString() + " unique)"
+        : null
+    },
+    {
+      id: "notif-optins",
+      cls: "notif-new",
+      icon: "bi-hand-thumbs-up-fill text-primary",
+      title: "New Opt-ins",
+      preset: { stage: ["ELIGIBLE"], optIn: ["OPTED IN"], rsFrom: _localFrom14, rsTo: _localTodayEpochDay },
+      body: newOptIns > 0
+        ? "<strong>" + newOptIns.toLocaleString() + "</strong> new opt-in" + (newOptIns !== 1 ? "s" : "") + " in the past 14 days"
+        : null
+    },
+    {
+      id: "notif-potential",
+      cls: "notif-earned",
+      icon: "bi-piggy-bank-fill text-success",
+      title: "New Potential",
+      preset: { stage: ["ELIGIBLE"], optIn: ["OPTED IN"], rsFrom: _localFrom14, rsTo: _localTodayEpochDay },
+      body: newOptInPotential > 0
+        ? "<strong>" + fmtMoney(newOptInPotential) + "</strong> in potential incentives from new opt-ins"
+        : null
+    },
+    {
+      id: "notif-earned",
+      cls: "notif-earned",
+      icon: "bi-cash-coin text-success",
+      title: "Incentives Earned",
+      alwaysLink: true,
+      preset: { checkboxIds: ["filter-earned"], eaFrom: _localFrom14, eaTo: _localTodayEpochDay },
+      body: earnedLast14 > 0
+        ? "<strong>" + fmtMoney(earnedLast14) + "</strong> in incentives earned over the past 14 days"
+        : null
+    },
+    {
+      id: "notif-expiry",
+      cls: "notif-expiry",
+      icon: "bi-clock-history text-warning",
+      title: "Expiring Soon",
+      emptyMsg: "Nothing expiring in the coming 14 days.",
+      preset: { optIn: ["OPTED IN"], stage: ["Eligible"], expFrom: _localTodayEpochDay, expTo: _localTo14 },
+      body: expiringSoon > 0
+        ? "<strong>" + expiringSoon.toLocaleString() + "</strong> opted-in deal" + (expiringSoon !== 1 ? "s" : "") + " expir" + (expiringSoon !== 1 ? "e" : "es") + " within 14 days"
+        : null
+    }
+  ];
+
+  notifs.forEach(function(n) {
+    if (dismissed[n.id]) return;
+    var hasData = !!n.body;
+    var isClickable = hasData || !!n.alwaysLink;
+    var extraCls = hasData ? n.cls : "notif-zero";
+    var bodyContent = hasData ? n.body : '<span class="text-muted">' + (n.emptyMsg || "Nothing to report in the past 14 days.") + '</span>';
+    var bodyHtml = isClickable
+      ? '<a href="javascript:void(0)" class="notif-link d-block text-reset text-decoration-none" data-notif-id="' + n.id + '">' + bodyContent + ' <i class="bi bi-arrow-right-circle ms-1" style="font-size:0.8rem;opacity:0.6"></i></a>'
+      : bodyContent;
+    var html =
+      '<div id="' + n.id + '" class="toast show mb-2 ' + extraCls + '" role="alert" data-bs-autohide="false">' +
+        '<div class="toast-header">' +
+          '<i class="bi ' + n.icon + ' me-2"></i>' +
+          '<strong class="me-auto">' + n.title + '</strong>' +
+          '<button type="button" class="btn-close ms-2" onclick="window._dismissNotif(\'' + n.id + '\');this.closest(\'.toast\').remove()" aria-label="Close"></button>' +
+        '</div>' +
+        '<div class="toast-body small">' + bodyHtml + '</div>' +
+      '</div>';
+    container.insertAdjacentHTML("beforeend", html);
+    if (isClickable) {
+      var el = container.querySelector('#' + n.id + ' .notif-link');
+      if (el) {
+        (function(preset) {
+          el.addEventListener("click", function() { window.navigateToDetails(preset); });
+        })(n.preset);
+      }
+    }
+  });
+}
+window.showDataNotifications = showDataNotifications;
 
 // Navigate to Details tab with a preset filter
 window.navigateToDetails = function (preset) {
