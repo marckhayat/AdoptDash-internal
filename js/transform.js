@@ -317,7 +317,9 @@ function transformData(rawRows) {
     else if (cs === "Completed") startDate = toDate(r["Stage Completion Date(Adopt)"]);
 
     if (startDate !== null) {
-      r["Days in stage"] = Math.floor((today.getTime() - startDate.getTime()) / 86400000);
+      var startDateMidnight = new Date(startDate.getTime());
+      startDateMidnight.setHours(0, 0, 0, 0);
+      r["Days in stage"] = Math.floor((today.getTime() - startDateMidnight.getTime()) / 86400000);
     } else {
       r["Days in stage"] = null;
     }
