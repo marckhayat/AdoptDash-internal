@@ -592,6 +592,11 @@ function finishLoad(filename, rowCount, headerAutoDetected, idbType, loadedAt, f
         restoreShortLabels();
         var activeTab = document.querySelector(".nav-link.active[data-bs-target]");
         if (activeTab) renderActiveTab(activeTab.dataset.bsTarget);
+        // Refresh notifications to reflect the new GEO filter (only if already visible)
+        var notifC = document.getElementById("notif-toast-container");
+        if (notifC && notifC.querySelector(".toast")) {
+          if (window.showDataNotifications) showDataNotifications(getActiveData());
+        }
       });
       sel.addEventListener("blur", restoreShortLabels);
 
