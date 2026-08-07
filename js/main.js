@@ -636,7 +636,6 @@ function finishLoad(filename, rowCount, headerAutoDetected, idbType, loadedAt, f
   } else {
     try { localStorage.removeItem(_notifStorageKey(window._currentSessionKey)); } catch(e) {}
   }
-  showDataNotifications(APP_DATA);
 }
 
 function restoreUploadSection(cachedEntries) {
