@@ -18,7 +18,7 @@ var APP_IS_DISTI = false;
 var APP_GEO_FILTER = "";   // BE GEO ID filter — applies to all tabs
 var APP_MULTI_SESSIONS = null;
 var APP_EXCL_ACTIVE = false;
-var APP_VERSION = "v1.9.4";
+var APP_VERSION = "v1.9.5";
 // Use the browser's preferred language for date formatting (respects user's browser locale setting)
 var APP_LOCALE = navigator.language || undefined;
 // Holds a FileSystemFileHandle from showOpenFilePicker() to be persisted after load
@@ -1679,6 +1679,8 @@ function showDataNotifications(data) {
       return isNaN(d.getTime()) ? null : d;
     }
     if (typeof x === "string" && x.trim()) {
+      var iso = x.trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (iso) return new Date(parseInt(iso[1],10), parseInt(iso[2],10)-1, parseInt(iso[3],10));
       var d2 = new Date(x);
       return isNaN(d2.getTime()) ? null : d2;
     }
