@@ -762,7 +762,7 @@ function restoreUploadSection(cachedEntries) {
         '<div style="min-width:0">' +
         '<div class="fw-semibold small" style="color:var(--cisco-blue)"><i class="bi bi-play-circle-fill me-1"></i>Demo</div>' +
         '<div class="text-muted" style="font-size:0.72rem">671 rows</div>' +
-        '<div class="text-muted" style="font-size:0.72rem">BE GEO ID: 12345</div>' +
+        '<div class="text-muted" style="font-size:0.72rem">BE GEO IDs: 12345, 23456, 34567</div>' +
         (demoDateStr ? '<div class="text-muted" style="font-size:0.72rem">' + demoDateStr + '</div>' : '') +
         '</div>' +
         '<div class="d-flex gap-1 flex-shrink-0">' +
