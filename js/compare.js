@@ -107,7 +107,7 @@ function renderCompare(data) {
   var _selectedOffer     = (_saved && _saved.offer)     || "";
   var _logScale          = (_saved && _saved.logScale)   || false;
   var _anonymize         = (_saved && _saved.anonymize)  || false;
-  var _topN              = (_saved && _saved.topN  != null) ? _saved.topN : 0; // 0 = all
+  var _topN              = (_saved && _saved.topN  != null) ? _saved.topN : 25; // default: Top 25
 
   function getOfferOptions(pf) {
     var opts = pf ? Array.from(offersByPortfolio[pf] || []) : (function() {
@@ -149,8 +149,9 @@ function renderCompare(data) {
   // Top N
   html += '<div class="d-flex flex-column"><label class="small text-muted mb-1">Show</label>';
   html += '<select id="cmp-topn" class="form-select form-select-sm">';
-  html += '<option value="0"' + (_topN === 0   ? ' selected' : '') + '>All</option>';
+  html += '<option value="0"'  + (_topN === 0  ? ' selected' : '') + '>All</option>';
   html += '<option value="10"' + (_topN === 10 ? ' selected' : '') + '>Top 10</option>';
+  html += '<option value="25"' + (_topN === 25 ? ' selected' : '') + '>Top 25</option>';
   html += '</select></div>';
 
   // Log scale — pushed to the right end of the row
@@ -336,8 +337,9 @@ function renderCompare(data) {
     var pfList = portfolio ? [portfolio] : portfolios;
     var byOptIn  = entries.slice().sort(function(a, b) { return b.optIn       - a.optIn;       });
     var byEarned = entries.slice().sort(function(a, b) { return b.totalEarned - a.totalEarned; });
+    var allEntries = byOptIn.slice(); // full list, before top-N slice, for ratio + potential charts
     if (_topN > 0) { byOptIn = byOptIn.slice(0, _topN); byEarned = byEarned.slice(0, _topN); }
-    return { byOptIn: byOptIn, byEarned: byEarned, pfList: pfList };
+    return { byOptIn: byOptIn, byEarned: byEarned, allEntries: allEntries, pfList: pfList };
   }
 
   // ── Chart renderers ─────────────────────────────────────────────────────────
@@ -652,8 +654,8 @@ function renderCompare(data) {
     var d = computeData();
     renderOptInChart(d.byOptIn, d.pfList);
     renderEarnedChart(d.byEarned, d.pfList);
-    renderRatioChart(d.byOptIn);
-    renderPotentialChart(d.byOptIn, d.pfList);
+    renderRatioChart(d.allEntries);
+    renderPotentialChart(d.allEntries, d.pfList);
   }
 
   // ── Wire controls ───────────────────────────────────────────────────────────
