@@ -958,9 +958,13 @@ function restoreUploadSection(cachedEntries) {
 
     function openPicker() {
       if (typeof window.showOpenFilePicker === "function") {
-        window.showOpenFilePicker({
-          types: [{ description: "CPI CSV", accept: { "text/csv": [".csv"], "application/octet-stream": [".csv"] } }],
-          multiple: false
+        IDB.loadHandle("lci-last-file").catch(function() { return null; }).then(function (lastHandle) {
+          var pickerOpts = {
+            types: [{ description: "CPI CSV", accept: { "text/csv": [".csv"], "application/octet-stream": [".csv"] } }],
+            multiple: false
+          };
+          if (lastHandle) pickerOpts.startIn = lastHandle;
+          return window.showOpenFilePicker(pickerOpts);
         }).then(function (handles) {
           var handle = handles[0];
           PENDING_FILE_HANDLE = handle;
@@ -988,11 +992,15 @@ function restoreUploadSection(cachedEntries) {
     // Try the last-used handle only if it matches the selected region
     IDB.loadHandle("lci-last-file").then(function (handle) {
       if (!handle) { openPicker(); return; }
-      // Check if the stored filename matches the selected region
+      // Check if the stored filename matches the selected region and week
       var regionFile = region === "DISTI" ? "DISTI" : region;
       var fileMatchesRegion = handle.name.indexOf("_" + regionFile + "_") !== -1 ||
                               handle.name.indexOf("_" + regionFile + ".") !== -1;
       if (!fileMatchesRegion) { openPicker(); return; }
+      var fileMatchesWeek = week
+        ? handle.name.indexOf("_" + week + ".") !== -1 || handle.name.indexOf("_" + week + "_") !== -1
+        : handle.name.indexOf("_" + regionFile + ".") !== -1;  // "Latest" → no week suffix
+      if (!fileMatchesWeek) { openPicker(); return; }
       handle.queryPermission({ mode: "read" }).then(function (perm) {
         if (perm === "granted") return perm;
         return handle.requestPermission({ mode: "read" });
