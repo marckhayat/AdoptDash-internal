@@ -18,7 +18,7 @@ var APP_IS_DISTI = false;
 var APP_GEO_FILTER = "";   // BE GEO ID filter — applies to all tabs
 var APP_MULTI_SESSIONS = null;
 var APP_EXCL_ACTIVE = false;
-var APP_VERSION = "v1.9.7";
+var APP_VERSION = "v1.9.8";
 // Use the browser's preferred language for date formatting (respects user's browser locale setting)
 var APP_LOCALE = navigator.language || undefined;
 // Holds a FileSystemFileHandle from showOpenFilePicker() to be persisted after load
@@ -624,11 +624,14 @@ function finishLoad(filename, rowCount, headerAutoDetected, idbType, loadedAt, f
 
   var activeTab = document.querySelector(".nav-link.active[data-bs-target]");
   var _activeTarget = activeTab ? activeTab.dataset.bsTarget : "#tab-overview";
+  // Render immediately so the Overview is visible right away even if IDB.save
+  // for a large dataset is still running and delays the ANNOTATIONS IDB read.
+  renderActiveTab(_activeTarget);
   ANNOTATIONS.load().then(function () {
+    // Re-render once annotations are loaded so exclusion counts etc. are accurate.
     renderActiveTab(_activeTarget);
   }).catch(function (err) {
-    console.warn("[AdoptDash] ANNOTATIONS.load() failed, rendering anyway:", err);
-    renderActiveTab(_activeTarget);
+    console.warn("[AdoptDash] ANNOTATIONS.load() failed:", err);
   });
   // Always reset first so no dismissed state bleeds from a previous session
   window._dismissedNotifs = {};
