@@ -18,7 +18,7 @@ var APP_IS_DISTI = false;
 var APP_GEO_FILTER = "";   // BE GEO ID filter — applies to all tabs
 var APP_MULTI_SESSIONS = null;
 var APP_EXCL_ACTIVE = false;
-var APP_VERSION = "v1.9.8";
+var APP_VERSION = "v2.0";
 // Use the browser's preferred language for date formatting (respects user's browser locale setting)
 var APP_LOCALE = navigator.language || undefined;
 // Holds a FileSystemFileHandle from showOpenFilePicker() to be persisted after load
@@ -56,6 +56,11 @@ function init() {
       // Hide the BE GEO ID filter on the Leaderboard tab (compares all entities)
       var geoSlot = document.getElementById("ovw-begeoid-tab-slot");
       if (geoSlot) geoSlot.classList.toggle("d-none", e.target.dataset.bsTarget === "#tab-compare");
+      // Reset Internal toggle on every tab switch so confidential fields
+      // never remain visible after leaving the Details tab.
+      APP_INTERNAL_MODE = false;
+      updateInternalToggleStyle();
+      updateInternalToggleVisibility(e.target.dataset.bsTarget);
       renderActiveTab(e.target.dataset.bsTarget);
     });
   });
@@ -569,9 +574,10 @@ function finishLoad(filename, rowCount, headerAutoDetected, idbType, loadedAt, f
         '</select>';
     }
 
-    if (!html) { slot.innerHTML = ""; slot.classList.add("d-none"); return; }
-    slot.innerHTML = html;
+    if (!html) { slot.innerHTML = ""; }
+    else { slot.innerHTML = html; }
     slot.classList.remove("d-none");
+    renderInternalToggle();
 
     if (beGeoIds.length > 0) {
       var sel = document.getElementById("ovw-begeoid-sel");
@@ -760,12 +766,22 @@ function restoreUploadSection(cachedEntries) {
     // Previous CPI sessions — full width below both columns
     (function() {
       var demoDateStr = (window.DEMO_GENERATED ? fmtDate(window.DEMO_GENERATED) : '');
+      var demoRowCount = (window.DEMO_DATA && window.DEMO_DATA.length) || 0;
+      var demoBeIds = '';
+      if (window.DEMO_DATA && window.DEMO_DATA.length) {
+        var seen = {};
+        for (var i = 0; i < window.DEMO_DATA.length; i++) {
+          var v = window.DEMO_DATA[i]['BE GEO ID'];
+          if (v && !seen[v]) seen[v] = true;
+        }
+        demoBeIds = Object.keys(seen).sort().join(', ');
+      }
       var demoCardHtml = '<div class="col"><div class="card mb-2 p-2" style="border-color:var(--cisco-blue)">' +
         '<div class="d-flex justify-content-between align-items-start gap-2">' +
         '<div style="min-width:0">' +
         '<div class="fw-semibold small" style="color:var(--cisco-blue)"><i class="bi bi-play-circle-fill me-1"></i>Demo</div>' +
-        '<div class="text-muted" style="font-size:0.72rem">671 rows</div>' +
-        '<div class="text-muted" style="font-size:0.72rem">BE GEO IDs: 12345, 23456, 34567</div>' +
+        '<div class="text-muted" style="font-size:0.72rem">' + demoRowCount + ' rows</div>' +
+        '<div class="text-muted" style="font-size:0.72rem">BE GEO IDs: ' + demoBeIds + '</div>' +
         (demoDateStr ? '<div class="text-muted" style="font-size:0.72rem">' + demoDateStr + '</div>' : '') +
         '</div>' +
         '<div class="d-flex gap-1 flex-shrink-0">' +
@@ -1578,6 +1594,61 @@ function getActiveData() {
   excludedIds.forEach(function (id) { idSet[id] = true; });
   return d.filter(function (r) { return !idSet[String(r["Deal WS-ID"] || "")]; });
 }
+
+// ── Internal mode toggle (Details tab only) ──────────────────────────────────
+// Reveals confidential fields (Deployment ID + derivation method) that must not
+// be visible when sharing the screen with partners.
+var APP_INTERNAL_MODE = false;
+
+function renderInternalToggle() {
+  var slot = document.getElementById("ovw-begeoid-tab-slot");
+  if (!slot) return;
+  // Always reset to off whenever the toggle is (re)mounted, e.g. when a new
+  // dataset is loaded, so confidential fields never start visible.
+  APP_INTERNAL_MODE = false;
+  if (document.getElementById("internal-mode-btn")) {
+    updateInternalToggleStyle();
+    return;
+  }
+  var btn = document.createElement("button");
+  btn.id = "internal-mode-btn";
+  btn.type = "button";
+  btn.className = "btn btn-sm";
+  btn.title = "Show internal-only fields (Deployment ID). Hide before sharing your screen with partners.";
+  btn.addEventListener("click", function () {
+    APP_INTERNAL_MODE = !APP_INTERNAL_MODE;
+    updateInternalToggleStyle();
+    var activeTab = document.querySelector(".nav-link.active[data-bs-target]");
+    var target = activeTab ? activeTab.dataset.bsTarget : "";
+    if (target === "#tab-details" && typeof window.__detailsRerenderTable === "function") {
+      window.__detailsRerenderTable();
+    } else if (activeTab) {
+      renderActiveTab(target);
+    }
+  });
+  slot.appendChild(btn);
+  updateInternalToggleStyle();
+  var activeTab = document.querySelector(".nav-link.active[data-bs-target]");
+  updateInternalToggleVisibility(activeTab ? activeTab.dataset.bsTarget : "#tab-overview");
+}
+
+function updateInternalToggleStyle() {
+  var btn = document.getElementById("internal-mode-btn");
+  if (!btn) return;
+  btn.innerHTML = '<i class="bi ' + (APP_INTERNAL_MODE ? "bi-eye-fill" : "bi-eye-slash") + ' me-1"></i>Internal';
+  btn.style.cssText = "font-size:0.78rem;font-weight:600;white-space:nowrap;padding:0.15rem 0.5rem;" +
+    (APP_INTERNAL_MODE
+      ? "background:#dc3545;border:1px solid #dc3545;color:#fff"
+      : "background:transparent;border:1px solid #dc3545;color:#dc3545");
+  btn.setAttribute("aria-pressed", APP_INTERNAL_MODE ? "true" : "false");
+}
+
+function updateInternalToggleVisibility(target) {
+  var btn = document.getElementById("internal-mode-btn");
+  if (btn) btn.classList.toggle("d-none", target !== "#tab-details");
+}
+
+window.updateInternalToggleVisibility = updateInternalToggleVisibility;
 
 function renderActiveTab(target) {
   switch (target) {

@@ -1,2 +1,5 @@
 *.xlsx
 *.csv
+
+anonymize_cpi.py
+CPI_data_EMEA_anonymized.csv

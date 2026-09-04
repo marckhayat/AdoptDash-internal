@@ -1228,6 +1228,7 @@ function renderDetails(data) {
     return '<div class="metric-card flex-fill"><div class="metric-value">' + value + '</div><div class="metric-label">' + label + infoIcon + '</div></div>';
   }
 
+  window.__detailsRerenderTable = renderTable;
   function renderTable() {
     var today = new Date();
     var in90  = new Date(today.getTime() + 90 * 86400000);
@@ -1246,6 +1247,25 @@ function renderDetails(data) {
     var totalPages = Math.ceil(filteredData.length / PAGE_SIZE);
 
     var has2TPartner = data.some(function (r) { return r["2T Partner Name"] && String(r["2T Partner Name"]).trim() !== ""; });
+
+    // Resolve the Deployment ID columns tolerantly: source headers vary in
+    // spacing, casing and dash characters between exports.
+    var depIdKey = null, depMethodKey = null;
+    (function () {
+      var keys = {};
+      for (var i = 0; i < data.length && i < 50; i++) {
+        Object.keys(data[i] || {}).forEach(function (k) { keys[k] = true; });
+      }
+      Object.keys(keys).forEach(function (k) {
+        var n = String(k).replace(/[\u200B-\u200F\uFEFF]/g, "")
+                         .replace(/[\u00A0\u2002\u2003\u2009\u202F]/g, " ")
+                         .replace(/[\u2010-\u2015]/g, "-")
+                         .replace(/\s+/g, " ").trim().toLowerCase();
+        if (n.indexOf("deployment id") !== 0) return;
+        if (/deriv/.test(n)) { if (!depMethodKey) depMethodKey = k; }
+        else if (/internal/.test(n)) { if (!depIdKey) depIdKey = k; }
+      });
+    })();
 
     var cols = [
       { label: window.APP_IS_DISTI ? "Distributor" : "Partner", field: "Partner Name", isPartnerCell: true, isDistiCell: !!window.APP_IS_DISTI, style: "min-width:160px" },
@@ -1485,6 +1505,14 @@ function renderDetails(data) {
               '<i class="bi bi-pencil-square"></i></button></div>';
           } else if (c.field === "Current stage") {
             cell = '<span class="stage-badge stage-' + escHtml(val) + '">' + escHtml(val) + '</span>';
+            if (window.APP_INTERNAL_MODE) {
+              var _depId = depIdKey ? String(r[depIdKey] || "").trim() : "";
+              if (_depId) {
+                var _depMethod = depMethodKey ? String(r[depMethodKey] || "").trim() : "";
+                var _depTitle = _depMethod ? ' title="Derivation method: ' + escHtml(_depMethod) + '"' : "";
+                cell += '<div style="font-size:0.72rem;color:#888;margin-top:2px' + (_depMethod ? ";cursor:help" : "") + '"' + _depTitle + '>' + escHtml(_depId) + '</div>';
+              }
+            }
           } else if (c.field === "Days in stage") {
             var days = val !== null && val !== undefined ? parseInt(val) : null;
             var dayColor = days === null ? "" : days > 180 ? "color:#D13438" : days > 90 ? "color:#FF8C00" : "color:#107C10";
