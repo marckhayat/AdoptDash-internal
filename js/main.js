@@ -1036,15 +1036,16 @@ function showDrillDownPicker(rawRows, onConfirm, options) {
       return '<option value="' + t + '">' + t + ' (' + n + ' countr' + (n === 1 ? 'y' : 'ies') + ')</option>';
     }).join('');
 
-    // Build unique BE GEO IDs list with all associated Partner Names
+    // Build unique BE GEO IDs list with all associated Partner/Disti Names
     var beGeoIds = [];
     var beGeoToPartners = {};
+    var nameField = regionUpper === "DISTI" ? "Disti name" : "Partner Name";
     rawRows.forEach(function(r) {
       var v = String(r["BE GEO ID"] || "").trim();
       if (v) {
         if (beGeoIds.indexOf(v) === -1) beGeoIds.push(v);
-        if (r["Partner Name"]) {
-          var pn = String(r["Partner Name"]).trim();
+        if (r[nameField]) {
+          var pn = String(r[nameField]).trim();
           if (pn) {
             if (!beGeoToPartners[v]) beGeoToPartners[v] = [];
             if (beGeoToPartners[v].indexOf(pn) === -1) beGeoToPartners[v].push(pn);
