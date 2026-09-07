@@ -1039,7 +1039,10 @@ function showDrillDownPicker(rawRows, onConfirm, options) {
     // Build unique BE GEO IDs list with all associated Partner/Disti Names
     var beGeoIds = [];
     var beGeoToPartners = {};
-    var nameField = regionUpper === "DISTI" ? "Disti name" : "Partner Name";
+    var rawKeys0 = rawRows[0] ? Object.keys(rawRows[0]) : [];
+    var partnerKey = rawKeys0.find(function(k) { return k.trim().toLowerCase() === "partner name"; }) || "Partner Name";
+    var distiKey   = rawKeys0.find(function(k) { return k.trim().toLowerCase() === "disti name"; });
+    var nameField = regionUpper === "DISTI" ? (distiKey || partnerKey) : partnerKey;
     rawRows.forEach(function(r) {
       var v = String(r["BE GEO ID"] || "").trim();
       if (v) {
