@@ -18,7 +18,7 @@ var APP_IS_DISTI = false;
 var APP_GEO_FILTER = "";   // BE GEO ID filter — applies to all tabs
 var APP_MULTI_SESSIONS = null;
 var APP_EXCL_ACTIVE = false;
-var APP_VERSION = "v1.10";
+var APP_VERSION = "v1.11";
 // Use the browser's preferred language for date formatting (respects user's browser locale setting)
 var APP_LOCALE = navigator.language || undefined;
 // Holds a FileSystemFileHandle from showOpenFilePicker() to be persisted after load
@@ -727,6 +727,17 @@ function restoreUploadSection(cachedEntries) {
     '<div class="d-flex align-items-center justify-content-center gap-2 flex-wrap">' +
     '<button id="lci-load-btn" class="btn btn-warning px-4"><i class="bi bi-folder2-open me-2"></i>Load CPI File…</button>' +
     '<button id="lci-pick-btn" class="btn btn-outline-secondary d-none"><i class="bi bi-arrow-repeat me-1"></i>Choose different file…</button>' +
+    '<button type="button" id="lci-help-btn" class="btn btn-sm btn-link text-secondary p-1" ' +
+      'data-bs-toggle="popover" data-bs-trigger="focus" data-bs-placement="right" data-bs-html="true" ' +
+      'title="Which file to load?" ' +
+      'data-bs-content="Select one of:<ul class=\'mb-0 ps-3\'>' +
+        '<li><code>CPI_data_EMEA.csv</code></li>' +
+        '<li><code>CPI_data_AMER.csv</code></li>' +
+        '<li><code>CPI_data_APJC.csv</code></li>' +
+        '<li><code>CPI_data_DISTI.csv</code></li>' +
+        '<li>or the partner file as downloaded from Workspan.</li>' +
+      '</ul>" ' +
+      'aria-label="Help"><i class="bi bi-question-circle fs-5"></i></button>' +
     '<input type="file" id="lci-file-input" accept=".csv" class="d-none" />' +
     '</div>'+
     '</div></div>' +
@@ -934,6 +945,10 @@ function restoreUploadSection(cachedEntries) {
     document.getElementById("lci-error").classList.add("d-none");
     openCpiFile(true);
   });
+
+  // Init help popover
+  var helpBtnEl = document.getElementById("lci-help-btn");
+  if (helpBtnEl && window.bootstrap && bootstrap.Popover) new bootstrap.Popover(helpBtnEl, { html: true });
 
   function openCpiFile(forcePicker) {
     function openPicker() {
