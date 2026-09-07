@@ -668,18 +668,20 @@ function restoreUploadSection(cachedEntries) {
   }
 
   function resumeCard(entry) {
-    var key = entry.type; // e.g. "cpi-EMEA", "cpi-EMEA-th:Southern Europe", "cpi-EMEA-co:France"
+    var key = entry.type; // e.g. "cpi-EMEA", "cpi-EMEA-th:Southern Europe", "cpi-EMEA-co:France", "cpi-PARTNER"
     var region = key.replace(/^cpi-/, "").replace(/-(th|co|bgeo):.*$/, "");
+    var isPartner = region === "PARTNER";
     var scopeType  = entry.meta.scopeType  || "region";
     var scopeLabel = entry.meta.scopeLabel || "";
     var scopeStr = scopeType === "theater" ? "Theater: " + scopeLabel
                  : scopeType === "country" ? "Country: " + scopeLabel
                  : scopeType === "begeoid" ? "BE GEO IDs: " + scopeLabel
-                 : "Whole Region";
+                 : (isPartner ? "Partner file" : "Whole Region");
+    var headerLabel = isPartner ? "Partner" : region;
     var html = '<div class="col"><div class="card border-warning mb-2 p-2">';
     html += '<div class="d-flex justify-content-between align-items-start gap-2">';
     html += '<div style="min-width:0">';
-    html += '<div class="fw-semibold small">' + region + ' &mdash; ' + scopeStr + '</div>';
+    html += '<div class="fw-semibold small">' + headerLabel + ' &mdash; ' + scopeStr + '</div>';
     html += '<div class="text-muted" style="font-size:0.72rem">' + (entry.meta.rowCount||0).toLocaleString() + ' rows</div>';
     var basename = (entry.meta.filename || '').split(/[\\/]/).pop();
     var dateStr = fmtDate(entry.meta.loadedAt);
@@ -702,22 +704,6 @@ function restoreUploadSection(cachedEntries) {
     if (e.type.indexOf("cpi-") === 0) cpiEntries.push(e);
   });
 
-  // ── Compute week options: Latest, then previous weeks down to 2026W23 ─────
-  var savedRegion = localStorage.getItem("AdoptDash_Internal_lci-region") || "EMEA";
-  function getISOWeek(date) {
-    var d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-    var day = d.getUTCDay() || 7;
-    d.setUTCDate(d.getUTCDate() + 4 - day);
-    var yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-    return { year: d.getUTCFullYear(), week: Math.ceil((((d - yearStart) / 86400000) + 1) / 7) };
-  }
-  var now = getISOWeek(new Date());
-  var weekOptions = '<option value="">Latest</option>';
-  for (var w = now.week - 1; w >= 23; w--) {
-    var wLabel = now.year + "W" + (w < 10 ? "0" + w : w);
-    weekOptions += '<option value="' + wLabel + '">' + wLabel + '</option>';
-  }
-
   // ── Build two-column layout ───────────────────────────────────────────────
   sec.innerHTML =
     '<div class="container-fluid py-4" style="max-width:1400px">' +
@@ -732,23 +718,15 @@ function restoreUploadSection(cachedEntries) {
     '<div class="card-header bg-warning bg-opacity-10 fw-semibold" style="font-size:0.9rem"><i class="bi bi-lock-fill me-2 text-warning"></i>Cisco-internal</div>' +
     '<div class="card-body p-4 text-center">' +
     '<p class="small mb-3"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="16" height="16" style="vertical-align:-2px;margin-right:4px"><path d="M50,0 A50,50 0 0,1 93.3,75 L50,50Z" fill="#EA4335"/><path d="M93.3,75 A50,50 0 0,1 6.7,75 L50,50Z" fill="#FBBC05"/><path d="M6.7,75 A50,50 0 0,1 50,0 L50,50Z" fill="#34A853"/><circle cx="50" cy="50" r="33" fill="white"/><circle cx="50" cy="50" r="20" fill="#4285F4"/></svg><strong>Chrome recommended for the best experience.</strong></p>' +
-    '<div class="row g-2 mb-3 align-items-end">' +
-    '<div class="col-auto"><label class="form-label small fw-semibold mb-1">Region</label>' +
-    '<select id="lci-region" class="form-select form-select-sm">' +
-    ['EMEA','AMER','APJC','DISTI'].map(function(r){ return '<option value="'+r+'"'+(r===savedRegion?' selected':'')+'>'+r+'</option>'; }).join('') +
-    '</select></div>'+
-    '<div class="col-auto"><label class="form-label small fw-semibold mb-1">Week</label>' +
-    '<select id="lci-week" class="form-select form-select-sm">' + weekOptions + '</select></div>' +
-    '</div>' +
     '<div id="lci-error" class="alert alert-danger py-2 px-3 small mb-3 d-none"></div>' +
     '<div id="lci-session-picker" class="d-none"></div>' +
     '<div id="lci-last-file-hint" class="d-none mb-2 text-start small">' +
     '<i class="bi bi-file-earmark-check me-1 text-success"></i>' +
     '<span id="lci-last-file-name" class="fw-semibold"></span>' +
     '</div>' +
-    '<div class="d-flex align-items-center gap-3 flex-wrap">' +
-    '<p id="lci-onedrive-hint" class="text-muted small mb-0">Locate the <span id="lci-file-hint-text" class="fw-semibold fst-italic"></span> file in your OneDrive.</p>' +
+    '<div class="d-flex align-items-center justify-content-center gap-2 flex-wrap">' +
     '<button id="lci-load-btn" class="btn btn-warning px-4"><i class="bi bi-folder2-open me-2"></i>Load CPI File…</button>' +
+    '<button id="lci-pick-btn" class="btn btn-outline-secondary d-none"><i class="bi bi-arrow-repeat me-1"></i>Choose different file…</button>' +
     '<input type="file" id="lci-file-input" accept=".csv" class="d-none" />' +
     '</div>'+
     '</div></div>' +
@@ -912,50 +890,33 @@ function restoreUploadSection(cachedEntries) {
     });
   });
 
-  function updateLciHint() {
-    var region = document.getElementById("lci-region").value;
-    var week   = document.getElementById("lci-week").value;
-    var regionFile = region === "DISTI" ? "DISTI" : region;
-    var filename = week ? "CPI_data_" + regionFile + "_" + week + ".csv" : "CPI_data_" + regionFile + ".csv";
-    document.getElementById("lci-file-hint-text").textContent = filename;
+  // ── Derive region from a CPI filename ────────────────────────────────────
+  // Matches CPI_data_<REGION>[_<week>].csv where REGION is EMEA|AMER|APJC|DISTI.
+  // Returns "" if no region can be parsed (partner file → loaded as-is).
+  function parseRegionFromFilename(name) {
+    if (!name) return "";
+    var m = String(name).match(/_(EMEA|AMER|APJC|DISTI)(?:_|\.)/i);
+    return m ? m[1].toUpperCase() : "";
   }
-
-  ["lci-region","lci-week"].forEach(function (id) {
-    document.getElementById(id).addEventListener("change", function () {
-      if (id === "lci-region") localStorage.setItem("AdoptDash_Internal_lci-region", this.value);
-      updateLciHint();
-      updateLastFileHint();
-    });
-  });
-  updateLciHint();
 
   // ── Show last-used CPI file hint if a handle is stored ───────────────────
   var _lastHandleName = null;
 
   function updateLastFileHint() {
-    if (!_lastHandleName) return;
-    var region = document.getElementById("lci-region").value;
-    var week   = document.getElementById("lci-week").value;
-    var regionFile = region === "DISTI" ? "DISTI" : region;
-    var fileMatchesRegion = _lastHandleName.indexOf("_" + regionFile + "_") !== -1 ||
-                            _lastHandleName.indexOf("_" + regionFile + ".") !== -1;
-    // Also verify the stored filename matches the selected week.
-    // A specific week must appear in the filename; "Latest" (empty) must match the no-week variant.
-    var fileMatchesWeek = week
-      ? _lastHandleName.indexOf("_" + week + ".") !== -1 || _lastHandleName.indexOf("_" + week + "_") !== -1
-      : _lastHandleName.indexOf("_" + regionFile + ".") !== -1;  // "Latest" → no week suffix
     var hintEl = document.getElementById("lci-last-file-hint");
     var nameEl = document.getElementById("lci-last-file-name");
-    var onedriveHint = document.getElementById("lci-onedrive-hint");
-    if (hintEl && nameEl) {
-      if (fileMatchesRegion && fileMatchesWeek) {
-        nameEl.textContent = _lastHandleName;
-        hintEl.classList.remove("d-none");
-        if (onedriveHint) onedriveHint.classList.add("d-none");
-      } else {
-        hintEl.classList.add("d-none");
-        if (onedriveHint) onedriveHint.classList.remove("d-none");
-      }
+    var loadBtn = document.getElementById("lci-load-btn");
+    var pickBtn = document.getElementById("lci-pick-btn");
+    if (!hintEl || !nameEl) return;
+    if (_lastHandleName) {
+      nameEl.textContent = _lastHandleName;
+      hintEl.classList.remove("d-none");
+      if (loadBtn) loadBtn.innerHTML = '<i class="bi bi-arrow-clockwise me-2"></i>Reload this file';
+      if (pickBtn) pickBtn.classList.remove("d-none");
+    } else {
+      hintEl.classList.add("d-none");
+      if (loadBtn) loadBtn.innerHTML = '<i class="bi bi-folder2-open me-2"></i>Load CPI File…';
+      if (pickBtn) pickBtn.classList.add("d-none");
     }
   }
 
@@ -968,13 +929,14 @@ function restoreUploadSection(cachedEntries) {
   // ── Load button: try last-used handle first, then fall back to file picker ──
   document.getElementById("lci-load-btn").addEventListener("click", function () {
     document.getElementById("lci-error").classList.add("d-none");
-    openCpiFile();
+    openCpiFile(false);
+  });
+  document.getElementById("lci-pick-btn").addEventListener("click", function () {
+    document.getElementById("lci-error").classList.add("d-none");
+    openCpiFile(true);
   });
 
-  function openCpiFile() {
-    var region = document.getElementById("lci-region").value;
-    var week   = document.getElementById("lci-week").value;
-
+  function openCpiFile(forcePicker) {
     function openPicker() {
       if (typeof window.showOpenFilePicker === "function") {
         IDB.loadHandle("lci-last-file").catch(function() { return null; }).then(function (lastHandle) {
@@ -993,7 +955,7 @@ function restoreUploadSection(cachedEntries) {
           }).catch(function() {});
           return handle.getFile();
         }).then(function (file) {
-          processCpiFile(file, region, week);
+          processCpiFile(file, parseRegionFromFilename(file.name));
         }).catch(function (err) {
           PENDING_FILE_HANDLE = null;
           if (err.name !== "AbortError") {
@@ -1008,18 +970,11 @@ function restoreUploadSection(cachedEntries) {
       }
     }
 
-    // Try the last-used handle only if it matches the selected region
+    if (forcePicker) { openPicker(); return; }
+
+    // Try the last-used handle silently
     IDB.loadHandle("lci-last-file").then(function (handle) {
       if (!handle) { openPicker(); return; }
-      // Check if the stored filename matches the selected region and week
-      var regionFile = region === "DISTI" ? "DISTI" : region;
-      var fileMatchesRegion = handle.name.indexOf("_" + regionFile + "_") !== -1 ||
-                              handle.name.indexOf("_" + regionFile + ".") !== -1;
-      if (!fileMatchesRegion) { openPicker(); return; }
-      var fileMatchesWeek = week
-        ? handle.name.indexOf("_" + week + ".") !== -1 || handle.name.indexOf("_" + week + "_") !== -1
-        : handle.name.indexOf("_" + regionFile + ".") !== -1;  // "Latest" → no week suffix
-      if (!fileMatchesWeek) { openPicker(); return; }
       handle.queryPermission({ mode: "read" }).then(function (perm) {
         if (perm === "granted") return perm;
         return handle.requestPermission({ mode: "read" });
@@ -1027,7 +982,7 @@ function restoreUploadSection(cachedEntries) {
         if (perm !== "granted") { openPicker(); return; }
         PENDING_FILE_HANDLE = handle;
         return handle.getFile().then(function (file) {
-          processCpiFile(file, region, week);
+          processCpiFile(file, parseRegionFromFilename(file.name));
         });
       }).catch(function () { openPicker(); });
     }).catch(function () { openPicker(); });
@@ -1038,7 +993,7 @@ function restoreUploadSection(cachedEntries) {
     var file = e.target.files[0];
     if (!file) return;
     PENDING_FILE_HANDLE = null;
-    processCpiFile(file, document.getElementById("lci-region").value, document.getElementById("lci-week").value);
+    processCpiFile(file, parseRegionFromFilename(file.name));
   });
 }
 
@@ -1354,22 +1309,9 @@ function showDrillDownPicker(rawRows, onConfirm, options) {
 }
 
 // ── CPI file processing — loads all rows, sessions keyed by region ───────────
-function processCpiFile(file, region, week) {
-  var regionFile = region === "DISTI" ? "DISTI" : region;
-  var expected = week
-    ? "CPI_data_" + regionFile + "_" + week + ".csv"
-    : "CPI_data_" + regionFile + ".csv";
+function processCpiFile(file, region) {
   var errEl = document.getElementById("lci-error");
   if (errEl) errEl.classList.add("d-none");
-
-  if (file.name !== expected) {
-    if (errEl) {
-      errEl.innerHTML = '<i class="bi bi-exclamation-triangle me-1"></i>Expected <strong>' + expected + '</strong> but got <strong>' + file.name + '</strong>. Please check your selections.';
-      errEl.classList.remove("d-none");
-    }
-    PENDING_FILE_HANDLE = null;
-    return;
-  }
 
   showLoader("Reading CPI file…");
   readFileAsText(file).then(function (rawText) {
@@ -1387,8 +1329,11 @@ function processCpiFile(file, region, week) {
             return r[rawDistiKey] && String(r[rawDistiKey]).trim() !== "";
           }));
 
-          fixTheaterField(results.data, region);
-          showDrillDownPicker(results.data, function(filteredRows, scopeType, scopeLabel) {
+          // If filename has no recognisable region, treat as a partner file.
+          var effectiveRegion = region || (rawIsDisti ? "DISTI" : "");
+          fixTheaterField(results.data, effectiveRegion);
+
+          function onScopeConfirmed(filteredRows, scopeType, scopeLabel) {
             try {
               // Build a unique key per region+scope so sessions don't overwrite each other
               var scopeSlug = scopeType === "region"   ? ""
@@ -1396,11 +1341,12 @@ function processCpiFile(file, region, week) {
                             : scopeType === "country"  ? "-co:" + scopeLabel
                             : scopeType === "begeoid"  ? "-bgeo:" + scopeLabel.replace(/,/g, "_")
                             : "";
-              var idbKey = "cpi-" + region + scopeSlug;
+              var keyRegion = effectiveRegion || "PARTNER";
+              var idbKey = "cpi-" + keyRegion + scopeSlug;
               APP_DATA = transformData(filteredRows);
               APP_IS_DISTI = rawIsDisti;
               APP_FILE_META = { name: file.name, lastModified: file.lastModified ? new Date(file.lastModified) : null };
-              var label = file.name + " · " + region + (scopeLabel ? " · " + scopeLabel : "");
+              var label = file.name + (effectiveRegion ? " · " + effectiveRegion : "") + (scopeLabel ? " · " + scopeLabel : "");
               // Stash scope info so finishLoad can persist it
               APP_FILE_META._scopeType  = scopeType;
               APP_FILE_META._scopeLabel = scopeLabel;
@@ -1411,7 +1357,21 @@ function processCpiFile(file, region, week) {
               console.error(err);
               alert("Error processing CPI file: " + err.message);
             }
-          }, { region: region });
+          }
+
+          if (!region) {
+            // Partner file: skip scope picker, use all BE GEO IDs found in file.
+            var _bgSet = {};
+            results.data.forEach(function(r) {
+              var v = String(r["BE GEO ID"] || "").trim();
+              if (v) _bgSet[v] = true;
+            });
+            var _bgList = Object.keys(_bgSet).sort();
+            var _bgLabel = _bgList.join(",");
+            onScopeConfirmed(results.data, _bgLabel ? "begeoid" : "region", _bgLabel);
+          } else {
+            showDrillDownPicker(results.data, onScopeConfirmed, { region: effectiveRegion });
+          }
         } catch (err) {
           PENDING_FILE_HANDLE = null;
           IDB.loadAllMeta().then(function(en) { restoreUploadSection(en); });
@@ -1526,16 +1486,18 @@ function refreshCpiFromHandle(file, idbKey, scopeType, scopeLabel, cacheOnly) {
             } else if (scopeType === "begeoid" && scopeLabel) {
               var _bgGeos = scopeLabel.split(",");
               rows = results.data.filter(function(r) { return _bgGeos.indexOf(String(r["BE GEO ID"] || "").trim()) !== -1; });
-            } else if (scopeType === "region" && regionUpper !== "DISTI") {
+            } else if (scopeType === "region" && regionUpper !== "DISTI" && regionUpper !== "PARTNER") {
               rows = results.data.filter(function(r) { return String(r["Stage"] || "").trim().toUpperCase() !== "NOT ELIGIBLE"; });
             }
 
             var _handle = PENDING_FILE_HANDLE;
-            var displayLabel = region + (scopeLabel ? " · " + scopeLabel : "");
+            var displayRegion = regionUpper === "PARTNER" ? "" : region;
+            var displayLabel = displayRegion + (scopeLabel ? (displayRegion ? " · " : "") + scopeLabel : "");
+            var fullLabel = displayLabel ? file.name + " · " + displayLabel : file.name;
             if (cacheOnly) {
               var transformed = transformData(rows);
               IDB.save(idbKey, transformed, {
-                filename:         file.name + " · " + displayLabel,
+                filename:         fullLabel,
                 rowCount:         transformed.length,
                 loadedAt:         new Date().toISOString(),
                 fileLastModified: file.lastModified ? new Date(file.lastModified).toISOString() : null,
@@ -1556,7 +1518,7 @@ function refreshCpiFromHandle(file, idbKey, scopeType, scopeLabel, cacheOnly) {
               window.APP_IS_DISTI = rawIsDisti;
               APP_DATA = transformData(rows);
               APP_FILE_META = { name: file.name, lastModified: file.lastModified ? new Date(file.lastModified) : null, _scopeType: scopeType, _scopeLabel: scopeLabel };
-              finishLoad(file.name + " · " + displayLabel, APP_DATA.length, false, idbKey);
+              finishLoad(fullLabel, APP_DATA.length, false, idbKey);
               resolve();
             }
           } catch (err) {
