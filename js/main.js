@@ -757,9 +757,8 @@ function restoreUploadSection(cachedEntries) {
       var demoCardHtml = '<div class="col"><div class="card mb-2 p-2" style="border-color:var(--cisco-blue)">' +
         '<div class="d-flex justify-content-between align-items-start gap-2">' +
         '<div style="min-width:0">' +
-        '<div class="fw-semibold small" style="color:var(--cisco-blue)"><i class="bi bi-play-circle-fill me-1"></i>Demo</div>' +
+        '<div class="fw-semibold small" style="color:var(--cisco-blue)"><i class="bi bi-play-circle-fill me-1"></i>Demo &mdash; BE GEO IDs: ' + demoBeIds + '</div>' +
         '<div class="text-muted" style="font-size:0.72rem">' + demoRowCount + ' rows</div>' +
-        '<div class="text-muted" style="font-size:0.72rem">BE GEO IDs: ' + demoBeIds + '</div>' +
         (demoDateStr ? '<div class="text-muted" style="font-size:0.72rem">' + demoDateStr + '</div>' : '') +
         '</div>' +
         '<div class="d-flex gap-1 flex-shrink-0">' +
