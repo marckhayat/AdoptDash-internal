@@ -683,7 +683,7 @@ function restoreUploadSection(cachedEntries) {
     html += '<div style="min-width:0">';
     html += '<div class="fw-semibold small">' + headerLabel + ' &mdash; ' + scopeStr + '</div>';
     html += '<div class="text-muted" style="font-size:0.72rem">' + (entry.meta.rowCount||0).toLocaleString() + ' rows</div>';
-    var basename = (entry.meta.filename || '').split(/[\\/]/).pop();
+    var basename = (entry.meta.filename || '').split(' · ')[0].split(/[\\/]/).pop();
     var dateStr = fmtDate(entry.meta.loadedAt);
     html += '<div class="text-muted text-truncate" style="font-size:0.72rem" title="' + entry.meta.filename + '">' + basename + '</div>';
     if (dateStr) html += '<div class="text-muted" style="font-size:0.72rem">' + dateStr + '</div>';
