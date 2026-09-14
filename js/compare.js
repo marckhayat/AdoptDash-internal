@@ -10,6 +10,10 @@ var _cmpChartPotential= null;
 function renderCompare(data) {
   var el = document.getElementById("tab-compare");
   if (!el) return;
+  if (_cmpChartOptin) { _cmpChartOptin.destroy(); _cmpChartOptin = null; }
+  if (_cmpChartEarned) { _cmpChartEarned.destroy(); _cmpChartEarned = null; }
+  if (_cmpChartRatio) { _cmpChartRatio.destroy(); _cmpChartRatio = null; }
+  if (_cmpChartPotential) { _cmpChartPotential.destroy(); _cmpChartPotential = null; }
 
   function norm(x) {
     if (x === null || x === undefined) return "";
@@ -32,27 +36,29 @@ function renderCompare(data) {
 
   // ── Determine comparison dimension ─────────────────────────────────────────
   var scopeType = (window.APP_FILE_META && window.APP_FILE_META._scopeType) || "region";
-  var useBeGeoKey = (scopeType !== "region" && scopeType !== "theater");
-  var dimField  = scopeType === "region"  ? "Theater"
-                : scopeType === "theater" ? "Partner Country"
-                : "BE GEO ID";
-  var dimLabel  = scopeType === "region"  ? "Theater"
-                : scopeType === "theater" ? "Country"
-                : "Partner";
+  function defaultComparisonLevel() {
+    return scopeType === "region" ? "theater"
+         : scopeType === "theater" ? "country"
+         : "partner";
+  }
+  function comparisonConfig(level) {
+    if (level === "country") return { field: "Partner Country", label: "Country" };
+    if (level === "partner") return { field: "BE GEO ID", label: "Partner" };
+    return { field: "Theater", label: "Theater" };
+  }
+  var validComparisonLevels = ["theater", "country", "partner"];
 
   // ── Build BE GEO ID → partner name frequency map (from full dataset) ────────
   // Tracks how many times each name appears per BE GEO ID so we can pick the
   // most recurrent one as the canonical display label.
   var beGeoLabelMap = {};
-  if (useBeGeoKey) {
-    data.forEach(function(r) {
-      var geoId = String(r["BE GEO ID"] || "").trim();
-      var pname = String(r["Partner Name"] || "").trim();
-      if (!geoId || !pname) return;
-      if (!beGeoLabelMap[geoId]) beGeoLabelMap[geoId] = {};
-      beGeoLabelMap[geoId][pname] = (beGeoLabelMap[geoId][pname] || 0) + 1;
-    });
-  }
+  data.forEach(function(r) {
+    var geoId = String(r["BE GEO ID"] || "").trim();
+    var pname = String(r["Partner Name"] || "").trim();
+    if (!geoId || !pname) return;
+    if (!beGeoLabelMap[geoId]) beGeoLabelMap[geoId] = {};
+    beGeoLabelMap[geoId][pname] = (beGeoLabelMap[geoId][pname] || 0) + 1;
+  });
 
   // ── Unique portfolios + offers in data ─────────────────────────────────────
   var portfolioSet = new Set();
@@ -108,6 +114,11 @@ function renderCompare(data) {
   var _logScale          = (_saved && _saved.logScale)   || false;
   var _anonymize         = (_saved && _saved.anonymize)  || false;
   var _topN              = (_saved && _saved.topN  != null) ? _saved.topN : 25; // default: Top 25
+  var _comparisonLevel   = (_saved && validComparisonLevels.indexOf(_saved.comparisonLevel) !== -1) ? _saved.comparisonLevel : defaultComparisonLevel();
+  var dimCfg             = comparisonConfig(_comparisonLevel);
+  var dimField           = dimCfg.field;
+  var dimLabel           = dimCfg.label;
+  var useBeGeoKey        = _comparisonLevel === "partner";
 
   function getOfferOptions(pf) {
     var opts = pf ? Array.from(offersByPortfolio[pf] || []) : (function() {
@@ -123,10 +134,8 @@ function renderCompare(data) {
 
   // Scope context badge — top of page
   var scopeLabel = (window.APP_FILE_META && window.APP_FILE_META._scopeLabel) || "";
-  var scopeDesc = scopeType === "region"  ? "Comparing all <strong>Theaters</strong>"
-                : scopeType === "theater" ? "Comparing all <strong>Countries</strong> in " + escHtml(scopeLabel)
-                : scopeType === "begeoid" ? "Comparing <strong>Partners</strong> across BE GEO IDs: " + escHtml(scopeLabel)
-                : "Comparing <strong>Partners</strong> in " + escHtml(scopeLabel);
+  var scopeContext = scopeLabel ? " for " + escHtml(scopeLabel) : "";
+  var scopeDesc = 'Comparing by <strong>' + dimLabel + '</strong>' + scopeContext + '. Default for this dataset is <strong>' + comparisonConfig(defaultComparisonLevel()).label + '</strong>.';
   html += '<div class="alert alert-light border small py-2 mb-3"><i class="bi bi-bar-chart-line me-2 text-primary"></i>' + scopeDesc + '</div>';
 
   // Global filters row (Portfolio / Offer / Show / Log scale) — apply to all charts
@@ -154,8 +163,16 @@ function renderCompare(data) {
   html += '<option value="25"' + (_topN === 25 ? ' selected' : '') + '>Top 25</option>';
   html += '</select></div>';
 
-  // Log scale — pushed to the right end of the row
-  html += '<div class="d-flex flex-column ms-auto justify-content-end">';
+  // Comparison level
+  html += '<div class="d-flex flex-column ms-auto"><label class="small text-muted mb-1">Compare by</label>';
+  html += '<select id="cmp-comparison-level" class="form-select form-select-sm" style="min-width:150px">';
+  html += '<option value="theater"' + (_comparisonLevel === "theater" ? ' selected' : '') + '>Theater</option>';
+  html += '<option value="country"' + (_comparisonLevel === "country" ? ' selected' : '') + '>Country</option>';
+  html += '<option value="partner"' + (_comparisonLevel === "partner" ? ' selected' : '') + '>Partner</option>';
+  html += '</select></div>';
+
+  // Log scale / anonymize toggles
+  html += '<div class="d-flex flex-column justify-content-end">';
   html += '<div class="form-check form-switch mb-1">';
   html += '<input class="form-check-input" type="checkbox" id="cmp-log-toggle"' + (_logScale ? ' checked' : '') + '>';
   html += '<label class="form-check-label small text-muted" for="cmp-log-toggle">Log scale</label>';
@@ -243,7 +260,7 @@ function renderCompare(data) {
 
     // Save state
     if (window.APP_FILTER_STATE) {
-      window.APP_FILTER_STATE.compare = { fy: _selectedFY, portfolio: portfolio, offer: offer, logScale: _logScale, anonymize: _anonymize, topN: _topN };
+      window.APP_FILTER_STATE.compare = { fy: _selectedFY, portfolio: portfolio, offer: offer, logScale: _logScale, anonymize: _anonymize, topN: _topN, comparisonLevel: _comparisonLevel };
     }
 
     // Filter: eligible rows (MaxFlag=YES), optional portfolio + offer
@@ -700,6 +717,23 @@ function renderCompare(data) {
 
   var topNEl = document.getElementById("cmp-topn");
   if (topNEl) topNEl.addEventListener("change", render);
+
+  var comparisonLevelEl = document.getElementById("cmp-comparison-level");
+  if (comparisonLevelEl) comparisonLevelEl.addEventListener("change", function() {
+    _comparisonLevel = this.value;
+    if (window.APP_FILTER_STATE) {
+      window.APP_FILTER_STATE.compare = {
+        fy: _selectedFY,
+        portfolio: pfSelEl ? pfSelEl.value : _selectedPortfolio,
+        offer: ofSelEl ? ofSelEl.value : _selectedOffer,
+        logScale: _logScale,
+        anonymize: _anonymize,
+        topN: topNEl ? (parseInt(topNEl.value, 10) || 0) : _topN,
+        comparisonLevel: _comparisonLevel
+      };
+    }
+    renderCompare(data);
+  });
 
   render();
 }
